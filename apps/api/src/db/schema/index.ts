@@ -1,10 +1,17 @@
 /**
- * Lược đồ CSDL (Drizzle). Mỗi nhóm bảng nằm một file riêng và được xuất lại tại đây
- * (vd: `export * from './catalog.js';`). Danh sách bảng và cột: docs/TAI_LIEU_THIET_KE.md mục 5.3–5.4.
+ * Lược đồ CSDL (Drizzle) — NGUỒN SỰ THẬT. Mô tả tổng quan, sơ đồ và cách xem: docs/db/README.md.
  *
  * Quy ước:
- * - Tên bảng/cột `snake_case`, tiếng Anh.
- * - Tiền chứng từ: numeric(18,0); đơn giá/giá vốn: numeric(18,4); số lượng: numeric(14,3).
- * - Không dùng float cho tiền. Chứng từ không xóa cứng (có `deleted_at`).
+ * - Tên bảng/cột `snake_case` tiếng Anh (khai báo camelCase, Drizzle tự đổi: `casing: 'snake_case'`).
+ * - Tiền chứng từ numeric(18,0); đơn giá/giá vốn numeric(18,4); số lượng numeric(14,3). Không dùng float.
+ * - Chứng từ không xóa cứng (đổi `status`); danh mục dùng `deleted_at`.
+ * - Sổ cái (`stock_movements`, `debt_ledger`) chỉ thêm; tồn/số dư không sửa trực tiếp.
  */
-export {};
+export * from './enums.js';
+export * from './system.js';
+export * from './catalog.js';
+export * from './partners.js';
+export * from './inventory.js';
+export * from './sales.js';
+export * from './purchasing.js';
+export * from './finance.js';

@@ -1,0 +1,8 @@
+# File sinh tự động / quá lớn: bỏ khỏi chỉ mục codebase-memory để đồ thị gọn và không báo lỗi phân tích SQL.
+# Nguồn thật của chúng là apps/api/src/db/schema/*.ts và các controller/DTO.
+apps/api/drizzle/
+docs/db/schema.sql
+docs/db/schema.dbml
+docs/db/data-dictionary.md
+docs/api/openapi.json
+pnpm-lock.yaml

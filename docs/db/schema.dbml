@@ -1,0 +1,922 @@
+Project kiot {
+  database_type: 'PostgreSQL'
+  Note: '''
+    # Kiot — Lược đồ CSDL
+    Sinh tự động từ apps/api/src/db/schema (Drizzle). KHÔNG sửa tay — chạy `pnpm db:docs`.
+
+    Quy ước kiểu số: numeric(18,0) = tiền chứng từ (đồng); numeric(18,4) = đơn giá/giá vốn; numeric(14,3) = số lượng.
+    Chứng từ không xóa cứng (đổi status). Sổ cái stock_movements và debt_ledger chỉ thêm.
+  '''
+}
+
+enum cash_account_type {
+  "cash"
+  "bank"
+}
+
+enum cash_direction {
+  "in"
+  "out"
+}
+
+enum customer_type {
+  "individual"
+  "company"
+}
+
+enum doc_status {
+  "completed"
+  "cancelled"
+}
+
+enum import_status {
+  "queued"
+  "running"
+  "completed"
+  "failed"
+}
+
+enum import_type {
+  "products"
+  "customers"
+  "suppliers"
+  "price-books"
+}
+
+enum ledger_entry_type {
+  "opening"
+  "invoice"
+  "payment"
+  "return"
+  "adjustment"
+}
+
+enum order_status {
+  "draft"
+  "completed"
+  "cancelled"
+}
+
+enum party_type {
+  "customer"
+  "supplier"
+  "employee"
+}
+
+enum payment_method {
+  "cash"
+  "bank"
+}
+
+enum return_settlement {
+  "offset_debt"
+  "refund"
+}
+
+enum stock_ref_type {
+  "opening"
+  "goods_receipt"
+  "invoice"
+  "sales_return"
+  "purchase_return"
+  "adjustment"
+}
+
+enum supplier_kind {
+  "goods"
+  "driver"
+  "other"
+}
+
+enum user_role {
+  "owner"
+  "accountant"
+  "warehouse"
+  "clerk"
+}
+
+Table audit_logs {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid
+  action text [not null]
+  entity_type text [not null]
+  entity_id uuid
+  before jsonb
+  after jsonb
+  ip text
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (entity_type, entity_id) [name: 'audit_logs_entity_idx']
+    (created_at) [name: 'audit_logs_created_idx']
+  }
+
+  Note: '''Nhật ký thao tác — chỉ thêm, không sửa.'''
+}
+
+Table branches {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code text [not null, unique]
+  name text [not null]
+  address text
+  phone text
+  is_default boolean [not null, default: false]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (is_default) [name: 'branches_one_default', unique]
+  }
+
+  Note: '''Chi nhánh/kho. Hiện chỉ có 1 nhưng mọi chứng từ đều gắn chi nhánh.'''
+}
+
+Table cash_accounts {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name text [not null]
+  type cash_account_type [not null]
+  branch_id uuid
+  opening_balance numeric(18,0) [not null, default: 0]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: '''Quỹ: tiền mặt hoặc tài khoản ngân hàng.'''
+}
+
+Table cash_categories {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name text [not null]
+  direction cash_direction [not null]
+  is_system boolean [not null, default: false]
+  is_active boolean [not null, default: true]
+  sort_order integer [not null, default: 0]
+
+  Note: '''Danh mục thu chi chuẩn.'''
+}
+
+Table cash_transactions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code text [not null, unique]
+  branch_id uuid [not null]
+  direction cash_direction [not null]
+  amount numeric(18,0) [not null, note: 'Luôn dương; chiều thu/chi do direction']
+  category_id uuid [not null]
+  account_id uuid [not null]
+  occurred_at timestamptz [not null]
+  party_type party_type
+  party_id uuid [note: 'Đa hình theo party_type (không có khóa ngoại)']
+  party_name text
+  vehicle_ref text
+  ref_type text
+  ref_id uuid
+  status doc_status [not null, default: 'completed']
+  note text
+  created_by uuid
+  cancelled_at timestamptz
+  cancel_reason text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (occurred_at) [name: 'cash_transactions_time_idx']
+    (party_type, party_id) [name: 'cash_transactions_party_idx']
+    (account_id, occurred_at) [name: 'cash_transactions_account_idx']
+  }
+
+  Note: '''Phiếu thu/chi. amount luôn dương, chiều do direction. party_id đa hình theo party_type.
+CHECK cash_transactions_amount_pos: amount > 0'''
+}
+
+Table categories {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name text [not null]
+  parent_id uuid
+  sort_order integer [not null, default: 0]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+
+  indexes {
+    (parent_id) [name: 'categories_parent_idx']
+  }
+
+  Note: '''Nhóm hàng dạng cây (parent_id).'''
+}
+
+Table code_sequences {
+  prefix text [pk]
+  next_value bigint [not null, default: 1]
+  digits integer [not null, default: 6]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: '''Bộ đếm sinh mã chứng từ theo tiền tố (HD, DH, PN…).'''
+}
+
+Table company_profile {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name text [not null]
+  address text
+  phone text
+  email text
+  tax_code text
+  bank_name text
+  bank_account text
+  logo_url text
+  invoice_note text
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: '''Thông tin công ty (1 dòng) dùng cho mẫu in.'''
+}
+
+Table customer_invoice_profiles {
+  customer_id uuid [pk]
+  buyer_name text
+  company_name text
+  tax_code text
+  address text
+  email text
+  phone text
+  bank_name text
+  bank_account text
+
+  Note: '''Thông tin xuất hóa đơn VAT/điện tử của khách.'''
+}
+
+Table customers {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code text [not null, unique]
+  name text [not null]
+  type customer_type [not null, default: 'individual']
+  phone text [unique]
+  address text
+  facebook text
+  sales_owner_id uuid [note: 'Nhân viên phụ trách (ở KiotViet là "Nhóm khách hàng")']
+  default_price_book_id uuid [note: 'Bảng giá tự áp khi đặt hàng']
+  credit_limit numeric(18,0) [note: 'Hạn mức công nợ (cảnh báo mềm)']
+  payment_term_days integer
+  note text
+  is_active boolean [not null, default: true]
+  created_by uuid
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+
+  indexes {
+    (name) [name: 'customers_name_idx']
+    (sales_owner_id) [name: 'customers_sales_owner_idx']
+    (default_price_book_id) [name: 'customers_price_book_idx']
+  }
+
+  Note: '''Khách hàng. Công nợ không lưu ở đây: số dư = tổng debt_ledger (có thể âm). sales_owner_id = nhân viên phụ trách.'''
+}
+
+Table debt_ledger {
+  id uuid [pk, default: `gen_random_uuid()`]
+  party_type party_type [not null]
+  party_id uuid [not null, note: 'Đa hình theo party_type (không có khóa ngoại)']
+  entry_type ledger_entry_type [not null]
+  ref_type text
+  ref_id uuid
+  ref_code text
+  amount numeric(18,0) [not null, note: '+ tăng nợ, − giảm nợ']
+  occurred_at timestamptz [not null]
+  note text
+  created_at timestamptz [not null, default: `now()`]
+  created_by uuid
+
+  indexes {
+    (party_type, party_id, occurred_at) [name: 'debt_ledger_party_idx']
+    (ref_type, ref_id) [name: 'debt_ledger_ref_idx']
+  }
+
+  Note: '''Sổ cái công nợ — chỉ thêm. amount có dấu (+ tăng nợ, − giảm nợ). Số dư được phép âm. party_id đa hình nên không có khóa ngoại.
+CHECK debt_ledger_nonzero: amount <> 0'''
+}
+
+Table goods_receipt_items {
+  id uuid [pk, default: `gen_random_uuid()`]
+  receipt_id uuid [not null]
+  product_id uuid [not null]
+  qty numeric(14,3) [not null]
+  unit_cost numeric(18,4) [not null]
+  line_total numeric(18,0) [not null]
+  note text
+
+  indexes {
+    (receipt_id) [name: 'goods_receipt_items_receipt_idx']
+    (product_id) [name: 'goods_receipt_items_product_idx']
+  }
+
+  Note: '''Dòng hàng của phiếu nhập.
+CHECK goods_receipt_items_qty_pos: qty > 0'''
+}
+
+Table goods_receipts {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code text [not null, unique]
+  branch_id uuid [not null]
+  supplier_id uuid [not null]
+  status doc_status [not null, default: 'completed']
+  received_at timestamptz [not null]
+  supplier_invoice_no text
+  po_ref text [note: 'Mã phiếu đặt nhập (PDN…) dạng chữ, chỉ để đối chiếu']
+  subtotal numeric(18,0) [not null]
+  discount numeric(18,0) [not null, default: 0]
+  total numeric(18,0) [not null]
+  paid_amount numeric(18,0) [not null, default: 0]
+  received_by uuid
+  note text
+  created_by uuid
+  cancelled_at timestamptz
+  cancel_reason text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (supplier_id, received_at) [name: 'goods_receipts_supplier_idx']
+    (received_at) [name: 'goods_receipts_time_idx']
+  }
+
+  Note: '''Phiếu nhập hàng. po_ref chỉ là mã phiếu đặt nhập dạng chữ để đối chiếu.'''
+}
+
+Table idempotency_keys {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  key text [not null]
+  endpoint text [not null]
+  request_hash text [not null]
+  response_status integer
+  response_body jsonb
+  resource_type text
+  resource_id uuid
+  created_at timestamptz [not null, default: `now()`]
+  expires_at timestamptz [not null]
+
+  indexes {
+    (user_id, key) [name: 'idempotency_user_key_uq', unique]
+    (expires_at) [name: 'idempotency_expires_idx']
+  }
+
+  Note: '''Chống tạo trùng khi gửi lại yêu cầu (header Idempotency-Key).'''
+}
+
+Table import_jobs {
+  id uuid [pk, default: `gen_random_uuid()`]
+  type import_type [not null]
+  status import_status [not null, default: 'queued']
+  dry_run boolean [not null, default: true]
+  file_name text
+  total integer [not null, default: 0]
+  created integer [not null, default: 0]
+  updated integer [not null, default: 0]
+  failed integer [not null, default: 0]
+  errors jsonb
+  created_by uuid
+  created_at timestamptz [not null, default: `now()`]
+  finished_at timestamptz
+
+  Note: '''Công việc import Excel chạy nền.'''
+}
+
+Table invoice_items {
+  id uuid [pk, default: `gen_random_uuid()`]
+  invoice_id uuid [not null]
+  line_no integer [not null]
+  product_id uuid [not null]
+  product_code text [not null]
+  product_name text [not null]
+  unit text
+  qty numeric(14,3) [not null]
+  list_price numeric(18,4) [not null]
+  discount_per_unit numeric(18,4) [not null, default: 0, note: 'Giảm giá tính trên 1 đơn vị (số tiền, không phải %)']
+  unit_price numeric(18,4) [not null, note: 'list_price − discount_per_unit']
+  line_total numeric(18,0) [not null]
+  unit_cost numeric(18,4) [not null, default: 0, note: 'Giá vốn tại thời điểm bán (tính lãi gộp)']
+  is_gift boolean [not null, default: false]
+  note text
+
+  indexes {
+    (invoice_id) [name: 'invoice_items_invoice_idx']
+    (product_id) [name: 'invoice_items_product_idx']
+  }
+
+  Note: '''Dòng hóa đơn; lưu bản sao mã/tên/đơn vị/giá vốn tại thời điểm bán.
+CHECK invoice_items_qty_pos: qty > 0'''
+}
+
+Table invoice_payments {
+  id uuid [pk, default: `gen_random_uuid()`]
+  invoice_id uuid [not null]
+  method payment_method [not null]
+  account_id uuid [not null]
+  amount numeric(18,0) [not null]
+  paid_at timestamptz [not null]
+  cash_transaction_id uuid
+
+  indexes {
+    (invoice_id) [name: 'invoice_payments_invoice_idx']
+  }
+
+  Note: '''Khoản thanh toán lúc xuất hóa đơn (tiền mặt/chuyển khoản).
+CHECK invoice_payments_amount_pos: amount > 0'''
+}
+
+Table invoices {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code text [not null, unique]
+  root_invoice_id uuid [note: 'Hóa đơn gốc (bản sửa .nn)']
+  revision_no integer [not null, default: 0]
+  branch_id uuid [not null]
+  order_id uuid [unique]
+  customer_id uuid [not null]
+  price_book_id uuid [not null]
+  seller_id uuid
+  invoiced_at timestamptz [not null]
+  subtotal numeric(18,0) [not null]
+  discount numeric(18,0) [not null, default: 0]
+  total numeric(18,0) [not null]
+  paid_total numeric(18,0) [not null, default: 0, note: 'Đã thu khi tạo + đã cấn trừ về sau (cache của sổ cái)']
+  status doc_status [not null, default: 'completed']
+  ship_name text
+  ship_phone text
+  ship_address text
+  note text
+  created_by uuid
+  cancelled_at timestamptz
+  cancel_reason text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (customer_id, invoiced_at) [name: 'invoices_customer_idx']
+    (invoiced_at) [name: 'invoices_time_idx']
+    (status) [name: 'invoices_status_idx']
+    (root_invoice_id, revision_no) [name: 'invoices_root_rev_uq', unique]
+  }
+
+  Note: '''Hóa đơn bán. Không sửa sau khi tạo (hủy và tạo lại). root_invoice_id/revision_no dành cho bản sửa .nn.'''
+}
+
+Table order_items {
+  id uuid [pk, default: `gen_random_uuid()`]
+  order_id uuid [not null]
+  line_no integer [not null]
+  product_id uuid [not null]
+  qty numeric(14,3) [not null]
+  list_price numeric(18,4) [not null]
+  discount_per_unit numeric(18,4) [not null, default: 0, note: 'Giảm giá tính trên 1 đơn vị (số tiền, không phải %)']
+  unit_price numeric(18,4) [not null]
+  line_total numeric(18,0) [not null]
+  is_gift boolean [not null, default: false]
+  note text
+
+  indexes {
+    (order_id) [name: 'order_items_order_idx']
+    (product_id) [name: 'order_items_product_idx']
+  }
+
+  Note: '''Dòng hàng của đơn đặt hàng.
+CHECK order_items_qty_pos: qty > 0'''
+}
+
+Table orders {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code text [not null, unique]
+  branch_id uuid [not null]
+  customer_id uuid [not null]
+  status order_status [not null, default: 'draft']
+  price_book_id uuid [not null]
+  seller_id uuid
+  ordered_at timestamptz [not null]
+  subtotal numeric(18,0) [not null, default: 0]
+  discount numeric(18,0) [not null, default: 0]
+  total numeric(18,0) [not null, default: 0]
+  deposit_amount numeric(18,0) [not null, default: 0, note: 'Tiền đặt cọc đã thu']
+  ship_name text
+  ship_phone text
+  ship_address text
+  package_count integer
+  weight_g numeric(12,2)
+  note text
+  created_by uuid
+  cancelled_at timestamptz
+  cancel_reason text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (customer_id, ordered_at) [name: 'orders_customer_idx']
+    (status) [name: 'orders_status_idx']
+  }
+
+  Note: '''Đặt hàng. draft = phiếu tạm giữ hàng; một đơn → tối đa một hóa đơn.'''
+}
+
+Table payment_allocations {
+  id uuid [pk, default: `gen_random_uuid()`]
+  cash_transaction_id uuid [not null]
+  invoice_id uuid [not null]
+  amount numeric(18,0) [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (cash_transaction_id, invoice_id) [name: 'payment_allocations_uq', unique]
+    (invoice_id) [name: 'payment_allocations_invoice_idx']
+  }
+
+  Note: '''Cấn trừ phiếu thu vào từng hóa đơn.
+CHECK payment_allocations_amount_pos: amount > 0'''
+}
+
+Table price_book_items {
+  price_book_id uuid [not null]
+  product_id uuid [not null]
+  price numeric(18,4) [not null]
+  updated_by uuid
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (price_book_id, product_id) [pk]
+    (product_id) [name: 'price_book_items_product_idx']
+  }
+
+  Note: '''Giá của từng sản phẩm trong từng bảng giá.'''
+}
+
+Table price_books {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code text [not null, unique]
+  name text [not null]
+  with_vat boolean [not null, default: false]
+  is_default boolean [not null, default: false]
+  is_active boolean [not null, default: true]
+  sort_order integer [not null, default: 0]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (is_default) [name: 'price_books_one_default', unique]
+  }
+
+  Note: '''Bảng giá theo hạng khách (Chung, Lớn, Vừa, VIP và 3 bản VAT). Thiếu giá thì lùi về bảng mặc định.'''
+}
+
+Table product_images {
+  id uuid [pk, default: `gen_random_uuid()`]
+  product_id uuid [not null]
+  url text [not null]
+  storage_key text
+  sort_order integer [not null, default: 0]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (product_id) [name: 'product_images_product_idx']
+  }
+
+  Note: '''Ảnh sản phẩm.'''
+}
+
+Table products {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code text [not null, unique]
+  name text [not null]
+  category_id uuid
+  unit text [not null, default: 'Cái', note: 'Đơn vị tính (quy cách thường nằm trong tên hàng)']
+  base_price numeric(18,4) [not null, default: 0, note: 'Giá bán trong Bảng giá chung']
+  cost_price numeric(18,4) [not null, default: 0, note: 'Giá vốn bình quân gia quyền']
+  last_purchase_price numeric(18,4)
+  min_stock numeric(14,3)
+  max_stock numeric(14,3)
+  location text
+  description text
+  weight_g numeric(12,2)
+  is_active boolean [not null, default: true]
+  is_sellable boolean [not null, default: true]
+  created_by uuid
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+
+  indexes {
+    (category_id) [name: 'products_category_idx']
+    (name) [name: 'products_name_idx']
+    (is_active) [name: 'products_active_idx']
+  }
+
+  Note: '''Hàng hóa. Mỗi quy cách là một SKU riêng; tồn kho ở bảng stocks.'''
+}
+
+Table purchase_return_items {
+  id uuid [pk, default: `gen_random_uuid()`]
+  return_id uuid [not null]
+  product_id uuid [not null]
+  qty numeric(14,3) [not null]
+  return_price numeric(18,4) [not null]
+  line_total numeric(18,0) [not null]
+
+  indexes {
+    (return_id) [name: 'purchase_return_items_return_idx']
+  }
+
+  Note: '''Dòng hàng của phiếu trả nhập.
+CHECK purchase_return_items_qty_pos: qty > 0'''
+}
+
+Table purchase_returns {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code text [not null, unique]
+  branch_id uuid [not null]
+  supplier_id uuid [not null]
+  goods_receipt_id uuid
+  status doc_status [not null, default: 'completed']
+  returned_at timestamptz [not null]
+  total numeric(18,0) [not null]
+  settlement return_settlement [not null, default: 'offset_debt']
+  refund_account_id uuid
+  reason text
+  note text
+  created_by uuid
+  cancelled_at timestamptz
+  cancel_reason text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (supplier_id, returned_at) [name: 'purchase_returns_supplier_idx']
+  }
+
+  Note: '''Trả hàng nhập (trả lại nhà cung cấp).'''
+}
+
+Table refresh_tokens {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  token_hash text [not null, unique]
+  expires_at timestamptz [not null]
+  revoked_at timestamptz
+  user_agent text
+  ip text
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id) [name: 'refresh_tokens_user_idx']
+  }
+
+  Note: '''Refresh token (lưu băm, không lưu token thô).'''
+}
+
+Table sales_return_items {
+  id uuid [pk, default: `gen_random_uuid()`]
+  return_id uuid [not null]
+  product_id uuid [not null]
+  qty numeric(14,3) [not null]
+  return_price numeric(18,4) [not null]
+  line_total numeric(18,0) [not null]
+  restock boolean [not null, default: true, note: 'true = nhập lại kho']
+  restock_cost numeric(18,4)
+  reason text
+
+  indexes {
+    (return_id) [name: 'sales_return_items_return_idx']
+  }
+
+  Note: '''Dòng hàng trả lại của khách.
+CHECK sales_return_items_qty_pos: qty > 0'''
+}
+
+Table sales_returns {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code text [not null, unique]
+  branch_id uuid [not null]
+  customer_id uuid [not null]
+  invoice_id uuid
+  status doc_status [not null, default: 'completed']
+  returned_at timestamptz [not null]
+  total numeric(18,0) [not null]
+  settlement return_settlement [not null, default: 'offset_debt']
+  refund_account_id uuid
+  received_by uuid
+  note text
+  created_by uuid
+  cancelled_at timestamptz
+  cancel_reason text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (customer_id, returned_at) [name: 'sales_returns_customer_idx']
+    (invoice_id) [name: 'sales_returns_invoice_idx']
+  }
+
+  Note: '''Trả hàng bán. Có thể không tham chiếu hóa đơn; mặc định bù trừ công nợ.'''
+}
+
+Table stock_movements {
+  id uuid [pk, default: `gen_random_uuid()`]
+  branch_id uuid [not null]
+  product_id uuid [not null]
+  qty_delta numeric(14,3) [not null, note: 'Số lượng thay đổi: + nhập, − xuất']
+  unit_cost numeric(18,4)
+  ref_type stock_ref_type [not null]
+  ref_id uuid
+  ref_code text
+  occurred_at timestamptz [not null]
+  created_at timestamptz [not null, default: `now()`]
+  created_by uuid
+
+  indexes {
+    (product_id, occurred_at) [name: 'stock_movements_product_time_idx']
+    (ref_type, ref_id) [name: 'stock_movements_ref_idx']
+  }
+
+  Note: '''Sổ cái kho — chỉ thêm. Phục vụ thẻ kho.
+CHECK stock_movements_nonzero: qtyDelta <> 0'''
+}
+
+Table stocks {
+  branch_id uuid [not null]
+  product_id uuid [not null]
+  on_hand numeric(14,3) [not null, default: 0, note: 'Tồn thực tế; không âm (CHECK)']
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (branch_id, product_id) [pk]
+  }
+
+  Note: '''Tồn hiện tại theo chi nhánh. Chỉ cập nhật cùng transaction với stock_movements.
+CHECK stocks_on_hand_nonneg: onHand >= 0'''
+}
+
+Table suppliers {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code text [not null, unique]
+  name text [not null]
+  kind supplier_kind [not null, default: 'goods']
+  phone text
+  address text
+  tax_code text
+  note text
+  is_active boolean [not null, default: true]
+  created_by uuid
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+
+  indexes {
+    (name) [name: 'suppliers_name_idx']
+    (kind) [name: 'suppliers_kind_idx']
+  }
+
+  Note: '''Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng khác.'''
+}
+
+Table users {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code text [not null, unique]
+  username text [not null, unique]
+  full_name text [not null]
+  password_hash text [not null]
+  role user_role [not null]
+  phone text
+  default_branch_id uuid
+  is_active boolean [not null, default: true]
+  last_login_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+
+  indexes {
+    (role) [name: 'users_role_idx']
+  }
+
+  Note: '''Người dùng đăng nhập. Vai trò cố định (enum user_role).'''
+}
+
+Ref: audit_logs.user_id > users.id [delete: set null]
+Ref: cash_accounts.branch_id > branches.id
+Ref: cash_transactions.branch_id > branches.id
+Ref: cash_transactions.category_id > cash_categories.id
+Ref: cash_transactions.account_id > cash_accounts.id
+Ref: cash_transactions.created_by > users.id
+Ref: categories.parent_id > categories.id
+Ref: customer_invoice_profiles.customer_id > customers.id [delete: cascade]
+Ref: customers.sales_owner_id > users.id
+Ref: customers.default_price_book_id > price_books.id
+Ref: customers.created_by > users.id
+Ref: debt_ledger.created_by > users.id
+Ref: goods_receipt_items.receipt_id > goods_receipts.id [delete: cascade]
+Ref: goods_receipt_items.product_id > products.id
+Ref: goods_receipts.branch_id > branches.id
+Ref: goods_receipts.supplier_id > suppliers.id
+Ref: goods_receipts.received_by > users.id
+Ref: goods_receipts.created_by > users.id
+Ref: idempotency_keys.user_id > users.id
+Ref: import_jobs.created_by > users.id
+Ref: invoice_items.invoice_id > invoices.id [delete: cascade]
+Ref: invoice_items.product_id > products.id
+Ref: invoice_payments.invoice_id > invoices.id [delete: cascade]
+Ref: invoice_payments.account_id > cash_accounts.id
+Ref: invoice_payments.cash_transaction_id > cash_transactions.id
+Ref: invoices.root_invoice_id > invoices.id
+Ref: invoices.branch_id > branches.id
+Ref: invoices.order_id > orders.id
+Ref: invoices.customer_id > customers.id
+Ref: invoices.price_book_id > price_books.id
+Ref: invoices.seller_id > users.id
+Ref: invoices.created_by > users.id
+Ref: order_items.order_id > orders.id [delete: cascade]
+Ref: order_items.product_id > products.id
+Ref: orders.branch_id > branches.id
+Ref: orders.customer_id > customers.id
+Ref: orders.price_book_id > price_books.id
+Ref: orders.seller_id > users.id
+Ref: orders.created_by > users.id
+Ref: payment_allocations.cash_transaction_id > cash_transactions.id
+Ref: payment_allocations.invoice_id > invoices.id
+Ref: price_book_items.price_book_id > price_books.id [delete: cascade]
+Ref: price_book_items.product_id > products.id [delete: cascade]
+Ref: price_book_items.updated_by > users.id
+Ref: product_images.product_id > products.id [delete: cascade]
+Ref: products.category_id > categories.id
+Ref: products.created_by > users.id
+Ref: purchase_return_items.return_id > purchase_returns.id [delete: cascade]
+Ref: purchase_return_items.product_id > products.id
+Ref: purchase_returns.branch_id > branches.id
+Ref: purchase_returns.supplier_id > suppliers.id
+Ref: purchase_returns.goods_receipt_id > goods_receipts.id
+Ref: purchase_returns.refund_account_id > cash_accounts.id
+Ref: purchase_returns.created_by > users.id
+Ref: refresh_tokens.user_id > users.id [delete: cascade]
+Ref: sales_return_items.return_id > sales_returns.id [delete: cascade]
+Ref: sales_return_items.product_id > products.id
+Ref: sales_returns.branch_id > branches.id
+Ref: sales_returns.customer_id > customers.id
+Ref: sales_returns.invoice_id > invoices.id
+Ref: sales_returns.refund_account_id > cash_accounts.id
+Ref: sales_returns.received_by > users.id
+Ref: sales_returns.created_by > users.id
+Ref: stock_movements.branch_id > branches.id
+Ref: stock_movements.product_id > products.id
+Ref: stock_movements.created_by > users.id
+Ref: stocks.branch_id > branches.id
+Ref: stocks.product_id > products.id
+Ref: suppliers.created_by > users.id
+Ref: users.default_branch_id > branches.id
+
+TableGroup "Hệ thống" {
+  branches
+  users
+  refresh_tokens
+  audit_logs
+  code_sequences
+  company_profile
+  idempotency_keys
+  import_jobs
+}
+
+TableGroup "Hàng hóa & giá" {
+  categories
+  products
+  product_images
+  price_books
+  price_book_items
+}
+
+TableGroup "Tồn kho" {
+  stocks
+  stock_movements
+}
+
+TableGroup "Đối tác" {
+  customers
+  customer_invoice_profiles
+  suppliers
+}
+
+TableGroup "Đơn hàng" {
+  orders
+  order_items
+  invoices
+  invoice_items
+  invoice_payments
+  sales_returns
+  sales_return_items
+}
+
+TableGroup "Mua hàng" {
+  goods_receipts
+  goods_receipt_items
+  purchase_returns
+  purchase_return_items
+}
+
+TableGroup "Sổ quỹ & công nợ" {
+  cash_accounts
+  cash_categories
+  cash_transactions
+  debt_ledger
+  payment_allocations
+}

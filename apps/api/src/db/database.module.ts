@@ -34,7 +34,8 @@ export type Database = NodePgDatabase<typeof schema>;
     {
       provide: DB,
       inject: [PG_POOL],
-      useFactory: (pool: Pool): Database => drizzle({ client: pool, schema }),
+      useFactory: (pool: Pool): Database =>
+        drizzle({ client: pool, schema, casing: 'snake_case' }),
     },
   ],
   exports: [DB, PG_POOL],
