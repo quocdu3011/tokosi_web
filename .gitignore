@@ -1,0 +1,29 @@
+# Phụ thuộc & build
+node_modules/
+dist/
+.next/
+.turbo/
+coverage/
+*.tsbuildinfo
+
+# Biến môi trường (chỉ commit *.example)
+.env
+.env.*
+!.env.example
+
+# Log & hệ điều hành
+*.log
+.DS_Store
+Thumbs.db
+
+# ⚠️ DỮ LIỆU THẬT (khách hàng, công nợ...) TUYỆT ĐỐI KHÔNG COMMIT
+# File xuất từ KiotViet và mọi bản sao dữ liệu thật để NGOÀI repo (vd: E:\Web\Data).
+data/
+*.xlsx
+*.xls
+*.csv
+*.sql.gz
+*.dump
+
+# Công cụ phân tích cục bộ
+_rea/

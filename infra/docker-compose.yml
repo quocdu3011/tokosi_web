@@ -1,0 +1,25 @@
+# Môi trường phát triển cục bộ: PostgreSQL.
+# Chạy:  pnpm db:up     |  Dừng: pnpm db:down
+# Mật khẩu dưới đây CHỈ dùng cho máy dev; production dùng secret riêng.
+services:
+  postgres:
+    image: postgres:17
+    container_name: kiot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kiot
+      POSTGRES_PASSWORD: kiot_dev_password
+      POSTGRES_DB: kiot
+      TZ: UTC
+    ports:
+      - '5432:5432'
+    volumes:
+      - kiot_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U kiot -d kiot']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  kiot_pgdata:
