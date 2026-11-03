@@ -1,0 +1,64 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Kiểm tra server còn sống (không cần đăng nhập)",
+        "tags": [
+          "Hệ thống"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Kiot API",
+    "description": "API hệ thống quản lý bán hàng sỉ. Quy ước chung (tiền là chuỗi thập phân, lỗi, phân trang, idempotency): xem docs/api/README.md.",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "ok"
+          },
+          "time": {
+            "type": "string",
+            "example": "2026-11-03T07:11:16.170Z",
+            "description": "Thời gian server (ISO 8601 UTC)"
+          }
+        },
+        "required": [
+          "status",
+          "time"
+        ]
+      }
+    }
+  }
+}

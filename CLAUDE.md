@@ -3,6 +3,7 @@
 Hệ thống **quản lý bán hàng sỉ nội bộ** cho một công ty, thay thế KiotViet.
 Tài liệu thiết kế gốc: [`docs/TAI_LIEU_THIET_KE.md`](docs/TAI_LIEU_THIET_KE.md) — **đọc mục liên quan trước khi làm tính năng**
 (phạm vi: mục 2.2; dữ liệu: mục 5; lộ trình 2 tháng: mục 13).
+Đối với những chức năng chưa quen thuộc, **đừng viết từ con số 0**. Hãy tìm kiếm các dự án mã nguồn mở trên GitHub để so sánh ý tưởng, cách tổ chức và các bẫy thường gặp trước khi bắt tay làm.
 
 ## Cấu trúc
 
@@ -16,15 +17,24 @@ docs/           Tài liệu thiết kế, ERD, ADR
 
 ## Lệnh thường dùng (chạy ở thư mục gốc)
 
-| Lệnh                                                        | Việc                                   |
-| ----------------------------------------------------------- | -------------------------------------- |
-| `pnpm install`                                              | Cài phụ thuộc                          |
-| `pnpm dev`                                                  | Chạy web + api ở chế độ phát triển     |
-| `pnpm build` / `pnpm lint` / `pnpm typecheck` / `pnpm test` | Qua Turborepo (có cache)               |
-| `pnpm db:up` / `pnpm db:down`                               | Bật/tắt PostgreSQL cục bộ (cần Docker) |
-| `pnpm --filter @kiot/api test`                              | Chạy test của một gói                  |
+| Lệnh                                                        | Việc                                                                 |
+| ----------------------------------------------------------- | -------------------------------------------------------------------- |
+| `pnpm install`                                              | Cài phụ thuộc                                                        |
+| `pnpm dev`                                                  | Chạy web + api ở chế độ phát triển                                   |
+| `pnpm build` / `pnpm lint` / `pnpm typecheck` / `pnpm test` | Qua Turborepo (có cache)                                             |
+| `pnpm db:up` / `pnpm db:down`                               | Bật/tắt PostgreSQL cục bộ (cần Docker)                               |
+| `pnpm --filter @kiot/api test`                              | Chạy test của một gói                                                |
+| `pnpm --filter @kiot/api test:e2e`                          | Test e2e của API (không cần CSDL thật)                               |
+| `pnpm --filter @kiot/api openapi:export`                    | Xuất `docs/api/openapi.json` (chạy khi đổi endpoint/DTO, commit kèm) |
 
 Mọi PR phải qua: `lint`, `typecheck`, `test`, `build` (CI chạy đúng bộ này).
+
+## Hợp đồng API (backend ↔ frontend)
+
+- Frontend đọc `docs/api/` để làm song song; đó là **hợp đồng**. Khi thêm/sửa/xóa endpoint hoặc field, **cập nhật `docs/api/` cùng PR** và ghi vào "Nhật ký thay đổi" trong `docs/api/README.md`.
+- Quy ước đã chốt: JSON camelCase; tiền/giá/số lượng là **chuỗi thập phân**; thời gian ISO 8601 UTC; phân trang `data` + `meta`; lỗi `{ code, message, details, requestId }`; tạo chứng từ cần `Idempotency-Key`.
+- Swagger tại `/api/docs`. Mọi controller gắn `@ApiTags`, `@ApiOperation`, `@ApiOkResponse`; mọi DTO có `@ApiProperty` và validator `class-validator`. Sau khi đổi endpoint/DTO chạy `pnpm --filter @kiot/api openapi:export` rồi commit `docs/api/openapi.json`.
+- Backend phải khớp đúng cấu trúc trong `docs/api/endpoints.md`; nếu cần khác thì sửa tài liệu trước và báo frontend.
 
 ## Quy tắc BẮT BUỘC (nghiệp vụ tiền / kho / công nợ)
 

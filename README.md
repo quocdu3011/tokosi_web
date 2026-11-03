@@ -4,6 +4,7 @@ Hệ thống quản lý bán hàng sỉ nội bộ (hàng hóa, mua hàng, đơn
 
 - Thiết kế, phạm vi, lộ trình: [`docs/TAI_LIEU_THIET_KE.md`](docs/TAI_LIEU_THIET_KE.md)
 - Quy tắc cho AI agent / dev: [`CLAUDE.md`](CLAUDE.md)
+- **Tài liệu API cho frontend:** [`docs/api/README.md`](docs/api/README.md) (quy ước chung) và [`docs/api/endpoints.md`](docs/api/endpoints.md) (danh sách endpoint)
 
 ## Công nghệ
 
@@ -26,6 +27,7 @@ Hệ thống quản lý bán hàng sỉ nội bộ (hàng hóa, mua hàng, đơn
 ```bash
 pnpm install
 pnpm dev          # web: http://localhost:3000 — api: http://localhost:3001 (đổi bằng biến PORT)
+                  # Swagger UI: http://localhost:3001/api/docs
 pnpm lint && pnpm typecheck && pnpm test && pnpm build
 ```
 
