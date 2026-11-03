@@ -22,6 +22,231 @@
           "Hệ thống"
         ]
       }
+    },
+    "/api/v1/permissions/catalog": {
+      "get": {
+        "operationId": "RolesController_catalog",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionCatalogDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Không có quyền `role.manage` (chỉ Quản lý)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh mục quyền, gom theo phân hệ (để dựng ma trận phân quyền)",
+        "tags": [
+          "Phân quyền"
+        ]
+      }
+    },
+    "/api/v1/roles": {
+      "get": {
+        "operationId": "RolesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoleSummaryDto"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Không có quyền `role.manage` (chỉ Quản lý)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách vai trò kèm số quyền và số người dùng",
+        "tags": [
+          "Phân quyền"
+        ]
+      }
+    },
+    "/api/v1/roles/{role}/permissions": {
+      "get": {
+        "operationId": "RolesController_get",
+        "parameters": [
+          {
+            "name": "role",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "manager",
+                "assistant",
+                "accountant",
+                "warehouse",
+                "driver",
+                "sales",
+                "marketing"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RolePermissionsDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Không có quyền `role.manage` (chỉ Quản lý)"
+          },
+          "404": {
+            "description": "Vai trò không tồn tại"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Quyền hiện tại của một vai trò",
+        "tags": [
+          "Phân quyền"
+        ]
+      },
+      "put": {
+        "description": "Thay thế toàn bộ bộ quyền cũ. Server tự thêm các quyền bắt buộc đi kèm (trả trong `autoAdded`). Có hiệu lực ngay cho mọi người dùng thuộc vai trò đó, không cần đăng nhập lại.",
+        "operationId": "RolesController_set",
+        "parameters": [
+          {
+            "name": "role",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "manager",
+                "assistant",
+                "accountant",
+                "warehouse",
+                "driver",
+                "sales",
+                "marketing"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetRolePermissionsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetRolePermissionsResultDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Không có quyền `role.manage` (chỉ Quản lý)"
+          },
+          "409": {
+            "description": "`ROLE_LOCKED`: không chỉnh được vai trò Quản lý"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Đặt lại toàn bộ quyền của một vai trò",
+        "tags": [
+          "Phân quyền"
+        ]
+      }
+    },
+    "/api/v1/roles/{role}/permissions/reset": {
+      "post": {
+        "operationId": "RolesController_reset",
+        "parameters": [
+          {
+            "name": "role",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "manager",
+                "assistant",
+                "accountant",
+                "warehouse",
+                "driver",
+                "sales",
+                "marketing"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetRolePermissionsResultDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Không có quyền `role.manage` (chỉ Quản lý)"
+          },
+          "409": {
+            "description": "`ROLE_LOCKED`: không chỉnh được vai trò Quản lý"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Khôi phục cấu hình mặc định (đề xuất ban đầu) của một vai trò",
+        "tags": [
+          "Phân quyền"
+        ]
+      }
     }
   },
   "info": {
@@ -57,6 +282,236 @@
         "required": [
           "status",
           "time"
+        ]
+      },
+      "PermissionDefDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "invoice.create"
+          },
+          "label": {
+            "type": "string",
+            "example": "Xuất hóa đơn"
+          },
+          "description": {
+            "type": "string"
+          },
+          "scopable": {
+            "type": "boolean",
+            "description": "Có thể chọn phạm vi \"chỉ của mình\""
+          },
+          "requires": {
+            "description": "Quyền bắt buộc đi kèm (tự được thêm khi lưu)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lockedToAdmin": {
+            "type": "boolean",
+            "description": "Chỉ vai trò Quản lý có; không thể cấp cho vai trò khác"
+          }
+        },
+        "required": [
+          "code",
+          "label",
+          "scopable",
+          "requires",
+          "lockedToAdmin"
+        ]
+      },
+      "PermissionModuleDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "sales"
+          },
+          "label": {
+            "type": "string",
+            "example": "Đơn hàng"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PermissionDefDto"
+            }
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "permissions"
+        ]
+      },
+      "PermissionCatalogDto": {
+        "type": "object",
+        "properties": {
+          "modules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PermissionModuleDto"
+            }
+          }
+        },
+        "required": [
+          "modules"
+        ]
+      },
+      "RoleSummaryDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "manager",
+              "assistant",
+              "accountant",
+              "warehouse",
+              "driver",
+              "sales",
+              "marketing"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "example": "Kế toán"
+          },
+          "locked": {
+            "type": "boolean",
+            "description": "Vai trò Quản lý: luôn đủ quyền, không chỉnh được"
+          },
+          "permissionCount": {
+            "type": "number"
+          },
+          "userCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "role",
+          "label",
+          "locked",
+          "permissionCount",
+          "userCount"
+        ]
+      },
+      "GrantDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "invoice.view",
+            "description": "Mã quyền trong danh mục (GET /permissions/catalog)"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "all",
+              "own"
+            ],
+            "example": "own",
+            "description": "`all` = toàn bộ dữ liệu; `own` = chỉ dữ liệu của mình (chỉ áp dụng quyền có `scopable`)"
+          }
+        },
+        "required": [
+          "code",
+          "scope"
+        ]
+      },
+      "RolePermissionsDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "manager",
+              "assistant",
+              "accountant",
+              "warehouse",
+              "driver",
+              "sales",
+              "marketing"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrantDto"
+            }
+          }
+        },
+        "required": [
+          "role",
+          "label",
+          "locked",
+          "permissions"
+        ]
+      },
+      "SetRolePermissionsDto": {
+        "type": "object",
+        "properties": {
+          "permissions": {
+            "description": "Bộ quyền MỚI của vai trò (thay thế toàn bộ bộ cũ)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrantDto"
+            }
+          }
+        },
+        "required": [
+          "permissions"
+        ]
+      },
+      "SetRolePermissionsResultDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "manager",
+              "assistant",
+              "accountant",
+              "warehouse",
+              "driver",
+              "sales",
+              "marketing"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrantDto"
+            }
+          },
+          "autoAdded": {
+            "description": "Quyền được tự thêm vì là điều kiện bắt buộc của quyền khác",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "role",
+          "label",
+          "locked",
+          "permissions",
+          "autoAdded"
         ]
       }
     }

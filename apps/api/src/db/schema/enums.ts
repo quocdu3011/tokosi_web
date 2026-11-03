@@ -1,10 +1,18 @@
 import { pgEnum } from 'drizzle-orm/pg-core';
 
+/**
+ * Vai trò theo cơ cấu thực tế của công ty:
+ * manager = Quản lý · assistant = Trợ lý · accountant = Kế toán · warehouse = Kho ·
+ * driver = Lái xe · sales = Sale · marketing = Marketing.
+ */
 export const userRole = pgEnum('user_role', [
-  'owner',
+  'manager',
+  'assistant',
   'accountant',
   'warehouse',
-  'clerk',
+  'driver',
+  'sales',
+  'marketing',
 ]);
 export const customerType = pgEnum('customer_type', ['individual', 'company']);
 export const supplierKind = pgEnum('supplier_kind', [
@@ -64,3 +72,6 @@ export const importStatus = pgEnum('import_status', [
   'completed',
   'failed',
 ]);
+
+/** Phạm vi của một quyền: toàn bộ dữ liệu hoặc chỉ dữ liệu của chính người dùng. */
+export const permissionScope = pgEnum('permission_scope', ['all', 'own']);

@@ -67,12 +67,12 @@ Endpoint danh sách dùng phân trang theo trang:
 GET /products?page=1&limit=20&sort=-createdAt&q=quat&categoryId=...
 ```
 
-| Tham số | Mặc định | Ghi chú                                                                    |
-| ------- | -------- | -------------------------------------------------------------------------- |
-| `page`  | `1`      | Bắt đầu từ 1                                                               |
-| `limit` | `20`     | Tối đa `100`                                                               |
-| `sort`  | tùy API  | Tên field; thêm `-` phía trước để giảm dần. Nhiều field cách nhau dấu phẩy |
-| `q`     | —        | Tìm **không phân biệt dấu/hoa thường** theo mã, tên, SĐT (tùy endpoint)    |
+| Tham số | Mặc định | Ghi chú                                                                                                                                                                             |
+| ------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `page`  | `1`      | Bắt đầu từ 1                                                                                                                                                                        |
+| `limit` | `20`     | Tối đa `100`                                                                                                                                                                        |
+| `sort`  | tùy API  | Tên field; thêm `-` phía trước để giảm dần. Nhiều field cách nhau dấu phẩy                                                                                                          |
+| `q`     | —        | Tìm **không phân biệt dấu/hoa thường** theo mã, tên, SĐT (tùy endpoint); nhiều từ cách nhau bằng dấu cách = **mọi từ đều phải có**, khớp một phần (vd `quat kep` ra "Quạt kẹp bàn") |
 
 Response:
 
@@ -132,41 +132,108 @@ Các thao tác tạo chứng từ ảnh hưởng tiền/kho/nợ phải gửi `I
 
 ## 7. Enum
 
-| Tên                                | Giá trị                                                                           |
-| ---------------------------------- | --------------------------------------------------------------------------------- |
-| `role`                             | `owner` (chủ), `accountant` (kế toán), `warehouse` (thủ kho), `clerk` (nhập liệu) |
-| `customer.type`                    | `individual`, `company`                                                           |
-| `supplier.kind`                    | `goods` (hàng hóa), `driver` (lái xe), `other`                                    |
-| `order.status`                     | `draft` (phiếu tạm), `completed` (đã xuất hóa đơn), `cancelled`                   |
-| `invoice.status`                   | `completed`, `cancelled`                                                          |
-| `receipt.status` / `return.status` | `completed`, `cancelled`                                                          |
-| `payment.method`                   | `cash` (tiền mặt), `bank` (chuyển khoản)                                          |
-| `cashAccount.type`                 | `cash`, `bank`                                                                    |
-| `cash.direction`                   | `in` (thu), `out` (chi)                                                           |
-| `party.type`                       | `customer`, `supplier`, `employee`                                                |
-| `return.settlement`                | `offset_debt` (bù trừ công nợ), `refund` (hoàn tiền)                              |
-| `ledger.entryType`                 | `opening`, `invoice`, `payment`, `return`, `adjustment`                           |
+| Tên                                | Giá trị                                                                                                                                          |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `role`                             | `manager` (Quản lý), `assistant` (Trợ lý), `accountant` (Kế toán), `warehouse` (Kho), `driver` (Lái xe), `sales` (Sale), `marketing` (Marketing) |
+| `customer.type`                    | `individual`, `company`                                                                                                                          |
+| `supplier.kind`                    | `goods` (hàng hóa), `driver` (lái xe), `other`                                                                                                   |
+| `order.status`                     | `draft` (phiếu tạm), `completed` (đã xuất hóa đơn), `cancelled`                                                                                  |
+| `invoice.status`                   | `completed`, `cancelled`                                                                                                                         |
+| `receipt.status` / `return.status` | `completed`, `cancelled`                                                                                                                         |
+| `payment.method`                   | `cash` (tiền mặt), `bank` (chuyển khoản)                                                                                                         |
+| `cashAccount.type`                 | `cash`, `bank`                                                                                                                                   |
+| `cash.direction`                   | `in` (thu), `out` (chi)                                                                                                                          |
+| `party.type`                       | `customer`, `supplier`, `employee`                                                                                                               |
+| `return.settlement`                | `offset_debt` (bù trừ công nợ), `refund` (hoàn tiền)                                                                                             |
+| `ledger.entryType`                 | `opening`, `invoice`, `payment`, `return`, `adjustment`                                                                                          |
 
 ## 8. Phân quyền
 
-4 vai trò cố định ở MVP. `GET /auth/me` trả `role` và mảng `permissions` (chuỗi dạng `invoice.create`) — **frontend ẩn/khóa nút theo `permissions`, không hard-code theo `role`**.
+**Quyền của từng vai trò do Quản lý cấu hình trong hệ thống** (màn hình _Phân quyền_, API ở [`endpoints.md`](endpoints.md) mục 10), không cố định trong mã. Có 7 vai trò theo cơ cấu công ty:
 
-Bảng dưới là **đề xuất ban đầu, chờ xác nhận với kế toán**:
+| `role`       | Tên hiển thị |
+| ------------ | ------------ |
+| `manager`    | Quản lý      |
+| `assistant`  | Trợ lý       |
+| `accountant` | Kế toán      |
+| `warehouse`  | Kho          |
+| `driver`     | Lái xe       |
+| `sales`      | Sale         |
+| `marketing`  | Marketing    |
 
-| Chức năng                              | owner | accountant |   warehouse   | clerk |
-| -------------------------------------- | :---: | :--------: | :-----------: | :---: |
-| Hàng hóa: xem                          |   ✔   |     ✔      |       ✔       |   ✔   |
-| Hàng hóa: thêm/sửa, thiết lập giá      |   ✔   |     ✔      | ✔ (không giá) |   ✖   |
-| **Xem giá vốn / giá nhập**             |   ✔   |     ✔      |       ✖       |   ✖   |
-| Nhà cung cấp, nhập hàng, trả hàng nhập |   ✔   |     ✔      |       ✔       |   ✖   |
-| Khách hàng: xem/sửa                    |   ✔   |     ✔      |       ✖       |   ✔   |
-| Đặt hàng, hóa đơn, trả hàng bán        |   ✔   |     ✔      |       ✖       |   ✔   |
-| Hủy hóa đơn                            |   ✔   |     ✔      |       ✖       |   ✖   |
-| Sổ quỹ (thu/chi, thu nợ)               |   ✔   |     ✔      |       ✖       |   ✖   |
-| Tổng quan, báo cáo                     |   ✔   |     ✔      |  chỉ tồn kho  |   ✖   |
-| Quản lý người dùng                     |   ✔   |     ✖      |       ✖       |   ✖   |
+### Cách hoạt động
 
-Khi thiếu quyền xem giá vốn, các field `costPrice`, `lastPurchasePrice`, `unitCost`, lãi gộp… **vắng mặt** trong response.
+- Mỗi **quyền** có mã dạng `module.hành_động` (vd `invoice.create`). Danh mục quyền lấy từ `GET /permissions/catalog`; **không tự hard-code** danh sách quyền ở frontend.
+- Mỗi vai trò có một tập quyền. Quyền hỗ trợ `scopable` còn có **phạm vi**: `all` (toàn bộ dữ liệu) hoặc `own` (**chỉ dữ liệu của mình**: khách mình phụ trách, đơn/hóa đơn mình bán). Backend tự lọc theo phạm vi; frontend chỉ nên hiện nhãn "Của tôi".
+- **Quyền đi kèm (`requires`)**: bật `invoice.create` thì tự bật `invoice.view`, `order.view`, `customer.view`, `product.view`… Server tự thêm và báo trong `autoAdded`.
+- **Vai trò Quản lý luôn có đủ quyền**, không chỉnh được (tránh tự khóa hệ thống). Hai quyền `user.manage` và `role.manage` **chỉ Quản lý có**, không cấp được cho vai trò khác.
+- Thay đổi **có hiệu lực ngay** cho mọi người dùng thuộc vai trò đó, không cần đăng nhập lại.
+
+### Frontend dùng thế nào
+
+- `GET /auth/me` trả `permissions: [{ "code", "scope" }]` — **ẩn/khóa menu và nút theo `permissions`, không hard-code theo `role`**. Ví dụ `can('invoice.cancel')` = có phần tử mang mã đó.
+- Gọi API mà thiếu quyền → `403` với `code = FORBIDDEN` và `details.permission` là mã quyền thiếu. Khi gặp lỗi này nên tải lại `GET /auth/me` (quyền có thể vừa bị đổi).
+- **Một số trường dữ liệu chỉ xuất hiện khi có quyền tương ứng** (vắng mặt hoàn toàn, không phải `null`):
+
+| Trường                                                            | Cần quyền                               |
+| ----------------------------------------------------------------- | --------------------------------------- |
+| `costPrice`, `lastPurchasePrice`, `unitCost`, lãi gộp             | `product.cost.view`                     |
+| `balance`, `creditLimit`, `debt`, `paid` của khách / nhà cung cấp | `debt.view`                             |
+| Sửa `basePrice` và bảng giá                                       | `price.edit`                            |
+| Sửa `listPrice` trên dòng hàng khi tạo đơn                        | `price.override`                        |
+| Giá trên phiếu giao hàng                                          | luôn ẩn (`delivery.view` không gồm giá) |
+
+### Cấu hình mặc định (đề xuất ban đầu)
+
+Dùng để khởi tạo lần đầu (`pnpm db:seed`) và cho nút "Khôi phục mặc định". **Chưa chốt với công ty** — Quản lý có thể chỉnh lại ngay trên hệ thống. Bảng dưới sinh tự động từ mã nguồn; "của mình" = phạm vi `own`.
+
+| Quyền                                                        | Quản lý | Trợ lý | Kế toán | Kho | Lái xe |   Sale   | Marketing |
+| ------------------------------------------------------------ | :-----: | :----: | :-----: | :-: | :----: | :------: | :-------: |
+| **Hàng hóa**                                                 |         |        |         |     |        |          |           |
+| `product.view` Xem hàng hóa                                  |    ✔    |   ✔    |    ✔    |  ✔  |        |    ✔     |     ✔     |
+| `product.edit` Thêm/sửa hàng hóa                             |    ✔    |   ✔    |         |  ✔  |        |          |           |
+| `product.content.edit` Sửa mô tả, ảnh hàng hóa               |    ✔    |        |         |     |        |          |     ✔     |
+| `price.edit` Thiết lập giá                                   |    ✔    |        |    ✔    |     |        |          |           |
+| `price.override` Sửa giá khi bán                             |    ✔    |        |         |     |        |          |           |
+| `product.cost.view` Xem giá vốn / giá nhập                   |    ✔    |        |    ✔    |     |        |          |           |
+| **Mua hàng**                                                 |         |        |         |     |        |          |           |
+| `purchase.view` Xem mua hàng                                 |    ✔    |   ✔    |    ✔    |  ✔  |        |          |           |
+| `purchase.edit` Nhập hàng / trả hàng nhập / sửa nhà cung cấp |    ✔    |   ✔    |    ✔    |  ✔  |        |          |           |
+| `purchase.cancel` Hủy phiếu nhập / phiếu trả nhập            |    ✔    |        |    ✔    |     |        |          |           |
+| **Khách hàng**                                               |         |        |         |     |        |          |           |
+| `customer.view` Xem khách hàng                               |    ✔    |   ✔    |    ✔    |  ✔  |        | của mình |     ✔     |
+| `customer.edit` Thêm/sửa khách hàng                          |    ✔    |   ✔    |         |     |        | của mình |           |
+| **Đơn hàng**                                                 |         |        |         |     |        |          |           |
+| `order.view` Xem đơn đặt hàng                                |    ✔    |   ✔    |    ✔    |  ✔  |        | của mình |           |
+| `order.create` Tạo/sửa/hủy đơn đặt hàng                      |    ✔    |   ✔    |         |     |        | của mình |           |
+| `invoice.view` Xem hóa đơn                                   |    ✔    |   ✔    |    ✔    |  ✔  |        | của mình |           |
+| `invoice.create` Xuất hóa đơn                                |    ✔    |   ✔    |         |     |        | của mình |           |
+| `invoice.cancel` Hủy hóa đơn                                 |    ✔    |        |    ✔    |     |        |          |           |
+| `return.create` Tạo phiếu trả hàng bán                       |    ✔    |   ✔    |         |     |        | của mình |           |
+| `delivery.view` Xem/in phiếu giao hàng                       |    ✔    |   ✔    |    ✔    |  ✔  |   ✔    |    ✔     |           |
+| **Sổ quỹ & công nợ**                                         |         |        |         |     |        |          |           |
+| `cash.view` Xem sổ quỹ                                       |    ✔    |        |    ✔    |     |        |          |           |
+| `cash.create` Lập phiếu thu/chi, thu nợ khách, trả nợ NCC    |    ✔    |        |    ✔    |     |        |          |           |
+| `cash.cancel` Hủy phiếu thu/chi                              |    ✔    |        |    ✔    |     |        |          |           |
+| `cash.manage` Quản lý quỹ và danh mục thu chi                |    ✔    |        |    ✔    |     |        |          |           |
+| `debt.view` Xem công nợ khách / nhà cung cấp                 |    ✔    |   ✔    |    ✔    |     |        | của mình |           |
+| **Tổng quan & báo cáo**                                      |         |        |         |     |        |          |           |
+| `dashboard.view` Xem trang Tổng quan                         |    ✔    |        |    ✔    |     |        |          |           |
+| `report.sales` Báo cáo doanh số                              |    ✔    |        |    ✔    |     |        | của mình |     ✔     |
+| `report.inventory` Báo cáo tồn kho                           |    ✔    |        |    ✔    |  ✔  |        |          |           |
+| `report.debt` Báo cáo công nợ                                |    ✔    |        |    ✔    |     |        |          |           |
+| `report.cash` Báo cáo sổ quỹ                                 |    ✔    |        |    ✔    |     |        |          |           |
+| **Hệ thống**                                                 |         |        |         |     |        |          |           |
+| `import.run` Nhập dữ liệu từ Excel                           |    ✔    |        |         |     |        |          |           |
+| `user.manage` Quản lý người dùng                             |    ✔    |        |         |     |        |          |           |
+| `role.manage` Phân quyền cho vai trò                         |    ✔    |        |         |     |        |          |           |
+
+### Câu hỏi còn mở (ảnh hưởng cấu hình mặc định)
+
+1. **Trợ lý** làm những việc gì? (đề xuất: thay Quản lý nhập đơn/khách/hàng, không đụng tiền, giá vốn và người dùng)
+2. **Lái xe** có đăng nhập hệ thống không, hay chỉ cần in phiếu giao hàng? (lái xe hiện cũng là nhà cung cấp loại `driver` để theo dõi công nợ)
+3. **Sale** có được xem khách/đơn của Sale khác không? (đề xuất: chỉ của mình)
+4. **Marketing** có cần xem số điện thoại khách và doanh số theo sản phẩm không?
 
 ## 9. Quy tắc nghiệp vụ frontend cần biết
 
@@ -189,7 +256,9 @@ Khi thiếu quyền xem giá vốn, các field `costPrice`, `lastPurchasePrice`,
 
 ## Nhật ký thay đổi
 
-| Ngày       | Thay đổi                                                                                                                                                                        |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-11-03 | Tạo bản thảo hợp đồng API đầu tiên (chưa triển khai)                                                                                                                            |
-| 2026-11-03 | Cài Swagger: giao diện `/api/docs`, JSON `/api/docs-json`, file `openapi.json`; triển khai `GET /health`; tiền tố `/api/v1`, CORS có credentials, kiểm tra dữ liệu vào bằng DTO |
+| Ngày       | Thay đổi                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-11-03 | Tạo bản thảo hợp đồng API đầu tiên (chưa triển khai)                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 2026-11-03 | Cài Swagger: giao diện `/api/docs`, JSON `/api/docs-json`, file `openapi.json`; triển khai `GET /health`; tiền tố `/api/v1`, CORS có credentials, kiểm tra dữ liệu vào bằng DTO                                                                                                                                                                                                                                                                                                       |
+| 2026-11-03 | Đổi vai trò từ 4 sang 7 theo cơ cấu công ty: `manager`, `assistant`, `accountant`, `warehouse`, `driver`, `sales`, `marketing`; thêm khái niệm dữ liệu "của mình" cho Sale; cập nhật bảng phân quyền (đề xuất)                                                                                                                                                                                                                                                                        |
+| 2026-11-03 | **Phân quyền cấu hình được:** quyền từng vai trò lưu trong CSDL, Quản lý chỉnh qua API mới (`/permissions/catalog`, `/roles…`, endpoints.md mục 10); `GET /auth/me` trả `permissions` dạng `[{ code, scope }]` (trước đây là mảng chuỗi); phạm vi `all`/`own`; quyền đi kèm `requires`; tách `report.view` thành `dashboard.view`, `report.sales/inventory/debt/cash`; thêm `debt.view`, `delivery.view`, `product.content.edit`, `price.override`; một số trường chỉ có khi đủ quyền |

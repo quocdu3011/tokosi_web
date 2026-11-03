@@ -19,6 +19,7 @@ import {
   timestamps,
   tstz,
 } from './_helpers.js';
+import { productSearchExpr, trgmIndex } from './_search.js';
 import { users } from './system.js';
 
 /** Nhóm hàng dạng cây (hiện tối đa 2 cấp, hỗ trợ nhiều cấp). */
@@ -63,7 +64,7 @@ export const products = pgTable(
   },
   (t) => [
     index('products_category_idx').on(t.categoryId),
-    index('products_name_idx').on(t.name),
+    trgmIndex('products_search_trgm', productSearchExpr(t)),
     index('products_active_idx').on(t.isActive),
   ],
 );

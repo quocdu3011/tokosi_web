@@ -72,8 +72,16 @@ erDiagram
 - **Khóa chính UUID** (`gen_random_uuid()`); PostgreSQL 17 chưa có uuidv7 gốc, đổi sang `uuidv7()` khi lên PostgreSQL 18.
 - **Nhiều chi nhánh:** chứng từ và tồn kho có `branch_id` (hiện chỉ có 1 chi nhánh).
 
+## Tìm kiếm không dấu (tiếng Việt)
+
+- Migration `0002_tim_khong_dau.sql` bật extension `unaccent` + `pg_trgm` và tạo hai hàm **IMMUTABLE**: `f_unaccent(text)` và `f_search_text(text)` (bỏ dấu + chữ thường: `"Đèn Lồng"` → `"den long"`).
+- Chỉ mục GIN trigram trên biểu thức đã chuẩn hóa: `products_search_trgm` (mã + tên), `customers_search_trgm` và `suppliers_search_trgm` (mã + tên + số điện thoại).
+- Trong mã dùng `searchWhere()` ([`apps/api/src/db/search.ts`](../../apps/api/src/db/search.ts)) với `productSearchExpr(products)` / `partySearchExpr(customers)`. Hàm tách từ khóa theo khoảng trắng, **mọi từ đều phải khớp** (thứ tự tùy ý), khớp một phần, và tự thoát ký tự `%`, `_`, `\`.
+- **Không viết tay `LIKE`/`ILIKE` trên cột `name`** — sẽ không dùng được chỉ mục và không bỏ dấu. Biểu thức trong chỉ mục và trong truy vấn phải giống hệt nhau; `search.spec.ts` kiểm tra bằng `EXPLAIN`.
+- Từ khóa dưới 3 ký tự không tận dụng được chỉ mục trigram (vẫn đúng kết quả, chỉ quét tuần tự); ở quy mô ~2.800 hàng / ~1.700 khách là không đáng kể.
+
 ## Chưa có trong lược đồ (sẽ thêm khi cần)
 
-- **Tìm không dấu** (`unaccent` + `pg_trgm`): cần tạo extension và chỉ mục GIN bằng migration viết tay ngay khi có CSDL thật; hiện chỉ có chỉ mục thường.
+- ~~Tìm không dấu~~ → **đã có** (xem mục dưới).
 - Dữ liệu khởi tạo (seed): 7 bảng giá, vai trò/tài khoản chủ, danh mục thu chi, quỹ tiền mặt, chi nhánh trung tâm, bộ đếm mã chứng từ.
 - Phase 2: kiểm kho, đặt hàng nhập, quy đổi đơn vị, bản sửa hóa đơn `.nn` (đã có sẵn cột `root_invoice_id`/`revision_no`), phân bổ chi phí nhập hàng.

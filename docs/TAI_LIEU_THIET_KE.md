@@ -69,7 +69,7 @@ Theo yêu cầu của công ty, hệ thống gồm **7 phân hệ**: Hàng hóa,
 | **6. Tổng quan** | Dashboard | Trang đầu sau đăng nhập: doanh thu hôm nay / tháng này / so với tháng trước, số hóa đơn, **công nợ phải thu & phải trả**, tồn quỹ, top 10 hàng bán chạy, top 10 khách mua nhiều, biểu đồ doanh thu theo ngày (30 ngày) |
 | **7. Báo cáo** | 5 báo cáo chuẩn | (1) **Công nợ khách** (tuổi nợ 0–30/31–60/61–90/>90 ngày, theo nhân viên phụ trách); (2) **Công nợ nhà cung cấp**; (3) **Doanh số** (theo ngày/tháng, khách, hàng hóa, nhóm hàng, người bán; có cột **lãi gộp** nhờ lưu giá vốn trên từng dòng bán); (4) **Tồn kho** (số lượng, tồn × giá vốn, theo nhóm hàng, hàng không phát sinh); (5) **Sổ quỹ** (thu/chi theo loại, theo kỳ, quỹ đầu–cuối). Bộ lọc theo kỳ, xuất Excel/PDF |
 
-**Phần nền bắt buộc** (không phải phân hệ, nhưng thiếu thì không chạy): đăng nhập, 4 vai trò cố định, nhật ký thao tác, công cụ import từ KiotViet, mã chứng từ tự tăng, backup.
+**Phần nền bắt buộc** (không phải phân hệ, nhưng thiếu thì không chạy): đăng nhập, 7 vai trò (Quản lý, Trợ lý, Kế toán, Kho, Lái xe, Sale, Marketing) với **quyền do Quản lý cấu hình** (bảng `role_permissions`, phạm vi "chỉ của mình" cho Sale), nhật ký thao tác, công cụ import từ KiotViet, mã chứng từ tự tăng, backup.
 
 **Ngoài phạm vi (chưa xây):** Kiểm kho, Đặt hàng nhập (chỉ lưu mã tham chiếu), quản lý nhân viên/phân quyền chi tiết, POS, khuyến mãi, tích hợp (HĐĐT, vận chuyển, TMĐT), báo cáo tùy biến/nâng cao (so sánh kỳ, hàng chậm bán, hoa hồng).
 
@@ -629,7 +629,7 @@ Phạm vi theo đúng 7 phân hệ ở mục 2.2:
 
 | Phân hệ | Làm trong 2 tháng |
 |---|---|
-| Nền | Đăng nhập, 4 vai trò cố định (chủ, kế toán, thủ kho, nhập liệu), nhật ký thao tác, 1 chi nhánh (vẫn có `branch_id`), backup |
+| Nền | Đăng nhập, 7 vai trò với **quyền do Quản lý cấu hình được** (danh mục ~31 quyền, phạm vi tất cả/chỉ của mình, backend + API đã xong), nhật ký thao tác, 1 chi nhánh (vẫn có `branch_id`), backup |
 | Chuyển dữ liệu | Import sản phẩm, bảng giá, khách, NCC, **tồn đầu kỳ, nợ đầu kỳ, quỹ đầu kỳ**, tải ảnh về kho file |
 | Hàng hóa | Danh sách hàng hóa (+ thẻ kho, nhập/xuất Excel), Thiết lập giá (7 bảng giá, lưới sửa giá, hàng loạt) |
 | Mua hàng | Nhà cung cấp (+ công nợ), Nhập hàng (giá vốn bình quân), Trả hàng nhập |
@@ -646,7 +646,7 @@ Phạm vi theo đúng 7 phân hệ ở mục 2.2:
 | Kiểm kho (phiếu kiểm, cân bằng) | Chỉ điều chỉnh tồn qua import/script có người duyệt |
 | Đặt hàng nhập (PDN) | Nhập hàng trực tiếp, lưu mã PDN dạng chữ để đối chiếu |
 | Bản sửa hóa đơn `.nn` | Hủy hóa đơn + tạo lại (có nhật ký) |
-| Phân quyền chi tiết theo chức năng | 4 vai trò cố định |
+| Phân quyền riêng cho từng người (ngoại lệ ngoài vai trò) | Gán quyền theo vai trò |
 | Import lịch sử chứng từ cũ | File Excel lưu trữ + KiotViet chỉ-đọc; chỉ import số dư đầu kỳ và đơn "phiếu tạm" còn mở |
 | Hoa hồng NVKD, hạn mức công nợ cứng, giao hàng/xe, quy đổi đơn vị, chi phí container, HĐ VAT/điện tử | Làm sau go-live (mục 13B.4) |
 
@@ -687,7 +687,7 @@ Cổng       G0▲       G1▲        G2▲                  G3▲(8/1)
 | **W5** (7/12) | Đơn → hóa đơn (transaction nguyên tử, idempotency), thanh toán, đặt cọc, hủy; **báo cáo Doanh số + lãi gộp** | **Hóa đơn**: danh sách, chi tiết, **in A4**; giao diện báo cáo Doanh số | Xuất hóa đơn thật trên staging |
 | **W6** (14/12) | Trả hàng bán; **Sổ quỹ** (phiếu thu/chi, thu nợ + cấn trừ, quỹ đầu kỳ); API lịch sử/công nợ theo khách; **báo cáo Công nợ khách + Sổ quỹ** | Màn hình Trả hàng, Sổ quỹ; **chi tiết Khách hàng** (lịch sử, công nợ, thu nợ nhanh, biên bản đối chiếu); giao diện báo cáo Công nợ khách, Sổ quỹ | **G2** (18/12): đối chiếu tổng nợ/tồn/quỹ/doanh số khớp file gốc; 20 hóa đơn mẫu cùng tổng tiền |
 | **W7** (21/12) | Nhập hàng + **giá vốn bình quân**, công nợ NCC, **Trả hàng nhập**, trả nợ NCC; **báo cáo Công nợ NCC** | Màn hình Nhập hàng, Trả hàng nhập, in phiếu nhập; giao diện báo cáo Công nợ NCC | Nhập/trả hàng chạy đúng giá vốn |
-| **W8** (28/12) | 4 vai trò + quyền, nhật ký, xuất Excel mọi danh sách, backup tự động, bảo mật cơ bản; truy vấn **Dashboard** | **Dashboard** (thẻ số liệu, top 10, biểu đồ 30 ngày), phím tắt, hướng dẫn sử dụng, Sentry | Đủ chức năng MVP-lite (đệm ~1–2 ngày) |
+| **W8** (28/12) | Màn hình Phân quyền, nhật ký thao tác, xuất Excel mọi danh sách, backup tự động, bảo mật cơ bản; truy vấn **Dashboard** | **Dashboard** (thẻ số liệu, top 10, biểu đồ 30 ngày), phím tắt, hướng dẫn sử dụng, Sentry | Đủ chức năng MVP-lite (đệm ~1–2 ngày) |
 | **W9** (4/1) | UAT & sửa lỗi; **chạy thử import cuối** (dry-run); thử khôi phục backup; triển khai production | UAT & sửa lỗi giao diện; giám sát; tài liệu người dùng | **G3** (8/1): sẵn sàng chạy song song |
 
 Lưu ý lịch: W6–W9 trùng mùa cao điểm trước Tết → **UAT chỉ nhờ 1–2 người** (kế toán + 1 nhân viên nhập liệu) và mỗi người ≤ 1–2 giờ/ngày.
@@ -825,7 +825,7 @@ Mốc khó nhất; **ưu tiên đúng nghiệp vụ hơn đẹp giao diện**.
 | Việc | Phụ trách |
 |---|---|
 | Báo cáo: công nợ khách/NCC (tuổi nợ), doanh số theo khách/NVKD/mặt hàng, lãi gộp, tồn kho & hàng chậm bán, sổ quỹ; xuất Excel | Dev B + AI |
-| Phân quyền theo vai trò thực tế (chủ, quản lý, kế toán, thủ kho, nhập liệu, NVKD); quyền xem giá vốn | Dev A |
+| Áp dụng phân quyền cấu hình được lên mọi endpoint (`@RequirePermission`), kiểm thử theo từng vai trò; quyền xem giá vốn | Dev A |
 | Hướng dẫn sử dụng ngắn + video; bảng phím tắt | Dev B + AI |
 | **UAT** với 2–3 người dùng chủ chốt trên dữ liệu thật tại staging; gom lỗi và sửa | Cả hai |
 
@@ -854,7 +854,7 @@ Mốc khó nhất; **ưu tiên đúng nghiệp vụ hơn đẹp giao diện**.
 ### 13B.5 Nếu bị trễ: thứ tự cắt phạm vi
 1. Báo cáo nâng cao (chỉ giữ công nợ, doanh số, tồn kho, sổ quỹ); báo cáo khác xuất Excel thủ công.
 2. Trả hàng nhập và kiểm kho tinh vi (tạm dùng phiếu điều chỉnh tồn đơn giản).
-3. Phân quyền chi tiết (tạm dùng 3–4 vai trò cố định).
+3. Phân quyền chi tiết (tạm chỉnh quyền bằng Swagger, chưa có màn hình).
 4. Chuyển lịch sử chứng từ cũ (giữ file lưu trữ, chỉ import số dư đầu kỳ).
 5. **Không cắt:** engine giá, sổ cái kho/nợ/quỹ, đối chiếu dữ liệu, backup. Thiếu các phần này thì **dời go-live sang 01/05**.
 

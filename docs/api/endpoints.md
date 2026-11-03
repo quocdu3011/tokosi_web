@@ -46,7 +46,11 @@ Ký hiệu: `?` = tùy chọn · `[]` = mảng · tiền/giá/số lượng là 
   "user": {
     "id": "0192…", "code": "NV0001", "fullName": "Nguyễn Văn A",
     "role": "accountant",
-    "permissions": ["invoice.create", "cash.create", "product.cost.view"],
+    "permissions": [                       // theo cấu hình hiện tại của vai trò (Quản lý chỉnh được)
+      { "code": "invoice.view",   "scope": "own" },   // "own" = chỉ dữ liệu của mình
+      { "code": "invoice.create", "scope": "own" },
+      { "code": "product.view",   "scope": "all" }
+    ],
     "branchId": "0192…"
   }
 }
@@ -760,9 +764,9 @@ Bộ lọc `GET /cash-transactions`: `from`, `to`, `direction`, `categoryId`, `a
 
 ## 7. Tổng quan
 
-| Method | Đường dẫn    | Mô tả             | Quyền         | Mốc |
-| ------ | ------------ | ----------------- | ------------- | --- |
-| GET    | `/dashboard` | Số liệu trang chủ | `report.view` | W8  |
+| Method | Đường dẫn    | Mô tả             | Quyền            | Mốc |
+| ------ | ------------ | ----------------- | ---------------- | --- |
+| GET    | `/dashboard` | Số liệu trang chủ | `dashboard.view` | W8  |
 
 ```json
 {
@@ -784,7 +788,7 @@ Bộ lọc `GET /cash-transactions`: `from`, `to`, `direction`, `categoryId`, `a
 
 ## 8. Báo cáo
 
-Tất cả nhận `?format=json` (mặc định) \| `xlsx` \| `pdf`. Quyền: `report.view` (riêng tồn kho: thủ kho cũng xem được).
+Tất cả nhận `?format=json` (mặc định) \| `xlsx` \| `pdf`. Quyền theo từng báo cáo: `/reports/inventory` → `report.inventory`; `/reports/sales` → `report.sales` (phạm vi `own` thì chỉ tính đơn của mình; cột lãi gộp chỉ có khi có `product.cost.view`); `/reports/customer-debt`, `/reports/supplier-debt` → `report.debt`; `/reports/cash-book` → `report.cash`.
 
 | Method | Đường dẫn                | Mô tả                             | Tham số chính                                                                                       | Mốc |
 | ------ | ------------------------ | --------------------------------- | --------------------------------------------------------------------------------------------------- | --- |
@@ -852,3 +856,88 @@ Dùng cho import hàng loạt (chuyển dữ liệu từ KiotViet và nhập tay
 - Import có thể chạy lại nhiều lần (cập nhật theo **mã**, không tạo trùng).
 - Hiển thị tiến độ bằng cách gọi `GET /imports/:id` mỗi 1–2 giây cho đến khi `status` là `completed` hoặc `failed`.
 - Import số dư đầu kỳ (tồn, nợ, quỹ) **không** mở cho giao diện; backend chạy bằng công cụ riêng khi chuyển đổi.
+
+---
+
+## 10. Phân quyền (dành cho Quản lý)
+
+Quyền của từng vai trò là **dữ liệu trong CSDL**, do Quản lý chỉnh trên màn hình _Phân quyền_; không còn cố định trong mã. Mọi endpoint dưới đây cần quyền `role.manage` (chỉ vai trò Quản lý có, không thể cấp cho vai trò khác). Quy tắc và giải thích: [`README.md`](README.md) mục 8.
+
+| Method | Đường dẫn                        | Mô tả                                             | Mốc |
+| ------ | -------------------------------- | ------------------------------------------------- | --- |
+| GET    | `/permissions/catalog`           | Danh mục quyền gom theo phân hệ (để dựng ma trận) | W1  |
+| GET    | `/roles`                         | 7 vai trò kèm số quyền, số người dùng             | W1  |
+| GET    | `/roles/:role/permissions`       | Quyền hiện tại của một vai trò                    | W1  |
+| PUT    | `/roles/:role/permissions`       | Đặt lại **toàn bộ** quyền của vai trò             | W1  |
+| POST   | `/roles/:role/permissions/reset` | Khôi phục cấu hình mặc định của vai trò           | W1  |
+
+`:role` là một trong `manager`, `assistant`, `accountant`, `warehouse`, `driver`, `sales`, `marketing`.
+
+```jsonc
+// GET /permissions/catalog
+{
+  "modules": [
+    {
+      "key": "sales", "label": "Đơn hàng",
+      "permissions": [
+        { "code": "invoice.view", "label": "Xem hóa đơn", "description": null,
+          "scopable": true,                       // có thể chọn "chỉ của mình"
+          "requires": ["customer.view"],          // tự được thêm khi bật quyền này
+          "lockedToAdmin": false },
+        { "code": "invoice.cancel", "label": "Hủy hóa đơn", "scopable": false,
+          "requires": ["invoice.view"], "lockedToAdmin": false }
+      ]
+    }
+  ]
+}
+
+// GET /roles
+[
+  { "role": "manager", "label": "Quản lý", "locked": true,  "permissionCount": 31, "userCount": 1 },
+  { "role": "sales",   "label": "Sale",    "locked": false, "permissionCount": 11, "userCount": 8 }
+]
+
+// GET /roles/sales/permissions
+{ "role": "sales", "label": "Sale", "locked": false,
+  "permissions": [
+    { "code": "product.view",  "scope": "all" },
+    { "code": "invoice.view",  "scope": "own" }
+  ] }
+```
+
+```jsonc
+// PUT /roles/sales/permissions   — gửi bộ quyền MỚI (thay thế toàn bộ bộ cũ)
+{ "permissions": [
+    { "code": "product.view",   "scope": "all" },
+    { "code": "invoice.create", "scope": "own" }
+] }
+
+// 200 — bộ quyền cuối cùng sau khi server chuẩn hóa
+{ "role": "sales", "label": "Sale", "locked": false,
+  "permissions": [
+    { "code": "product.view",   "scope": "all" },
+    { "code": "customer.view",  "scope": "own" },
+    { "code": "order.view",     "scope": "own" },
+    { "code": "invoice.view",   "scope": "own" },
+    { "code": "invoice.create", "scope": "own" }
+  ],
+  "autoAdded": ["customer.view", "order.view", "invoice.view"] }   // hiện cho người dùng: "đã tự bật thêm…"
+```
+
+Lỗi thường gặp:
+
+| HTTP | `code`              | Khi nào                                                                        |
+| ---- | ------------------- | ------------------------------------------------------------------------------ |
+| 400  | `VALIDATION_ERROR`  | Mã quyền không có trong danh mục (`details.unknown`), phạm vi sai, thiếu field |
+| 400  | `PERMISSION_LOCKED` | Cố cấp `user.manage` / `role.manage` cho vai trò khác (`details.locked`)       |
+| 404  | `NOT_FOUND`         | `:role` không phải vai trò hợp lệ                                              |
+| 409  | `ROLE_LOCKED`       | Cố sửa/khôi phục vai trò `manager` (luôn đủ quyền)                             |
+
+**Lưu ý cho frontend khi dựng màn hình:**
+
+- Dựng ma trận từ `/permissions/catalog` (hàng = quyền, gom theo `modules`; cột = vai trò). Ô của quyền `scopable` có thêm lựa chọn **Tất cả / Chỉ của mình**; quyền `lockedToAdmin` hiển thị khóa.
+- Bật một quyền có `requires` thì **hiển thị trước** các quyền đi kèm sẽ tự bật (frontend có thể tự bật theo `requires`); kết quả cuối cùng luôn lấy theo response của PUT.
+- Cột `manager` chỉ để xem (khóa). Nút "Khôi phục mặc định" gọi `POST …/reset` và cần hộp thoại xác nhận.
+- Có hiệu lực **ngay** cho mọi người dùng thuộc vai trò đó, không cần đăng nhập lại. Frontend nên gọi lại `GET /auth/me` khi nhận `403 FORBIDDEN` hoặc khi tải lại trang để cập nhật menu/nút.
+- Nên cảnh báo khi Quản lý bỏ quyền làm vai trò đó mất khả năng làm việc (vd bỏ `product.view` của Sale) — server vẫn cho phép.
+- Mọi thay đổi được ghi vào nhật ký thao tác (ai đổi, trước/sau).

@@ -6,11 +6,17 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { importStatus, importType, userRole } from './enums.js';
+import {
+  importStatus,
+  importType,
+  permissionScope,
+  userRole,
+} from './enums.js';
 import { pk, softDelete, timestamps, tstz } from './_helpers.js';
 
 /** Chi nhánh / kho. Hiện chỉ có 1 ("Chi nhánh trung tâm") nhưng mọi chứng từ đều gắn chi nhánh. */
@@ -154,3 +160,22 @@ export const importJobs = pgTable('import_jobs', {
   createdAt: tstz().notNull().defaultNow(),
   finishedAt: tstz(),
 });
+
+/**
+ * Quyền của từng vai trò — do Quản lý chỉnh. Vai trò `manager` KHÔNG lưu ở đây (luôn có mọi quyền).
+ * `permission_code` thuộc danh mục trong packages/shared/src/permissions.ts (kiểm tra ở tầng ứng dụng).
+ */
+export const rolePermissions = pgTable(
+  'role_permissions',
+  {
+    role: userRole().notNull(),
+    permissionCode: text().notNull(),
+    scope: permissionScope().notNull().default('all'),
+    updatedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    updatedAt: tstz().notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.role, t.permissionCode] }),
+    index('role_permissions_role_idx').on(t.role),
+  ],
+);

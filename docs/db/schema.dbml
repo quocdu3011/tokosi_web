@@ -68,6 +68,11 @@ enum payment_method {
   "bank"
 }
 
+enum permission_scope {
+  "all"
+  "own"
+}
+
 enum return_settlement {
   "offset_debt"
   "refund"
@@ -89,10 +94,13 @@ enum supplier_kind {
 }
 
 enum user_role {
-  "owner"
+  "manager"
+  "assistant"
   "accountant"
   "warehouse"
-  "clerk"
+  "driver"
+  "sales"
+  "marketing"
 }
 
 Table audit_logs {
@@ -264,7 +272,7 @@ Table customers {
   deleted_at timestamptz
 
   indexes {
-    (name) [name: 'customers_name_idx']
+    (`f_search_text(code || ' ' || name || ' ' || coalesce(phone, '')) gin_trgm_ops`) [name: 'customers_search_trgm']
     (sales_owner_id) [name: 'customers_sales_owner_idx']
     (default_price_book_id) [name: 'customers_price_book_idx']
   }
@@ -602,7 +610,7 @@ Table products {
 
   indexes {
     (category_id) [name: 'products_category_idx']
-    (name) [name: 'products_name_idx']
+    (`f_search_text(code || ' ' || name) gin_trgm_ops`) [name: 'products_search_trgm']
     (is_active) [name: 'products_active_idx']
   }
 
@@ -666,6 +674,19 @@ Table refresh_tokens {
   }
 
   Note: '''Refresh token (lưu băm, không lưu token thô).'''
+}
+
+Table role_permissions {
+  role user_role [not null]
+  permission_code text [not null]
+  scope permission_scope [not null, default: 'all']
+  updated_by uuid
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (role, permission_code) [pk]
+    (role) [name: 'role_permissions_role_idx']
+  }
 }
 
 Table sales_return_items {
@@ -766,7 +787,7 @@ Table suppliers {
   deleted_at timestamptz
 
   indexes {
-    (name) [name: 'suppliers_name_idx']
+    (`f_search_text(code || ' ' || name || ' ' || coalesce(phone, '')) gin_trgm_ops`) [name: 'suppliers_search_trgm']
     (kind) [name: 'suppliers_kind_idx']
   }
 
@@ -850,6 +871,7 @@ Ref: purchase_returns.goods_receipt_id > goods_receipts.id
 Ref: purchase_returns.refund_account_id > cash_accounts.id
 Ref: purchase_returns.created_by > users.id
 Ref: refresh_tokens.user_id > users.id [delete: cascade]
+Ref: role_permissions.updated_by > users.id [delete: set null]
 Ref: sales_return_items.return_id > sales_returns.id [delete: cascade]
 Ref: sales_return_items.product_id > products.id
 Ref: sales_returns.branch_id > branches.id

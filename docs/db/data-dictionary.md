@@ -2,7 +2,7 @@
 
 > **Sinh tự động** từ `apps/api/src/db/schema` bằng `pnpm db:docs` — không sửa tay. Tổng quan và cách xem sơ đồ: [`README.md`](README.md).
 
-**34 bảng · 14 kiểu liệt kê (enum)**
+**35 bảng · 15 kiểu liệt kê (enum)**
 
 ## Mục lục
 
@@ -28,10 +28,11 @@
 | `order_status` | `draft`, `completed`, `cancelled` |
 | `party_type` | `customer`, `supplier`, `employee` |
 | `payment_method` | `cash`, `bank` |
+| `permission_scope` | `all`, `own` |
 | `return_settlement` | `offset_debt`, `refund` |
 | `stock_ref_type` | `opening`, `goods_receipt`, `invoice`, `sales_return`, `purchase_return`, `adjustment` |
 | `supplier_kind` | `goods`, `driver`, `other` |
-| `user_role` | `owner`, `accountant`, `warehouse`, `clerk` |
+| `user_role` | `manager`, `assistant`, `accountant`, `warehouse`, `driver`, `sales`, `marketing` |
 
 ## Hệ thống
 
@@ -240,7 +241,7 @@ Hàng hóa. Mỗi quy cách là một SKU riêng; tồn kho ở bảng stocks.
 **Chỉ mục:**
 
 - `products_category_idx`: `category_id`
-- `products_name_idx`: `name`
+- `products_search_trgm`: `f_search_text(code || ' ' || name) gin_trgm_ops`
 - `products_active_idx`: `is_active`
 
 ### product_images
@@ -372,7 +373,7 @@ Khách hàng. Công nợ không lưu ở đây: số dư = tổng debt_ledger (c
 
 **Chỉ mục:**
 
-- `customers_name_idx`: `name`
+- `customers_search_trgm`: `f_search_text(code || ' ' || name || ' ' || coalesce(phone, '')) gin_trgm_ops`
 - `customers_sales_owner_idx`: `sales_owner_id`
 - `customers_price_book_idx`: `default_price_book_id`
 
@@ -414,7 +415,7 @@ Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng 
 
 **Chỉ mục:**
 
-- `suppliers_name_idx`: `name`
+- `suppliers_search_trgm`: `f_search_text(code || ' ' || name || ' ' || coalesce(phone, '')) gin_trgm_ops`
 - `suppliers_kind_idx`: `kind`
 
 ## Đơn hàng

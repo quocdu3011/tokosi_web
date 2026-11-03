@@ -25,6 +25,7 @@ docs/           Tài liệu thiết kế, ERD, ADR
 | `pnpm db:up` / `pnpm db:down`                               | Bật/tắt PostgreSQL cục bộ (cần Docker)                               |
 | `pnpm --filter @kiot/api test`                              | Chạy test của một gói                                                |
 | `pnpm --filter @kiot/api test:e2e`                          | Test e2e của API (không cần CSDL thật)                               |
+| `pnpm --filter @kiot/api db:seed`                           | Dữ liệu khởi tạo (quyền mặc định); chạy lại an toàn                  |
 | `pnpm --filter @kiot/api openapi:export`                    | Xuất `docs/api/openapi.json` (chạy khi đổi endpoint/DTO, commit kèm) |
 
 Mọi PR phải qua: `lint`, `typecheck`, `test`, `build` (CI chạy đúng bộ này).
@@ -35,6 +36,15 @@ Mọi PR phải qua: `lint`, `typecheck`, `test`, `build` (CI chạy đúng bộ
 - Quy ước đã chốt: JSON camelCase; tiền/giá/số lượng là **chuỗi thập phân**; thời gian ISO 8601 UTC; phân trang `data` + `meta`; lỗi `{ code, message, details, requestId }`; tạo chứng từ cần `Idempotency-Key`.
 - Swagger tại `/api/docs`. Mọi controller gắn `@ApiTags`, `@ApiOperation`, `@ApiOkResponse`; mọi DTO có `@ApiProperty` và validator `class-validator`. Sau khi đổi endpoint/DTO chạy `pnpm --filter @kiot/api openapi:export` rồi commit `docs/api/openapi.json`.
 - Backend phải khớp đúng cấu trúc trong `docs/api/endpoints.md`; nếu cần khác thì sửa tài liệu trước và báo frontend.
+
+## Phân quyền (Quản lý cấu hình được)
+
+- Quyền của từng vai trò nằm trong bảng `role_permissions` (Quản lý chỉnh qua `/roles/...`), **không** hard-code theo vai trò trong mã. Vai trò `manager` luôn đủ quyền.
+- Danh mục quyền ở `packages/shared/src/permissions.ts` (mã `module.hành_động`, nhãn, `scopable`, `requires`). **Mọi endpoint nghiệp vụ phải gắn `@RequirePermission('<mã>')`** (`apps/api/src/modules/authorization/`); không tự kiểm tra `user.role === ...`.
+- Quyền có phạm vi `own` (`req.grants['invoice.view'] === 'own'`) thì **service phải lọc** chỉ dữ liệu của người đó (khách có `sales_owner_id`, đơn/hóa đơn có `seller_id` là chính họ).
+- Trường nhạy cảm (giá vốn, công nợ…) chỉ trả về khi đủ quyền tương ứng — xem `docs/api/README.md` mục 8.
+- Thêm quyền mới: thêm vào danh mục + `DEFAULT_ROLE_PERMISSIONS` (nếu muốn cấp mặc định), cập nhật `docs/api/`. Cài đặt đã chạy rồi thì quyền mới chỉ Quản lý có cho tới khi được cấp (seed không ghi đè cấu hình hiện có).
+- `AuthGuard` (JWT) phải đăng ký `APP_GUARD` **trước** `PermissionGuard`.
 
 ## Quy tắc BẮT BUỘC (nghiệp vụ tiền / kho / công nợ)
 
@@ -66,4 +76,4 @@ Mọi PR phải qua: `lint`, `typecheck`, `test`, `build` (CI chạy đúng bộ
 - Next.js 16 (có thay đổi lớn): xem `apps/web/AGENTS.md` và tài liệu trong `node_modules/next/dist/docs/` trước khi viết code Next.
 - NestJS 12 chạy ESM (`"type": "module"`, `nodenext`): import tương đối phải có đuôi `.js`. Test dùng Vitest, lint dùng Oxlint.
 - ORM: **Drizzle** (`drizzle-orm` 0.45.x, `drizzle-kit` 0.31.x — bản ổn định; bản 1.0 còn beta/RC, không dùng). Lược đồ ở `apps/api/src/db/schema/`, migration ở `apps/api/drizzle/`. Chọn Drizzle vì là SQL gần như thuần, kiểu dữ liệu chặt, AI agent viết và rà soát ổn định hơn.
-- Lệnh CSDL (chạy trong `apps/api`): `pnpm db:generate` (sinh migration từ schema), `pnpm db:migrate` (áp dụng), `pnpm db:studio`. Sau khi đổi lược đồ chạy thêm `pnpm db:docs` để sinh lại `docs/db/` (DBML, từ điển dữ liệu, schema.sql) và commit kèm; xem `docs/db/README.md`. Lược đồ hiện có 34 bảng (đã kiểm chứng migration chạy được trên PostgreSQL). **Luôn đọc file SQL migration được sinh ra trước khi chạy**; không sửa tay CSDL production.
+- Lệnh CSDL (chạy trong `apps/api`): `pnpm db:generate` (sinh migration từ schema), `pnpm db:migrate` (áp dụng), `pnpm db:studio`. Sau khi đổi lược đồ chạy thêm `pnpm db:docs` để sinh lại `docs/db/` (DBML, từ điển dữ liệu, schema.sql) và commit kèm; xem `docs/db/README.md`. Lược đồ hiện có 34 bảng (đã kiểm chứng migration chạy được trên PostgreSQL). **Tìm kiếm theo tên/mã/SĐT** luôn dùng `searchWhere()` (`apps/api/src/db/search.ts`) — không tự viết `LIKE` (xem `docs/db/README.md`). **Luôn đọc file SQL migration được sinh ra trước khi chạy**; không sửa tay CSDL production.

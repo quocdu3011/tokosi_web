@@ -8,6 +8,34 @@
       "when": 1793696643338,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793698273307,
+      "tag": "0001_vai_tro_7",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793698422359,
+      "tag": "0002_tim_khong_dau",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793698452214,
+      "tag": "0003_chi_muc_tim_kiem",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793698755721,
+      "tag": "0004_phan_quyen_theo_vai_tro",
+      "breakpoints": true
     }
   ]
 }

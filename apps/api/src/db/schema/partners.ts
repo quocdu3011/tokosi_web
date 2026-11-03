@@ -8,6 +8,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { customerType, supplierKind } from './enums.js';
 import { money, pk, softDelete, timestamps } from './_helpers.js';
+import { partySearchExpr, trgmIndex } from './_search.js';
 import { priceBooks } from './catalog.js';
 import { users } from './system.js';
 
@@ -36,7 +37,7 @@ export const customers = pgTable(
     ...softDelete(),
   },
   (t) => [
-    index('customers_name_idx').on(t.name),
+    trgmIndex('customers_search_trgm', partySearchExpr(t)),
     index('customers_sales_owner_idx').on(t.salesOwnerId),
     index('customers_price_book_idx').on(t.defaultPriceBookId),
   ],
@@ -75,7 +76,7 @@ export const suppliers = pgTable(
     ...softDelete(),
   },
   (t) => [
-    index('suppliers_name_idx').on(t.name),
+    trgmIndex('suppliers_search_trgm', partySearchExpr(t)),
     index('suppliers_kind_idx').on(t.kind),
   ],
 );
