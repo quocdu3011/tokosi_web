@@ -1,7 +1,10 @@
 # Hệ thống Quản lý Bán hàng (tương tự KiotViet) – Tài liệu Thiết kế & Công nghệ
 
-> Phiên bản: 0.1 (bản nháp) – Ngày: 2026-11-03
-> Mục đích: Làm nền tảng thống nhất phạm vi, kiến trúc, công nghệ và lộ trình trước khi code.
+> Phiên bản: **0.2** – Ngày: 2026-11-04 (0.1: 2026-11-03)
+> Mục đích: Làm nền tảng thống nhất phạm vi, kiến trúc, công nghệ và lộ trình. **Là nguồn sự thật cho người và AI agent** cùng với `CLAUDE.md` (quy tắc bắt buộc), `docs/api/` (hợp đồng API) và `docs/db/` (lược đồ CSDL).
+> Khi tài liệu này mâu thuẫn với `CLAUDE.md` hoặc `docs/api/`, **ưu tiên hai nơi đó** rồi sửa lại tài liệu này.
+>
+> **Thay đổi ở 0.2:** thống nhất với các quyết định đã chốt (7 vai trò, 2 chi nhánh mặc định Hà Nội, chuyển kho đã làm, không dùng Redis/Zod/SDK tự sinh, cấu trúc repo thực tế, quy trình git hiện tại); trả lời mục 1.3 và 5.8; số liệu quy mô thực tế; danh sách bảng khớp lược đồ (39 bảng); ghi trạng thái triển khai.
 
 ---
 
@@ -11,23 +14,35 @@
 Xây dựng phần mềm quản lý bán hàng cho công ty, gồm: bán hàng tại quầy (POS), quản lý kho, sản phẩm, khách hàng, nhà cung cấp, công nợ, sổ quỹ, báo cáo, phân quyền nhân viên, nhiều chi nhánh.
 
 ### 1.2 Đối tượng sử dụng
-| Vai trò | Nhu cầu chính |
-|---|---|
-| Chủ / Quản lý | Xem báo cáo, cấu hình, phân quyền, kiểm soát kho & quỹ |
-| Thu ngân | Bán hàng nhanh trên POS, in hóa đơn, thu tiền |
-| Thủ kho | Nhập/xuất/chuyển/kiểm kho |
-| Kế toán | Công nợ, sổ quỹ, đối soát, báo cáo tài chính |
-| Nhân viên kinh doanh | Quản lý khách hàng, đặt hàng, báo giá |
 
-### 1.3 Câu hỏi cần chốt với công ty (ảnh hưởng lớn đến thiết kế)
-1. ~~Nội bộ hay SaaS?~~ → **ĐÃ CHỐT: DÙNG NỘI BỘ MỘT CÔNG TY.** Bỏ multi-tenant (không có `tenant_id`, không RLS theo tenant), giữ **đa chi nhánh/đa kho**. Nếu sau này muốn bán SaaS thì chi phí thêm `tenant_id` là đáng kể, cần cân nhắc từ bây giờ.
-2. ~~Ngành hàng~~ → **ĐÃ CHỐT: BÁN SỈ hàng gia dụng tổng hợp** (xem mục 2.4). Không cần FnB. Dữ liệu mẫu không có hàng cần lô/HSD hay serial. Các điểm cần xác nhận thêm từ dữ liệu mẫu nằm ở **mục 5.8**.
-3. Có cần **POS chạy offline** khi mất mạng? (khuyến nghị: có)
-4. Cần **hóa đơn điện tử** (theo Nghị định 123/2020, TT78) và tích hợp nhà cung cấp (VNPT, Viettel, MISA, ...)?
-5. Kênh bán online: Shopee, Lazada, TikTok Shop, Haravan, website riêng?
-6. Phần cứng: máy in nhiệt (K80/K58), máy quét mã vạch, ngăn kéo tiền, máy in tem?
-7. Số chi nhánh, số SKU, số giao dịch/ngày dự kiến? (để chọn hạ tầng)
-8. Ngân sách, thời gian, quy mô đội dev?
+Hệ thống có **7 vai trò**; quyền của từng vai trò do **Quản lý cấu hình** (bảng `role_permissions`), không viết cứng trong mã. Bảng dưới chỉ là nhu cầu chính; cấu hình quyền mặc định chỉ là đề xuất.
+
+| Vai trò | Mã | Nhu cầu chính |
+|---|---|---|
+| Quản lý | `manager` | Luôn đủ quyền; xem cả hai chi nhánh; cấu hình phân quyền, người dùng, báo cáo, kiểm soát kho & quỹ |
+| Trợ lý | `assistant` | *(Chưa xác nhận công việc cụ thể)* hỗ trợ quản lý |
+| Kế toán | `accountant` | Công nợ, sổ quỹ, đối soát, báo cáo tài chính |
+| Kho | `warehouse` | Nhập/xuất/chuyển kho, tồn kho |
+| Lái xe | `driver` | *(Chưa xác nhận có đăng nhập hệ thống không)* |
+| Sale | `sales` | Khách hàng của mình, đặt hàng, hóa đơn (phạm vi "chỉ của mình") |
+| Marketing | `marketing` | *(Chưa xác nhận có xem số điện thoại khách không)* |
+
+Mỗi nhân viên được **gán chi nhánh** (Hà Nội, Sài Gòn); Quản lý thấy cả hai.
+
+### 1.3 Các câu hỏi đã chốt / còn mở
+
+| # | Câu hỏi | Trạng thái |
+|---|---|---|
+| 1 | Nội bộ hay SaaS? | ✅ **Dùng nội bộ một công ty.** Không multi-tenant (không có `tenant_id`), giữ **đa chi nhánh**. Thêm `tenant_id` về sau rất tốn kém nên nếu có ý định bán SaaS phải cân nhắc từ bây giờ |
+| 2 | Ngành hàng | ✅ **Bán sỉ hàng gia dụng tổng hợp** (mục 2.4). Không cần FnB; không có hàng cần lô/HSD hay serial |
+| 3 | POS chạy offline? | ✅ **Không làm trong phạm vi hiện tại** (bán sỉ, đơn tạo ở văn phòng/kho có mạng); hạ xuống Phase 3 nếu sau này có quầy bán nhanh (ADR-06) |
+| 4 | Hóa đơn điện tử / VAT | ⏳ Chưa chốt (mục 5.8 câu 5). Hiện có 3 bảng giá VAT; hóa đơn điện tử để Phase 2 nếu cần |
+| 5 | Kênh bán online (Shopee, Lazada, TikTok…) | ✅ **Không làm** (ngoài phạm vi) |
+| 6 | Phần cứng in/quét | ✅ In **A4/A5** qua trình duyệt/PDF; máy in nhiệt, ngăn kéo tiền, in tem chỉ làm nếu sau này có POS |
+| 7 | Quy mô | ✅ **2 chi nhánh, ~2.800 SKU, ~1.700 khách, ~65 hóa đơn/ngày** (từ dữ liệu mẫu) → PostgreSQL một máy là đủ |
+| 8 | Thời gian, đội | ✅ **2 tháng** (09/11/2026 → 08/01/2027), 2 người + AI agent (mục 13) |
+
+Các câu hỏi nghiệp vụ còn mở nằm ở mục 5.8 và trong `MEMORY.md` (cục bộ).
 
 ---
 
@@ -77,8 +92,8 @@ Theo yêu cầu của công ty, hệ thống gồm **7 phân hệ**: Hàng hóa,
 
 | Giai đoạn | Nội dung | Ước tính* |
 |---|---|---|
-| **MVP (Phase 1)** *(danh sách đầy đủ; bản 2 tháng rút gọn theo mục 13.1: kiểm kho đầy đủ, trả hàng nhập, bản sửa hóa đơn, phân quyền chi tiết, import lịch sử được hoãn)* | Đăng nhập & phân quyền, hàng hóa (phẳng, 1 đơn vị/SKU, ảnh, vị trí kho), **7 bảng giá theo hạng khách (Lớn/Vừa/VIP/Chung + bản VAT)**, khách hàng (có NV phụ trách, hạng giá)/NCC, đặt hàng nhập → nhập hàng, tồn kho + giữ hàng, **đặt hàng (phiếu tạm) → hóa đơn**, trả hàng bán/nhập, **công nợ KH/NCC (cho phép số dư âm, thu theo khách, cấn trừ hóa đơn cũ nhất, đối chiếu)**, sổ quỹ có danh mục thu chi chuẩn, **kiểm kho**, báo cáo công nợ/doanh số/tồn kho, in A4, nhập/xuất Excel, **công cụ chuyển dữ liệu từ KiotViet** (mục 5.7) | **2 tháng** (09/11/2026 → bản dùng được 08/01/2027, phạm vi MVP-lite mục 13.1; cắt chuyển khuyến nghị 01/03/2027). Phạm vi đầy đủ: ~5 tháng (mục 13B) |
-| **Phase 2** | Đa kho/chuyển kho, quy đổi đơn vị tính, báo giá riêng, giao hàng từng phần/quản lý tài xế-xe, phân bổ chi phí nhập hàng (container), NVKD & hoa hồng, hạn mức công nợ cứng, hóa đơn VAT/điện tử (nếu cần), POS quầy giản lược | Sau go-live; gồm cả các mục hoãn ở 13.1 |
+| **MVP (Phase 1)** *(danh sách đầy đủ; bản 2 tháng rút gọn theo mục 13.1: kiểm kho, bản sửa hóa đơn, phân quyền riêng từng người, import lịch sử được hoãn)* | Đăng nhập & phân quyền, hàng hóa (phẳng, 1 đơn vị/SKU, ảnh, vị trí kho), **7 bảng giá theo hạng khách (Lớn/Vừa/VIP/Chung + bản VAT)**, khách hàng (có NV phụ trách, hạng giá)/NCC, đặt hàng nhập → nhập hàng, tồn kho + giữ hàng, **đặt hàng (phiếu tạm) → hóa đơn**, trả hàng bán/nhập, **công nợ KH/NCC (cho phép số dư âm, thu theo khách, cấn trừ hóa đơn cũ nhất, đối chiếu)**, sổ quỹ có danh mục thu chi chuẩn, **kiểm kho**, báo cáo công nợ/doanh số/tồn kho, in A4, nhập/xuất Excel, **công cụ chuyển dữ liệu từ KiotViet** (mục 5.7) | **2 tháng** (09/11/2026 → bản dùng được 08/01/2027, phạm vi MVP-lite mục 13.1; cắt chuyển khuyến nghị 01/03/2027). Phạm vi đầy đủ: ~5 tháng (mục 13B) |
+| **Phase 2** | Kiểm kho, nhận thiếu/sai lệch khi chuyển kho, quy đổi đơn vị tính, báo giá riêng, giao hàng từng phần/quản lý tài xế-xe, phân bổ chi phí nhập hàng (container), NVKD & hoa hồng, hạn mức công nợ cứng, hóa đơn VAT/điện tử (nếu cần), POS quầy giản lược | Sau go-live; gồm cả các mục hoãn ở 13.1 |
 | **Phase 3** | Cổng đặt hàng B2B cho đại lý, app mobile cho NVKD/tài xế, POS offline (nếu cần), cổng thanh toán/VietQR, tích hợp vận chuyển & sàn TMĐT | Sau Phase 2 |
 
 \* Ước tính cho **đội 2 người + AI agent** (mục 11.1). AI rút ngắn đáng kể thời gian viết code, nhưng **không rút ngắn** việc làm rõ nghiệp vụ, kiểm thử đối chiếu số liệu và chuyển dữ liệu; đó mới là phần quyết định tiến độ. Con số chỉ là ước lượng ban đầu, cần chỉnh lại tại cổng G1 (mục 13).
@@ -126,10 +141,10 @@ Công ty có 2 chi nhánh **dùng chung một hệ thống**: cùng hàng hóa, 
 | Chuyển kho | Có, **hai bước** (gửi → nhận). Hai chi nhánh coi nhau là khách hàng / nhà cung cấp nội bộ. Giá nhập kho bên nhận = giá gốc bên gửi **cộng phí vận chuyển**; phí vẫn được ghi riêng |
 | Người dùng | Nhân viên được gán chi nhánh; Quản lý xem cả hai |
 | Trả hàng | Về chi nhánh của hóa đơn gốc |
-| Mã chứng từ | Một dãy số chung cho cả hai chi nhánh (giả định, chưa xác nhận) |
+| Mã chứng từ | Một dãy số chung cho cả hai chi nhánh (giả định, **chưa xác nhận** — mục 5.8) |
 | Dữ liệu cũ | Chi nhánh còn lại cũng ở KiotViet, nhập sau; **chi nhánh mặc định là Hà Nội** (chủ dự án chốt 04/11/2026) |
 
-**Ảnh hưởng lịch 2 tháng:** thêm khoảng 5–7 ngày (giá/tồn/nợ/quỹ theo chi nhánh 3–4 ngày, chuyển kho 2–3 ngày; chuyển kho vốn thuộc Phase 2). Phần lược đồ, seed, tồn kho theo chi nhánh, chuyển kho và quyền truy cập chi nhánh đã làm xong ở backend (tuần 1); còn lại là các màn hình và gắn `branch_id` vào từng phân hệ khi xây. Nếu trễ: cắt Trả hàng nhập và biểu đồ Dashboard trước.
+**Ảnh hưởng lịch 2 tháng:** thêm khoảng 5–7 ngày (giá/tồn/nợ/quỹ theo chi nhánh 3–4 ngày, chuyển kho 2–3 ngày; chuyển kho vốn thuộc Phase 2 nhưng đã được đưa vào MVP). Phần lược đồ, seed, tồn kho theo chi nhánh, nghiệp vụ chuyển kho (`StockTransfersService`) và quyền truy cập chi nhánh **đã làm xong ở backend** (tuần 1); còn lại là các endpoint/màn hình và gắn `branch_id` vào từng phân hệ khi xây. Nếu trễ: cắt Trả hàng nhập và biểu đồ Dashboard trước.
 
 ---
 
@@ -143,38 +158,42 @@ Công ty có 2 chi nhánh **dùng chung một hệ thống**: cùng hàng hóa, 
 ### 3.2 Sơ đồ tổng thể
 
 ```
-┌────────────────────────── Client ──────────────────────────┐
-│  Web Admin (Next.js)     POS (PWA, offline)     Mobile app*│
-└───────────────┬───────────────────┬────────────────────────┘
-                │ HTTPS (REST/JSON) │ WebSocket (realtime)
-        ┌───────▼───────────────────▼───────┐
-        │   API Gateway / Reverse Proxy      │  (Nginx / Caddy)
-        └───────────────┬────────────────────┘
-        ┌───────────────▼────────────────────┐
-        │   Backend – NestJS (Modular Monolith)│
-        │  auth │ catalog │ inventory │ sales  │
-        │  partners │ cashbook │ reports │ ... │
-        └──┬──────────┬──────────┬────────────┘
-           │          │          │
-   ┌───────▼──┐  ┌────▼───┐  ┌───▼────────┐   ┌───────────────┐
-   │PostgreSQL│  │ Redis  │  │ Object     │   │ Worker (BullMQ)│
-   │ (chính)  │  │cache/  │  │ Storage    │   │ báo cáo, email,│
-   │          │  │queue   │  │ (S3/MinIO) │   │ import/export, │
-   └──────────┘  └────────┘  └────────────┘   │ đồng bộ sàn... │
-                                               └───────────────┘
+┌──────────────── Client ────────────────┐
+│  Web quản trị (Next.js, responsive)     │   (POS PWA / mobile: Phase 3)
+└───────────────┬────────────────────────┘
+                │ HTTPS (REST/JSON, cookie refresh httpOnly)
+        ┌───────▼────────────────┐
+        │ Reverse proxy (Nginx / │   TLS, nén, giới hạn kích thước
+        │ Caddy)                 │
+        └───────┬────────────────┘
+        ┌───────▼─────────────────────────────────┐
+        │ Backend – NestJS (Modular Monolith)      │
+        │ auth │ authorization │ branches │ catalog│
+        │ inventory │ stock-transfers │ sales │ … │
+        │ (job nền chạy trong cùng tiến trình)     │
+        └──┬──────────────────────┬───────────────┘
+           │                      │
+   ┌───────▼──────┐      ┌────────▼────────┐
+   │ PostgreSQL   │      │ Kho file (ảnh,  │
+   │ (duy nhất;   │      │ file import/    │
+   │ cả hàng đợi  │      │ export): đĩa    │
+   │ job pg-boss) │      │ hoặc S3/MinIO   │
+   └──────────────┘      └─────────────────┘
 ```
 
+Không có Redis, không có tiến trình worker riêng, không có WebSocket ở giai đoạn này (mục 4.1); thêm khi có nhu cầu thật.
+
 ### 3.3 Nguyên tắc thiết kế
-1. **Đa chi nhánh/đa kho, đơn công ty (single-tenant)**: không có `tenant_id`; bảng tồn kho/giao dịch có `branch_id`. Phân quyền theo chi nhánh xử lý ở tầng ứng dụng. Triển khai một instance cho công ty (có thể on-premise hoặc VPS riêng).
+1. **Đa chi nhánh/đa kho (hiện 2 chi nhánh), đơn công ty (single-tenant)**: không có `tenant_id`; tồn kho, giá bán, công nợ, quỹ và chứng từ có `branch_id`. Phân quyền theo chi nhánh xử lý ở tầng ứng dụng (`BranchAccessService`). Triển khai một instance cho công ty (có thể on-premise hoặc VPS riêng).
 2. **Tồn kho theo sổ cái (ledger)**: không sửa số tồn trực tiếp; mọi biến động ghi vào `stock_movements` (append-only), tồn hiện tại = tổng hợp/được cập nhật trong cùng transaction. Đảm bảo truy vết & đối soát.
 3. **Giao dịch nguyên tử**: tạo hóa đơn = trừ kho + ghi sổ quỹ + cập nhật công nợ trong **một transaction**.
-4. **Idempotency**: API tạo hóa đơn nhận `client_request_id` (UUID) để POS gửi lại khi mạng chập chờn mà không bị trùng.
+4. **Idempotency**: API tạo chứng từ nhận header `Idempotency-Key` (bảng `idempotency_keys`) để gửi lại khi mạng chập chờn mà không bị trùng.
 5. **Soft delete + audit log**: không xóa cứng dữ liệu nghiệp vụ; ghi lại ai làm gì, khi nào.
 6. **Tiền tệ**: tiền chứng từ `NUMERIC(18,0)` (đồng); **đơn giá, giá nhập, giá vốn `NUMERIC(18,4)`** (dữ liệu thực có giá lẻ như 219.967,98); **tuyệt đối không dùng float**.
 7. **Múi giờ**: lưu UTC, hiển thị `Asia/Ho_Chi_Minh`.
 8. **Giá vốn**: dùng phương pháp **bình quân gia quyền di động** (giống KiotViet); thiết kế để có thể mở rộng FIFO sau.
 
-### 3.4 POS Offline-first (Phase 2)
+### 3.4 POS Offline-first (Phase 3, không nằm trong phạm vi hiện tại)
 - POS là **PWA** (Service Worker + IndexedDB/Dexie) lưu cache danh mục sản phẩm, giá, khách hàng.
 - Khi mất mạng: tạo hóa đơn lưu hàng đợi cục bộ (kèm `client_request_id`, mã hóa đơn tạm theo thiết bị).
 - Khi có mạng: đồng bộ tuần tự lên server; server kiểm tra idempotency, xử lý xung đột tồn kho (cho phép âm kho hoặc cảnh báo tùy cấu hình).
@@ -189,27 +208,27 @@ Công ty có 2 chi nhánh **dùng chung một hệ thống**: cùng hàng hóa, 
 | Lớp | Công nghệ | Lý do chọn |
 |---|---|---|
 | Ngôn ngữ | **TypeScript** toàn bộ | Dùng chung type FE/BE, giảm lỗi, dễ tuyển dev |
-| Frontend (Admin + POS) | **Next.js (React) + TypeScript** | Hệ sinh thái lớn, SSR/CSR linh hoạt, PWA tốt. *(Có thể dùng Vite + React nếu muốn SPA thuần)* |
+| Frontend (Admin) | **Next.js 16 (React) + TypeScript** | Hệ sinh thái lớn, SSR/CSR linh hoạt. *(POS/PWA: Phase 3)* |
 | UI | **Tailwind CSS + shadcn/ui** (Radix) | Nhanh, tùy biến cao, accessible |
 | Bảng dữ liệu | **TanStack Table** + **TanStack Query** | Bảng lớn, lọc/sắp xếp, cache & đồng bộ server state |
-| State/Form | **Zustand**, **React Hook Form + Zod** | Nhẹ; validate dùng chung schema với backend |
+| State/Form | **Zustand**, **React Hook Form** | Nhẹ. Frontend tự chọn thư viện validate; **nguồn sự thật về dữ liệu là `docs/api/openapi.json`** |
 | Biểu đồ | **Recharts** hoặc **ECharts** | Dashboard & báo cáo |
-| Offline POS | **Workbox (Service Worker) + Dexie.js (IndexedDB)** | PWA offline-first |
-| Backend | **NestJS (Node.js, TypeScript)** | Kiến trúc module sẵn có, DI, phù hợp modular monolith |
+| Offline POS | *(Phase 3, chưa chọn)* | Không nằm trong phạm vi hiện tại |
+| Backend | **NestJS 12 (Node.js, TypeScript, ESM)** | Kiến trúc module sẵn có, DI, phù hợp modular monolith. Test Vitest, lint Oxlint |
 | ORM | **Drizzle ORM** (`drizzle-orm` 0.45 + `drizzle-kit` 0.31, node-postgres) | **Đã chốt.** SQL gần như thuần, kiểu dữ liệu chặt, migration là file SQL đọc/duyệt được; AI agent viết và rà soát ổn định. Không dùng Prisma 8 (RC) |
-| CSDL chính | **PostgreSQL 16+** | ACID, JSONB, RLS, index mạnh, báo cáo tốt |
+| CSDL chính | **PostgreSQL 17** (Docker khi dev) | ACID, JSONB, index mạnh (GIN `pg_trgm`), báo cáo tốt. Test dùng PGlite (PostgreSQL thật trong bộ nhớ) |
 | Cache / Queue | **Bắt đầu KHÔNG cần Redis**: job nền dùng hàng đợi trong PostgreSQL (`pg-boss`); thêm Redis + BullMQ khi thực sự cần | Đội 2 người: ít thành phần vận hành hơn. Quy mô ~65 HĐ/ngày chưa cần cache riêng |
-| Realtime | **WebSocket (Socket.IO)** hoặc SSE | Cập nhật tồn kho/đơn hàng, thông báo |
+| Realtime | *Chưa dùng.* Nếu cần: SSE trước, WebSocket sau | ~65 hóa đơn/ngày: tải lại trang là đủ |
 | Tìm kiếm | PostgreSQL `pg_trgm` + unaccent (đủ cho ~2.800 SKU / ~1.700 khách) | **Không cần Meilisearch** ở quy mô này |
-| File | **S3-compatible** (MinIO tự host hoặc Cloudflare R2/AWS S3) | Ảnh sản phẩm, file import/export |
-| Xác thực | **JWT (access ngắn) + Refresh token (httpOnly cookie)**, argon2 | Chuẩn, an toàn |
-| Phân quyền | **RBAC** (vai trò → quyền theo module/hành động) + giới hạn theo chi nhánh | Giống KiotViet |
-| API | **REST + OpenAPI (Swagger)**; sinh client type tự động | Dễ tích hợp bên thứ ba; (có thể thêm tRPC/GraphQL sau) |
+| File | Đĩa cục bộ hoặc **S3-compatible** (MinIO / Cloudflare R2) | Ảnh sản phẩm (tải về từ KiotViet), file import/export |
+| Xác thực | **Đã triển khai:** JWT HS256 (`jose`, 15 phút, chỉ chứa id) + refresh token ngẫu nhiên trong cookie httpOnly (14 ngày, lưu băm, xoay vòng, phát hiện dùng lại), argon2id | Chuẩn, an toàn; vai trò/quyền đọc từ CSDL mỗi yêu cầu |
+| Phân quyền | **RBAC cấu hình được** (bảng `role_permissions`, 34 quyền, phạm vi `all`/`own`) + giới hạn theo chi nhánh | Quản lý tự phân quyền, không hard-code |
+| API | **REST + OpenAPI (Swagger)** tại `/api/docs`; `docs/api/openapi.json` là hợp đồng cho frontend | Frontend có thể tự sinh client từ OpenAPI nếu muốn (không bắt buộc) |
 | Xuất Excel/PDF | **ExcelJS**, **Puppeteer/Playwright** hoặc **pdfmake** | Báo cáo, hóa đơn A4 |
 | In nhiệt | **ESC/POS** qua WebUSB/WebSerial hoặc dịch vụ in cục bộ (agent) ; hoặc in qua trình duyệt (CSS `@media print`) | Hóa đơn K80/K58, tem mã |
-| Monorepo | **pnpm workspaces + Turborepo** | Chia sẻ package (types, validators, ui) |
-| Test | **Vitest/Jest**, **Playwright** (E2E), **Supertest** | Đơn vị, tích hợp, E2E |
-| CI/CD | **GitHub Actions / GitLab CI** | Lint, test, build, deploy |
+| Monorepo | **pnpm workspaces + Turborepo** | `apps/api`, `apps/web`, `packages/shared` |
+| Test | **Vitest** (đơn vị + HTTP tích hợp trên PGlite), **Supertest**; Playwright cho E2E giao diện (khi có) | Đơn vị, tích hợp, E2E |
+| CI/CD | **GitHub Actions** (đã chạy: lint → typecheck → test → build) | Deploy: sẽ bổ sung |
 | Container | **Docker + docker compose** | Dev/prod đồng nhất |
 | Hạ tầng | VPS/Cloud (Hetzner, DigitalOcean, AWS, hoặc nhà cung cấp VN: Viettel IDC, VNG Cloud) + Nginx/Caddy | Chi phí hợp lý, dữ liệu ở VN nếu cần |
 | Giám sát | **Sentry** (lỗi), **Prometheus + Grafana** hoặc **Grafana Cloud**, log **Loki/ELK** | Quan sát hệ thống |
@@ -226,7 +245,7 @@ Công ty có 2 chi nhánh **dùng chung một hệ thống**: cùng hàng hóa, 
 > **Khuyến nghị**: chọn stack mà **đội của bạn đang mạnh nhất**. Stack TypeScript ở trên được đề xuất vì thống nhất ngôn ngữ và dễ chia sẻ code giữa web/POS/backend.
 
 ### 4.3 Ghi chú sử dụng thư viện
-Khi bắt đầu code, nên tra cứu tài liệu phiên bản mới nhất của từng thư viện (Next.js, NestJS, Drizzle, Prisma, TanStack...) để tránh dùng API cũ.
+Khi bắt đầu code, tra cứu tài liệu phiên bản mới nhất của từng thư viện (Next.js, NestJS, Drizzle, TanStack...) để tránh dùng API cũ. Phiên bản đã dùng ghi ở `CLAUDE.md` mục "Ghi chú về phiên bản".
 
 ---
 
@@ -325,30 +344,31 @@ Các file chứng từ đều là dạng **phẳng**: thông tin phiếu lặp l
 
 Bộ đếm (`code_sequences`) được khởi tạo bằng **số lớn nhất hiện có + 1** của từng tiền tố. Mã cũ lưu nguyên, chỉ thêm cột `legacy_code` nếu cần đối chiếu.
 
-### 5.3 Danh sách bảng (MVP)
+### 5.3 Danh sách bảng (39 bảng đã có trong lược đồ)
+
+Lược đồ chính thức: `apps/api/src/db/schema/` (Drizzle) và `docs/db/` (DBML, từ điển dữ liệu, `schema.sql`, sinh tự động bằng `pnpm db:docs`).
 
 ```
-Hệ thống  : company_profile, branches, users, roles, permissions, user_roles,
-            user_branches, audit_logs, settings, code_sequences, attachments
-Hàng hóa  : categories (cây, parent_id), products, product_images,
-            price_books (7 bảng giá), price_book_items
-Tồn kho   : stocks (branch_id, product_id, on_hand, cost_price, ...),
+Hệ thống  : company_profile, branches, users, role_permissions, user_branches, refresh_tokens,
+            audit_logs, code_sequences, idempotency_keys, import_jobs
+Hàng hóa  : categories (cây), products, product_images, price_books (7 bảng giá),
+            price_book_items (khóa: bảng giá + chi nhánh + sản phẩm)
+Tồn kho   : stocks (chi nhánh + sản phẩm: tồn, giá vốn bình quân, giá nhập cuối, tối thiểu/tối đa, vị trí),
             stock_movements (sổ cái, chỉ thêm),
-            stock_takes, stock_take_items        -- [Phase 2] kiểm kho, thay NCC ảo
-Đối tác   : customers, customer_invoice_profiles, suppliers
-Bán hàng  : orders, order_items,
-            invoices, invoice_items, invoice_payments,
+            stock_transfers, stock_transfer_items      -- chuyển kho 2 bước giữa HN và SG
+Đối tác   : customers, customer_invoice_profiles, customer_branch_terms (hạn mức/kỳ hạn theo chi nhánh),
+            suppliers (có group_name: nhóm NCC, có thể để trống)
+Bán hàng  : orders, order_items, invoices, invoice_items, invoice_payments,
             sales_returns, sales_return_items
-Mua hàng  : purchase_orders, purchase_order_items,  -- [Phase 2] MVP chỉ lưu mã PDN dạng chữ
-            goods_receipts, goods_receipt_items,
-            purchase_returns, purchase_return_items
-Tiền/nợ   : cash_accounts, cash_categories, cash_transactions,
-            debt_ledger, payment_allocations (tùy chọn)
-Phase 2   : product_unit_conversions, quotations, deliveries/delivery_items,
-            stock_transfers, landed_costs, commission_rules, customer_price_rules
-Bỏ/hoãn   : product_variants, product_combos, batches/lô-HSD, customer_groups,
-            sales_channels, delivery_partners, loyalty, promotions
+Mua hàng  : goods_receipts, goods_receipt_items, purchase_returns, purchase_return_items
+Tiền/nợ   : cash_accounts, cash_categories, cash_transactions, debt_ledger, payment_allocations
+Chưa làm  (Phase 2): stock_takes/stock_take_items (kiểm kho, thay NCC ảo), purchase_orders (đặt hàng nhập),
+            product_unit_conversions, quotations, deliveries, landed_costs, commission_rules, customer_price_rules
+Bỏ/hoãn   : product_variants, product_combos, batches/lô-HSD, customer_groups, sales_channels,
+            delivery_partners, loyalty, promotions
 ```
+
+Ghi chú: quyền nằm ở `role_permissions` (vai trò là danh sách cố định 7 giá trị trong mã, không có bảng `roles`/`permissions`/`user_roles`); nhóm khách của KiotViet thực chất là nhân viên phụ trách nên không có bảng `customer_groups` (ADR-13).
 
 ### 5.4 Cột chính của các bảng cốt lõi
 
@@ -452,14 +472,17 @@ Sau import: đối chiếu số lượng bản ghi, tổng tồn × giá vốn, 
 
 ## 6. Thiết kế API
 
-- Tiền tố & phiên bản: `/api/v1/...`
-- Quy ước REST: `GET /products`, `POST /products`, `GET /products/:id`, `PATCH /products/:id`, `DELETE /products/:id`.
-- Phân trang **cursor/offset**, lọc & sắp xếp qua query: `?page=1&limit=20&sort=-created_at&q=...&branchId=...`.
-- Định dạng lỗi thống nhất: `{ "code": "STOCK_NOT_ENOUGH", "message": "...", "details": [...] }`.
-- Header: `Authorization: Bearer`, `X-Branch-Id` (chi nhánh đang làm việc), `Idempotency-Key`.
-- Tài liệu hóa bằng **OpenAPI/Swagger**, sinh SDK TypeScript cho frontend.
-- Rate limit (Redis), CORS chặt, validate đầu vào bằng Zod/class-validator.
-- Webhook ra ngoài (sự kiện hóa đơn, tồn kho) để tích hợp bên thứ ba.
+> **Hợp đồng chính thức: `docs/api/README.md` + `docs/api/endpoints.md` + `docs/api/openapi.json`.** Mục này chỉ tóm tắt nguyên tắc.
+
+- Tiền tố & phiên bản: `/api/v1/...`; JSON camelCase; tiền/giá/số lượng là **chuỗi thập phân**; thời gian ISO 8601 UTC.
+- Quy ước REST: `GET /products`, `POST /products`, `GET /products/:id`, `PATCH /products/:id`; **không xóa cứng** (ngưng/hủy bằng đổi trạng thái).
+- Phân trang `?page=1&limit=20`, lọc/sắp xếp qua query (`sort=-created_at`, `q=` tìm không dấu, `branchId=`). Phản hồi danh sách: `data` + `meta`.
+- **Mọi lỗi** có dạng `{ code, message, details, requestId }` (bộ lọc lỗi toàn cục đã triển khai); `details` của lỗi nhập liệu là `[{ field, message }]`.
+- Header: `Authorization: Bearer`, `X-Branch-Id` (chi nhánh đang làm việc), `Idempotency-Key`, `X-Request-Id`.
+- Mặc định mọi endpoint **cần đăng nhập** (`@Public()` mới công khai) và gắn `@RequirePermission`.
+- Tài liệu hóa bằng **OpenAPI/Swagger**; validate đầu vào bằng **class-validator** (DTO) ở backend.
+- Giới hạn tốc độ: đăng nhập đã có giới hạn riêng (trong bộ nhớ); giới hạn toàn cục sẽ bổ sung, **không dùng Redis** ở giai đoạn này. CORS theo `WEB_ORIGIN`.
+- Webhook ra ngoài: chưa làm (Phase 3).
 
 **Ví dụ endpoint chính:**
 ```
@@ -490,7 +513,7 @@ POST   /imports/products         (upload Excel → job nền)
 ### 7.2 Sơ đồ điều hướng
 
 ```
-Đăng nhập → (chi nhánh mặc định)
+Đăng nhập → chọn chi nhánh làm việc (mặc định: Hà Nội; Quản lý chuyển được giữa HN/SG)
  ├─ Tổng quan
  ├─ Hàng hóa ─ Danh sách hàng hóa │ Thiết lập giá
  ├─ Mua hàng ─ Nhà cung cấp │ Nhập hàng │ Trả hàng nhập
@@ -501,7 +524,7 @@ POST   /imports/products         (upload Excel → job nền)
 ```
 *(Phạm vi đã chốt, mục 2.2. Nhân viên, Khuyến mãi, POS thuộc giai đoạn sau.)*
 
-### 7.3 Màn hình POS (bố cục gợi ý)
+### 7.3 Màn hình POS (bố cục gợi ý — Phase 3, không thuộc phạm vi hiện tại)
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │ [Tab HĐ 1][Tab HĐ 2][+]            Thu ngân: A │ Chi nhánh X │
@@ -524,14 +547,14 @@ Gợi ý: dựng **design system** riêng (token màu, spacing, component) trư�
 ## 8. Phân quyền & bảo mật
 
 ### 8.1 Phân quyền (RBAC)
-- Quyền chi tiết theo `module.hành_động` (VD: `invoice.create`, `invoice.cancel`, `product.cost.view`, `report.finance.view`).
-- Vai trò mặc định: Chủ, Quản lý, Thu ngân, Thủ kho, Kế toán, Nhân viên KD; cho phép tạo vai trò tùy chỉnh.
-- Giới hạn theo **chi nhánh** (user chỉ thấy/chỉ thao tác chi nhánh được gán).
+- Quyền chi tiết theo `module.hành_động` (VD: `invoice.create`, `invoice.cancel`, `product.cost.view`); danh mục 34 quyền ở `packages/shared/src/permissions.ts`. Quyền có thể có **phạm vi** `all` hoặc `own` (chỉ dữ liệu của mình).
+- **7 vai trò cố định**: Quản lý, Trợ lý, Kế toán, Kho, Lái xe, Sale, Marketing. Quản lý luôn đủ quyền và **cấu hình quyền cho các vai trò còn lại** qua `/roles/...` (bảng `role_permissions`); chưa hỗ trợ tạo vai trò mới hay ngoại lệ riêng từng người.
+- Giới hạn theo **chi nhánh** (nhân viên chỉ thấy/thao tác chi nhánh được gán; Quản lý thấy cả hai).
 - Quyền nhạy cảm cần xác nhận: sửa giá, giảm giá vượt ngưỡng, hủy hóa đơn, xem giá vốn (có thể yêu cầu PIN quản lý).
 
 ### 8.2 Bảo mật
-- Mật khẩu băm **argon2id**; chính sách mật khẩu; tùy chọn **2FA (TOTP)**; khóa tạm khi đăng nhập sai nhiều lần.
-- HTTPS bắt buộc, HSTS, cookie `httpOnly; Secure; SameSite`, CSRF protection.
+- Mật khẩu băm **argon2id**; chính sách mật khẩu (10–128 ký tự, không chứa tên đăng nhập); bắt đổi mật khẩu lần đầu; khóa tạm khi đăng nhập sai quá 5 lần/15 phút; 2FA (TOTP) *chưa làm*.
+- HTTPS bắt buộc ở production, HSTS; cookie refresh `httpOnly; Secure; SameSite=Lax; Path=/api/v1/auth`; access token chỉ giữ trong bộ nhớ của trình duyệt.
 - Chống OWASP Top 10: SQL injection (ORM/parameterized), XSS (escape, CSP), IDOR (kiểm tra quyền chi nhánh `branch_id` ở mọi truy vấn), SSRF, upload file an toàn.
 - Mã hóa dữ liệu nhạy cảm (secret tích hợp) – dùng KMS/secret manager, không commit `.env`.
 - **Audit log** bất biến cho thao tác quan trọng.
@@ -544,10 +567,10 @@ Gợi ý: dựng **design system** riêng (token màu, spacing, component) trư�
 
 | Hạng mục | Mục tiêu đề xuất |
 |---|---|
-| Hiệu năng POS | Tìm hàng < 200ms; tạo hóa đơn < 1s (p95) |
-| Hiệu năng API | p95 < 500ms cho thao tác thường |
-| Khả dụng | ≥ 99.5% (POS vẫn bán được nhờ offline) |
-| Quy mô | Hàng trăm nghìn SKU, hàng triệu hóa đơn/năm, vài chục chi nhánh |
+| Hiệu năng tìm kiếm | Tìm hàng/khách (không dấu) < 200ms |
+| Hiệu năng API | p95 < 500ms cho thao tác thường; tạo hóa đơn < 1s (p95) |
+| Khả dụng | ≥ 99.5% giờ làm việc (không có POS offline) |
+| Quy mô thiết kế | **2 chi nhánh, ~2.800 SKU, ~1.700 khách, ~65 hóa đơn/ngày** (~24.000/năm); dư địa gấp 10 lần không cần đổi kiến trúc |
 | Báo cáo | Báo cáo nặng chạy nền hoặc dùng bảng tổng hợp (materialized view/aggregate) |
 | Khả năng bảo trì | Coverage test ≥ 70% phần nghiệp vụ lõi; lint/format bắt buộc |
 | Trình duyệt hỗ trợ | Chrome/Edge/Safari/Firefox bản mới (2 năm gần nhất) |
@@ -559,38 +582,27 @@ Gợi ý: dựng **design system** riêng (token màu, spacing, component) trư�
 ```
 kiot/
 ├─ apps/
-│  ├─ web/            # Next.js – Admin + POS (PWA)
 │  ├─ api/            # NestJS – backend (modular monolith)
-│  └─ worker/         # (tùy chọn) tách job nền; ban đầu chạy chung tiến trình với api
+│  └─ web/            # Next.js – giao diện quản trị
 ├─ packages/
-│  ├─ shared-types/   # type, enum, hằng số dùng chung
-│  ├─ validators/     # schema Zod dùng chung FE/BE
-│  ├─ ui/             # component UI dùng chung
-│  └─ config/         # eslint, tsconfig, tailwind preset
-├─ docs/              # tài liệu, ADR, sơ đồ
-├─ infra/             # docker-compose, nginx, scripts triển khai
-├─ .github/workflows/ # CI/CD
+│  └─ shared/         # kiểu, hằng số, danh mục quyền, mã chứng từ dùng chung (build ra dist/)
+├─ docs/              # tài liệu thiết kế, hợp đồng API (docs/api), lược đồ CSDL (docs/db)
+├─ infra/             # docker-compose (PostgreSQL)
+├─ .github/workflows/ # CI
 └─ package.json / pnpm-workspace.yaml / turbo.json
 ```
 
-Cấu trúc một module backend (ví dụ `sales`):
-```
-apps/api/src/modules/sales/
-├─ sales.module.ts
-├─ controllers/  (invoices.controller.ts, returns.controller.ts)
-├─ services/     (invoice.service.ts, ...)
-├─ domain/       (entities, events, rules)
-├─ dto/
-└─ tests/
-```
+Sẽ bổ sung khi cần: tiến trình worker riêng (hiện job nền chạy chung `api`), `packages/ui`, cấu hình triển khai.
+
+Cấu trúc một module backend (thực tế, ví dụ `auth`): `apps/api/src/modules/auth/` gồm `*.module.ts`, `*.controller.ts`, `*.service.ts`, `*.dto.ts`, `*.guard.ts`, `*.spec.ts` (test đặt cạnh mã). Module không truy cập bảng của module khác trực tiếp; dùng service của module đó.
 
 ---
 
 ## 11. Quy trình phát triển & triển khai
 
-- **Git flow gọn**: `main` (production), `develop`, nhánh `feature/*`; Pull Request + review bắt buộc; Conventional Commits.
+- **Git**: Hiện chỉ **một người** viết backend nên đang commit thẳng vào `main` (CI chạy sau mỗi lần đẩy). **Từ phân hệ Hàng hóa/Giá trở đi** (và mọi thay đổi chạm tiền/kho/nợ): làm trên nhánh `feature/*` rồi Pull Request, **người thứ hai duyệt** trước khi merge (quy tắc số 9 của `CLAUDE.md`). Không cần nhánh `develop`. Conventional Commits.
 - **Môi trường**: local (docker compose) → staging → production.
-- **CI**: lint → type-check → unit test → build → E2E (nhánh chính). **CD**: tự động deploy staging, duyệt tay lên production.
+- **CI** (GitHub Actions, đã chạy): lint → typecheck → test → build. Bổ sung sau: kiểm tra `openapi.json` và `docs/db` đã sinh lại, E2E giao diện. **CD**: tự động deploy staging, duyệt tay lên production (chưa làm).
 - **Migration CSDL** chạy tự động, có kế hoạch rollback; không sửa tay trên production.
 - **Feature flag** cho tính năng chưa hoàn thiện.
 - **Dữ liệu seed & dữ liệu demo** để test; công cụ **di chuyển dữ liệu từ KiotViet** (import Excel hàng hóa/khách hàng/tồn đầu kỳ) – rất quan trọng khi công ty chuyển đổi.
@@ -605,10 +617,10 @@ apps/api/src/modules/sales/
 | AI agent | Sinh code theo spec, viết test, import/đối chiếu dữ liệu, tài liệu, refactor — **luôn qua PR có người duyệt** |
 
 **Nguyên tắc để AI làm việc hiệu quả và an toàn**
-1. **Đặt tài liệu này (và ERD) làm nguồn sự thật trong repo** (`docs/`), kèm `CLAUDE.md`/`AGENTS.md` ghi quy ước: cấu trúc module, đặt tên, cách chạy test, các điều **không được làm** (không dùng float cho tiền, không sửa tồn trực tiếp, không bỏ qua transaction).
+1. **Đặt tài liệu này, `docs/api/`, `docs/db/` làm nguồn sự thật trong repo**, kèm `CLAUDE.md` (đã có) ghi quy ước: cấu trúc module, đặt tên, cách chạy test, các điều **không được làm** (không dùng float cho tiền, không sửa tồn trực tiếp, không bỏ qua transaction).
 2. **Thiết kế theo spec nhỏ, từng lát dọc** (vertical slice): mỗi tính năng = 1 spec ngắn (đầu vào, quy tắc, ví dụ số) → AI viết code + test → người duyệt. Tránh giao "làm cả module".
 3. **Test là hàng rào chính**: viết test nghiệp vụ trước/đồng thời cho phần nhạy cảm — tính giá theo bảng giá, giá vốn bình quân, cân bằng kho, cấn trừ công nợ, số dư sổ quỹ. Dùng **chính dữ liệu KiotViet làm bộ test đối chiếu** (ví dụ: tổng công nợ, tồn × giá vốn, tồn quỹ phải khớp file gốc).
-4. **Kiểu dữ liệu chặt**: TypeScript strict + schema Zod/OpenAPI dùng chung → AI sai kiểu sẽ lỗi ngay khi biên dịch/CI.
+4. **Kiểu dữ liệu chặt**: TypeScript strict + DTO `class-validator` + OpenAPI sinh từ mã → AI sai kiểu sẽ lỗi ngay khi biên dịch/CI.
 5. **Mọi thay đổi qua PR + CI xanh**; phần chạm tiền/kho/nợ bắt buộc có người đọc kỹ. AI không có quyền ghi trực tiếp vào production hoặc chạy migration production.
 6. **Không đưa dữ liệu thật (tên, SĐT, địa chỉ khách) vào prompt, repo hay log**: dùng dữ liệu đã ẩn danh/giả lập cho dev và test; file Excel gốc để ngoài repo (thêm vào `.gitignore`).
 7. **Giữ stack nhỏ và quen thuộc** để AI sinh code chính xác và hai người vận hành nổi: một ngôn ngữ (TypeScript), một CSDL (PostgreSQL), ít dịch vụ phụ.
@@ -629,7 +641,8 @@ apps/api/src/modules/sales/
 | Phụ thuộc vào 1–2 người (nghỉ việc/ốm) | Trung bình | Tài liệu + ADR trong repo, CI/CD tự động, backup & hướng dẫn khôi phục viết sẵn |
 | Lộ dữ liệu khách hàng qua công cụ AI | Trung bình | Chỉ dùng dữ liệu ẩn danh trong dev/test, không commit file Excel gốc |
 | Sai lệch tồn kho / giá vốn | Cao | Ledger append-only, transaction, test kỹ nghiệp vụ, công cụ đối soát |
-| POS offline phức tạp (xung đột đồng bộ) | Cao | Thiết kế idempotency + UUID từ đầu, thử nghiệm kịch bản mất mạng |
+| Quyết định nghiệp vụ còn mở (mục 5.8: VAT, vai trò, mã chứng từ…) làm trễ cổng G0 | Cao | Họp chốt với kế toán/chủ trong tuần 1; ghi giả định tạm vào `MEMORY.md`; không mở lại sau tuần 2 |
+| Làm một mình ở backend, không có người duyệt phần chạm tiền/kho/nợ | Trung bình | Từ phân hệ Hàng hóa: nhánh + PR có người thứ hai duyệt; test đối chiếu số liệu KiotViet |
 | Hiệu năng báo cáo khi dữ liệu lớn | Trung bình | Index, bảng tổng hợp, job nền, partition |
 | Tích hợp bên thứ ba thay đổi API | Trung bình | Lớp adapter, retry/queue, theo dõi lỗi |
 | Mất dữ liệu | Cao | Backup tự động + test restore, replica |
@@ -649,9 +662,9 @@ Phạm vi theo đúng 7 phân hệ ở mục 2.2:
 
 | Phân hệ | Làm trong 2 tháng |
 |---|---|
-| Nền | Đăng nhập, 7 vai trò với **quyền do Quản lý cấu hình được** (danh mục ~31 quyền, phạm vi tất cả/chỉ của mình, backend + API đã xong), nhật ký thao tác, 1 chi nhánh (vẫn có `branch_id`), backup |
-| Chuyển dữ liệu | Import sản phẩm, bảng giá, khách, NCC, **tồn đầu kỳ, nợ đầu kỳ, quỹ đầu kỳ**, tải ảnh về kho file |
-| Hàng hóa | Danh sách hàng hóa (+ thẻ kho, nhập/xuất Excel), Thiết lập giá (7 bảng giá, lưới sửa giá, hàng loạt) |
+| Nền | **Đã xong ở backend (tuần 1):** đăng nhập JWT, 7 vai trò với **quyền do Quản lý cấu hình được** (34 quyền, phạm vi tất cả/chỉ của mình), **2 chi nhánh** (giá/tồn/nợ/quỹ riêng, chuyển kho 2 bước), tìm không dấu, bộ lọc lỗi toàn cục, seed. **Còn lại:** quản lý người dùng, nhật ký thao tác (ghi `requestId`/chi nhánh), backup |
+| Chuyển dữ liệu | Import sản phẩm, bảng giá, khách, NCC (giữ nhóm NCC vào `group_name`), **tồn đầu kỳ, nợ đầu kỳ, quỹ đầu kỳ** — có tham số **chi nhánh đích**; bỏ email thử của khách và NCC kiểm kê ảo; tải ảnh về kho file |
+| Hàng hóa | Danh sách hàng hóa (+ thẻ kho, tồn theo chi nhánh, nhập/xuất Excel), Thiết lập giá (7 bảng giá × 2 chi nhánh, lưới sửa giá, hàng loạt, sao chép giữa chi nhánh) |
 | Mua hàng | Nhà cung cấp (+ công nợ), Nhập hàng (giá vốn bình quân), Trả hàng nhập |
 | Đơn hàng | **Engine tính giá**, Đặt hàng (màn hình tạo đơn sỉ, đặt cọc, giữ hàng), Hóa đơn (in A4), Trả hàng bán |
 | Sổ quỹ | Phiếu thu/chi, danh mục thu chi, thu nợ khách + cấn trừ, trả nợ NCC, quỹ tiền mặt/ngân hàng |
@@ -675,7 +688,7 @@ Phạm vi theo đúng 7 phân hệ ở mục 2.2:
 **Cách tăng tốc (đã tính vào lịch):**
 1. Dùng mẫu giao diện admin có sẵn (shadcn/ui + TanStack Table), **không thiết kế riêng**; chỉ đầu tư đặc biệt vào màn hình tạo đơn sỉ.
 2. Sinh CRUD/migration/import bằng AI theo spec; người dành thời gian cho nghiệp vụ lõi và duyệt.
-3. **Chốt nghiệp vụ trong 2 ngày đầu** (mục 5.8); không mở lại sau tuần 2 trừ lỗi nghiêm trọng.
+3. **Chốt nghiệp vụ trong 2 ngày đầu** (mục 5.8: còn câu 3, 4, 5 và vài giả định); không mở lại sau tuần 2 trừ lỗi nghiêm trọng.
 4. Một môi trường staging dùng chung, deploy tự động mỗi lần merge.
 5. Test tự động chỉ tập trung phần tiền/kho/nợ (giá, giá vốn, cấn trừ, sổ quỹ); phần giao diện kiểm tay.
 
@@ -700,7 +713,7 @@ Cổng       G0▲       G1▲        G2▲                  G3▲(8/1)
 
 | Tuần | Dev A (nghiệp vụ + backend) | Dev B (giao diện + hạ tầng) | Đầu ra / cổng |
 |---|---|---|---|
-| **W1** (9/11) | Chốt nghiệp vụ với kế toán (mục 5.8); ERD gọn; skeleton API, auth, `code_sequences` | Xuất dữ liệu bổ sung từ KiotViet (6 bảng giá, nhân viên, quỹ); repo + CI + staging + `CLAUDE.md`; wireframe màn hình tạo đơn và dashboard | **G0**: nghiệp vụ chốt, staging chạy, ERD duyệt |
+| **W1** (9/11) | Chốt nghiệp vụ với kế toán (mục 5.8). *Backend nền đã xong sớm (từ 04/11): lược đồ 39 bảng, auth JWT, phân quyền, 2 chi nhánh, chuyển kho, seed, CI.* | Xuất dữ liệu bổ sung từ KiotViet (6 bảng giá, nhân viên, quỹ); repo + CI + staging + `CLAUDE.md`; wireframe màn hình tạo đơn và dashboard | **G0**: nghiệp vụ chốt, staging chạy, ERD duyệt |
 | **W2** (16/11) | Sản phẩm, nhóm hàng, 7 bảng giá, khách, NCC (API + migration) | Khung giao diện, bảng dữ liệu chung; màn hình **Danh sách hàng hóa** | Danh sách hàng hóa thao tác được |
 | **W3** (23/11) | **Công cụ import** (SP, bảng giá, khách, NCC, nhân viên) + tải ảnh; **engine tính giá** + test | **Thiết lập giá** (lưới, hàng loạt, Excel), Nhà cung cấp, **Khách hàng** (danh sách, form, hồ sơ xuất hóa đơn); **khung báo cáo dùng chung** (bộ lọc kỳ, bảng, xuất Excel) | **G1**: import khớp 2.787 SP / 1.665 KH |
 | **W4** (30/11) | Sổ cái tồn kho + tồn đầu kỳ; sổ cái công nợ + nợ đầu kỳ; thẻ kho; **báo cáo Tồn kho** | **Đặt hàng**: màn hình tạo đơn sỉ (bàn phím, giá/tồn/công nợ tức thì); giao diện báo cáo Tồn kho | Tạo được phiếu tạm; báo cáo Tồn kho đúng |
@@ -754,6 +767,8 @@ Lưu ý lịch: W6–W9 trùng mùa cao điểm trước Tết → **UAT chỉ n
 
 ## 13B. Phương án đầy đủ (~5 tháng, để tham khảo)
 
+> **Chỉ để tham khảo, không cập nhật theo các thay đổi sau bản 0.1** (có thể còn nhắc 1 chi nhánh, chuyển kho ở Phase 2, vai trò cũ…). Lịch đang thực hiện là mục 13.
+>
 > Giữ lại để so sánh: phạm vi đầy đủ hơn (kiểm kho, trả hàng nhập, bản sửa hóa đơn, báo cáo đủ, import lịch sử), có đệm và chạy song song dài hơn. Dùng khi 2 tháng không khả thi.
 
 Lộ trình thiết kế cho **đội 2 người + AI agent**, bắt đầu **thứ Hai 09/11/2026**, mục tiêu **go-live 01/04/2027** (đầu tháng/đầu quý để chốt công nợ và tồn quỹ đầu kỳ sạch). Phương án dự phòng: **01/05/2027**, quyết định tại cổng G2.
@@ -905,11 +920,11 @@ Mốc khó nhất; **ưu tiên đúng nghiệp vụ hơn đẹp giao diện**.
 |---|---|---|
 | ADR-01 | Modular monolith, chưa dùng microservices | Đơn giản vận hành, đủ tốt cho quy mô công ty |
 | ADR-02 | TypeScript full-stack (Next.js + NestJS) | Chia sẻ type/validator, thống nhất đội ngũ |
-| ADR-03 | PostgreSQL làm CSDL duy nhất cho dữ liệu nghiệp vụ | ACID, RLS, báo cáo, tránh phức tạp đa CSDL |
+| ADR-03 | PostgreSQL làm CSDL duy nhất cho dữ liệu nghiệp vụ (kể cả hàng đợi job); chưa dùng Redis | ACID, báo cáo, ít thành phần vận hành |
 | ADR-04 | Tồn kho dạng ledger append-only | Truy vết, đối soát, an toàn dữ liệu |
 | ADR-05 | Single-tenant (nội bộ công ty), multi-branch/kho từ đầu (nay là 2 chi nhánh: Hà Nội, Sài Gòn) | Đơn giản hơn; đa chi nhánh khó bổ sung về sau |
 | ADR-06 | ~~POS offline ở Phase 2~~ → hạ xuống Phase 3; ưu tiên quy trình đơn sỉ + công nợ | Chốt bán sỉ: ít đơn/giá trị lớn, thường có mạng |
-| ADR-07 | Engine giá riêng (khách > nhóm > chung; bậc thang; đơn vị) | Bán sỉ phụ thuộc bảng giá phức tạp |
+| ADR-07 | Engine giá riêng: giá riêng khách > bảng giá của khách > Bảng giá chung **cùng chi nhánh**; giảm giá là số tiền/đơn vị. Bậc thang/đơn vị: sau | Bán sỉ phụ thuộc bảng giá phức tạp |
 | ADR-08 | Đơn hàng dùng state machine, hỗ trợ giao từng phần | Vòng đời đơn sỉ nhiều bước |
 | ADR-09 | Công nợ theo sổ cái, cho phép số dư âm, thu theo khách rồi cấn trừ hóa đơn | 90% hóa đơn mua chịu; 111 khách có số dư âm; thu nợ không gắn hóa đơn |
 | ADR-10 | Sản phẩm phẳng (không biến thể/combo/lô/HSD), 1 SKU = 1 quy cách | Dữ liệu thực không dùng các khái niệm này |
@@ -921,5 +936,9 @@ Mốc khó nhất; **ưu tiên đúng nghiệp vụ hơn đẹp giao diện**.
 | ADR-16 | Hai chi nhánh dùng chung dữ liệu gốc; giá bán, tồn kho, giá vốn, công nợ, quỹ và chứng từ tách theo `branch_id` | Giá và tồn khác nhau; công nợ tách biệt hoàn toàn |
 | ADR-17 | Giá vốn bình quân gia quyền lưu ở `stocks` (theo chi nhánh), không ở `products` | Mỗi chi nhánh nhập và giữ hàng riêng |
 | ADR-18 | Chuyển kho là chứng từ riêng (không phải hóa đơn/phiếu nhập), 2 bước; chi nhánh là khách/nhà cung cấp nội bộ; phí vận chuyển cộng vào giá nhập bên nhận | Không làm sai doanh thu; theo dõi được công nợ và phí giữa 2 chi nhánh |
+| ADR-19 | Xác thực: access JWT 15 phút chỉ chứa id; refresh token ngẫu nhiên (không phải JWT) trong cookie httpOnly, lưu băm, xoay vòng + phát hiện dùng lại; vai trò/trạng thái đọc từ CSDL mỗi yêu cầu | Khóa tài khoản/đổi quyền có hiệu lực ngay; token bị đánh cắp bị phát hiện |
+| ADR-20 | Mọi lỗi API theo `{ code, message, details, requestId }` qua bộ lọc lỗi toàn cục | Frontend xử lý lỗi thống nhất; không lộ chi tiết nội bộ |
+| ADR-21 | Chi nhánh mặc định là Hà Nội (04/11/2026) | Chủ dự án quyết định |
+| ADR-22 | Nhóm nhà cung cấp chỉ là cột dữ liệu `suppliers.group_name` (có thể trống), không có nghiệp vụ riêng | Công ty không cần theo dõi nợ/ứng riêng cho tài xế, nhân viên |
 
-> Các quyết định trên có thể thay đổi sau khi trả lời các câu hỏi ở mục 1.3.
+> Các quyết định trên có thể thay đổi khi các câu hỏi còn mở ở mục 5.8 được trả lời.
