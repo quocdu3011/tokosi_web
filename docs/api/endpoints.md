@@ -366,13 +366,13 @@ Dùng khi người dùng chọn khách / thêm hàng để **hiển thị đúng
 
 ### 3.1 Nhà cung cấp
 
-| Method | Đường dẫn                       | Mô tả                                          | Quyền           | Mốc |
-| ------ | ------------------------------- | ---------------------------------------------- | --------------- | --- |
-| GET    | `/suppliers`                    | Danh sách (`q`, `kind`, `hasDebt`, `isActive`) | `purchase.view` | W3  |
-| GET    | `/suppliers/:id`                | Chi tiết + `balance`                           | `purchase.view` | W3  |
-| POST   | `/suppliers`                    | Tạo                                            | `purchase.edit` | W3  |
-| PATCH  | `/suppliers/:id`                | Sửa / ngưng                                    | `purchase.edit` | W3  |
-| GET    | `/suppliers/:id/ledger?from&to` | Sổ công nợ NCC                                 | `purchase.view` | W7  |
+| Method | Đường dẫn                       | Mô tả                                                       | Quyền           | Mốc |
+| ------ | ------------------------------- | ----------------------------------------------------------- | --------------- | --- |
+| GET    | `/suppliers`                    | Danh sách (`q`, `kind`, `groupName`, `hasDebt`, `isActive`) | `purchase.view` | W3  |
+| GET    | `/suppliers/:id`                | Chi tiết + `balance`                                        | `purchase.view` | W3  |
+| POST   | `/suppliers`                    | Tạo                                                         | `purchase.edit` | W3  |
+| PATCH  | `/suppliers/:id`                | Sửa / ngưng                                                 | `purchase.edit` | W3  |
+| GET    | `/suppliers/:id/ledger?from&to` | Sổ công nợ NCC                                              | `purchase.view` | W7  |
 
 ```json
 // Supplier
@@ -381,6 +381,7 @@ Dùng khi người dùng chọn khách / thêm hàng để **hiển thị đúng
   "code": "NCC000002",
   "name": "Công ty TNHH ABC",
   "kind": "goods",
+  "groupName": null, // nhóm nhà cung cấp: chuỗi tự do, có thể null (để trống); chỉ để phân loại/lọc, không ảnh hưởng nghiệp vụ
   "phone": "0901234567",
   "address": null,
   "taxCode": null,

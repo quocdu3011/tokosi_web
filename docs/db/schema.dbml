@@ -859,6 +859,7 @@ Table suppliers {
   code text [not null, unique]
   name text [not null]
   kind supplier_kind [not null, default: 'goods']
+  group_name text
   phone text
   address text
   tax_code text
@@ -875,7 +876,7 @@ Table suppliers {
     (kind) [name: 'suppliers_kind_idx']
   }
 
-  Note: '''Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng khác.'''
+  Note: '''Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng khác; group_name là nhóm NCC (chuỗi tự do, có thể để trống).'''
 }
 
 Table user_branches {

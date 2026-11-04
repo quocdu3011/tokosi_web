@@ -445,7 +445,7 @@ Sau import: đối chiếu số lượng bản ghi, tổng tồn × giá vốn, 
 3. ⏳ Số 10 chữ số đi sau tên nhân viên là gì (mã nhân viên, điện thoại, ID KiotViet)? — _trả lời sau_
 4. ⏳ `CTMTH…` là loại phiếu chi gì? — _trả lời sau_
 5. ⏳ Có cần hóa đơn VAT/HĐĐT không? (có 3 bảng giá VAT và 9 khách công ty nhưng cột trạng thái HĐĐT rỗng và chỉ 1 khách có MST). — _trả lời sau_
-6. ✅ **Không cần quan tâm nhóm nhà cung cấp** (Lái xe, "tạm giữ lương"): không theo dõi nợ/ứng của tài xế, nhân viên trong hệ thống. Khi import **bỏ qua** các nhà cung cấp thuộc các nhóm này (cùng NCC kiểm kê ảo); không cần `party_type = employee`, không cần `suppliers.kind`.
+6. ✅ **Không cần xử lý nghiệp vụ riêng cho nhóm nhà cung cấp** (Lái xe, "tạm giữ lương"): không theo dõi nợ/ứng của tài xế, nhân viên thành đối tượng riêng. Nhưng **vẫn có cột `suppliers.group_name`** (chuỗi tự do, **có thể để trống**) để lưu nhóm NCC từ KiotViet. Khi import: giữ nguyên các NCC này như NCC thường kèm giá trị nhóm; chỉ bỏ NCC kiểm kê ảo.
 7. ✅ **Giữ lịch sử chứng từ, thời gian tạm thời là không giới hạn** (không xóa/đưa vào kho lưu trữ theo hạn). Phù hợp quy tắc không xóa cứng chứng từ.
 
 ---

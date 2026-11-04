@@ -505,7 +505,7 @@ Thông tin xuất hóa đơn VAT/điện tử của khách.
 
 ### suppliers
 
-Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng khác.
+Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng khác; group_name là nhóm NCC (chuỗi tự do, có thể để trống).
 
 | Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
 | --- | --- | :-: | --- | --- |
@@ -513,6 +513,7 @@ Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng 
 | `code` | text |  |  | unique |
 | `name` | text |  |  |  |
 | `kind` | supplier_kind |  | `'goods'` |  |
+| `group_name` | text | ✔ |  |  |
 | `phone` | text | ✔ |  |  |
 | `address` | text | ✔ |  |  |
 | `tax_code` | text | ✔ |  |  |

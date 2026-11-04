@@ -123,7 +123,7 @@ const TABLE_NOTES: Record<string, string> = {
     'Khách hàng. Công nợ không lưu ở đây: số dư = tổng debt_ledger (có thể âm). sales_owner_id = nhân viên phụ trách.',
   customer_invoice_profiles: 'Thông tin xuất hóa đơn VAT/điện tử của khách.',
   suppliers:
-    'Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng khác.',
+    'Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng khác; group_name là nhóm NCC (chuỗi tự do, có thể để trống).',
   orders: 'Đặt hàng. draft = phiếu tạm giữ hàng; một đơn → tối đa một hóa đơn.',
   order_items: 'Dòng hàng của đơn đặt hàng.',
   invoices:

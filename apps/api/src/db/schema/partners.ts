@@ -90,6 +90,8 @@ export const suppliers = pgTable(
     code: text().notNull().unique(),
     name: text().notNull(),
     kind: supplierKind().notNull().default('goods'),
+    /** Nhóm nhà cung cấp (tên tự do, như "Nhóm NCC" của KiotViet). Có thể để trống; hệ thống không dựa vào nó để xử lý nghiệp vụ. */
+    groupName: text(),
     phone: text(),
     address: text(),
     taxCode: text(),
