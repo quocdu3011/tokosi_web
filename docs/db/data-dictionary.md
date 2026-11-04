@@ -82,6 +82,7 @@ Người dùng đăng nhập. Vai trò cố định (enum user_role).
 **Chỉ mục:**
 
 - `users_role_idx`: `role`
+- `users_username_lower_unique` (unique): `lower(username)`
 
 ### refresh_tokens
 

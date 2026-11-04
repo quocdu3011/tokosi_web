@@ -910,6 +910,7 @@ Table users {
 
   indexes {
     (role) [name: 'users_role_idx']
+    (`lower(username)`) [name: 'users_username_lower_unique', unique]
   }
 
   Note: '''Người dùng đăng nhập. Vai trò cố định (enum user_role).'''

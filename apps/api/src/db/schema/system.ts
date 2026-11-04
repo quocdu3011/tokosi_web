@@ -58,7 +58,11 @@ export const users = pgTable(
     ...timestamps(),
     ...softDelete(),
   },
-  (t) => [index('users_role_idx').on(t.role)],
+  (t) => [
+    index('users_role_idx').on(t.role),
+    // Tên đăng nhập không phân biệt hoa thường: chặn 'An' và 'an' cùng tồn tại (service luôn đưa về chữ thường)
+    uniqueIndex('users_username_lower_unique').on(sql`lower(${t.username})`),
+  ],
 );
 
 /** Refresh token (lưu băm, không lưu token thô). */

@@ -21,20 +21,23 @@ Ký hiệu: `?` = tùy chọn · `[]` = mảng · tiền/giá/số lượng là 
 
 ## 1. Hệ thống & xác thực
 
-> **Trạng thái: đã triển khai** (có trong Swagger `/api/docs` và `openapi.json`) — `/health`, `/auth/*`, `/branches`, `/roles…`, `/permissions/catalog`.
+> **Trạng thái: đã triển khai** (có trong Swagger `/api/docs` và `openapi.json`) — `/health`, `/auth/*`, `/branches`, `/users…`, `/roles…`, `/permissions/catalog`.
 
-| Method         | Đường dẫn                   | Mô tả                                                     | Quyền                   | Mốc |
-| -------------- | --------------------------- | --------------------------------------------------------- | ----------------------- | --- |
-| GET            | `/health`                   | Kiểm tra sống                                             | công khai               | ✔   |
-| POST           | `/auth/login`               | Đăng nhập                                                 | công khai               | ✔   |
-| POST           | `/auth/refresh`             | Lấy access token mới (dùng cookie `refresh_token`)        | công khai (cần cookie)  | ✔   |
-| POST           | `/auth/logout`              | Đăng xuất: thu hồi phiên hiện tại, xóa cookie             | công khai (dùng cookie) | ✔   |
-| GET            | `/auth/me`                  | Thông tin người dùng + quyền + chi nhánh hiện tại         | đã đăng nhập            | ✔   |
-| POST           | `/auth/change-password`     | Đổi mật khẩu (thu hồi mọi phiên cũ, cấp phiên mới)        | đã đăng nhập            | ✔   |
-| GET            | `/branches`                 | Chi nhánh người dùng được phép làm việc (Quản lý: tất cả) | đã đăng nhập            | ✔   |
-| GET/POST/PATCH | `/users`, `/users/:id`      | Quản lý người dùng                                        | `user.manage`           | W8  |
-| POST           | `/users/:id/reset-password` | Đặt lại mật khẩu (đặt lại cờ `mustChangePassword`)        | `user.manage`           | W8  |
-| PUT            | `/users/:id/branches`       | Gán chi nhánh cho người dùng `{ branchIds: [...] }`       | `user.manage`           | W8  |
+| Method | Đường dẫn                   | Mô tả                                                              | Quyền                   | Mốc |
+| ------ | --------------------------- | ------------------------------------------------------------------ | ----------------------- | --- |
+| GET    | `/health`                   | Kiểm tra sống                                                      | công khai               | ✔   |
+| POST   | `/auth/login`               | Đăng nhập                                                          | công khai               | ✔   |
+| POST   | `/auth/refresh`             | Lấy access token mới (dùng cookie `refresh_token`)                 | công khai (cần cookie)  | ✔   |
+| POST   | `/auth/logout`              | Đăng xuất: thu hồi phiên hiện tại, xóa cookie                      | công khai (dùng cookie) | ✔   |
+| GET    | `/auth/me`                  | Thông tin người dùng + quyền + chi nhánh hiện tại                  | đã đăng nhập            | ✔   |
+| POST   | `/auth/change-password`     | Đổi mật khẩu (thu hồi mọi phiên cũ, cấp phiên mới)                 | đã đăng nhập            | ✔   |
+| GET    | `/branches`                 | Chi nhánh người dùng được phép làm việc (Quản lý: tất cả)          | đã đăng nhập            | ✔   |
+| GET    | `/users`                    | Danh sách người dùng (`q`, `role`, `isActive`, `page`, `limit`)    | `user.manage`           | ✔   |
+| GET    | `/users/:id`                | Chi tiết một người dùng                                            | `user.manage`           | ✔   |
+| POST   | `/users`                    | Tạo người dùng                                                     | `user.manage`           | ✔   |
+| PATCH  | `/users/:id`                | Sửa thông tin / vai trò / khóa-mở tài khoản                        | `user.manage`           | ✔   |
+| POST   | `/users/:id/reset-password` | Đặt lại mật khẩu (bắt đổi ở lần đăng nhập kế tiếp)                 | `user.manage`           | ✔   |
+| PUT    | `/users/:id/branches`       | Gán chi nhánh `{ branchIds, defaultBranchId? }` (thay thế toàn bộ) | `user.manage`           | ✔   |
 
 **POST `/auth/login`**
 
@@ -102,6 +105,48 @@ Ký hiệu: `?` = tùy chọn · `[]` = mảng · tiền/giá/số lượng là 
 **Tài khoản bị bắt đổi mật khẩu (`mustChangePassword = true`)** — gặp ở tài khoản Quản lý khởi tạo và tài khoản vừa được đặt lại mật khẩu. Mọi endpoint khác ngoài `/auth/me`, `/auth/change-password`, `/auth/logout` trả `403 PASSWORD_CHANGE_REQUIRED`. Frontend: sau khi đăng nhập, nếu `user.mustChangePassword` là true thì chuyển thẳng sang màn hình đổi mật khẩu.
 
 **GET `/branches`** → `[ { "id": "…", "code": "SG", "name": "Chi nhánh Sài Gòn", "isDefault": true } ]` — chỉ các chi nhánh người dùng được phép (đã sắp theo mã).
+
+**Quản lý người dùng (`/users…`, chỉ Quản lý — quyền `user.manage` không cấp được cho vai trò khác)**
+
+```jsonc
+// User  (GET /users/:id, phần tử của GET /users, kết quả POST/PATCH/PUT)
+{
+  "id": "0192…", "code": "NV0002", "username": "ketoan01", "fullName": "Nguyễn Văn A",
+  "role": "accountant",                  // manager | assistant | accountant | warehouse | driver | sales | marketing
+  "phone": "0901234567",                 // null nếu chưa có
+  "isActive": true,
+  "mustChangePassword": true,
+  "lastLoginAt": "2026-11-04T07:00:00.000Z",   // null nếu chưa từng đăng nhập
+  "defaultBranchId": "0193…",            // null nếu chưa đặt
+  "branchIds": ["0192…", "0193…"],       // chi nhánh được gán (Quản lý làm việc được ở mọi chi nhánh bất kể danh sách này)
+  "createdAt": "2026-11-04T07:00:00.000Z"
+}
+
+// GET /users?q=nguyen&role=sales&isActive=true&page=1&limit=20   →   { "data": [User], "meta": { page, limit, total, totalPages } }
+// q tìm không dấu theo mã / tên đăng nhập / họ tên / SĐT; limit tối đa 100
+
+// POST /users
+{ "username": "ketoan01", "fullName": "Nguyễn Văn A", "role": "accountant", "phone": "0901234567",
+  "branchIds": ["0192…"], "defaultBranchId": "0192…", "password": "tùy chọn" }
+// 201 → User + "temporaryPassword" (chỉ khi KHÔNG gửi "password"; hiện đúng một lần, header Cache-Control: no-store)
+
+// PATCH /users/:id        (mọi field đều tùy chọn)
+{ "fullName": "…", "phone": null, "role": "sales", "isActive": false, "defaultBranchId": "0192…" }
+
+// POST /users/:id/reset-password
+{ "newPassword": "tùy chọn" }           // 200 → { "temporaryPassword": "…" } khi không gửi newPassword; ngược lại {}
+
+// PUT /users/:id/branches
+{ "branchIds": ["0192…"], "defaultBranchId": "0192…" }   // thay thế toàn bộ; 200 → User
+```
+
+- **Tên đăng nhập:** chữ thường không dấu, số, `.` `_` `-`, 3–32 ký tự; gửi chữ hoa thì server đưa về chữ thường; **không đổi được** sau khi tạo; trùng (không phân biệt hoa thường) → `409 DUPLICATE_USERNAME`.
+- **Mật khẩu:** cùng chính sách với đổi mật khẩu (10–128 ký tự, không chứa tên đăng nhập). Không gửi thì hệ thống sinh mật khẩu tạm — **hiển thị cho Quản lý một lần rồi chuyển cho người dùng** (không xem lại được). Tài khoản mới và tài khoản vừa đặt lại luôn bị bắt đổi mật khẩu ở lần đăng nhập đầu (`mustChangePassword = true`).
+- **Chi nhánh:** mọi vai trò trừ Quản lý phải có ít nhất 1 chi nhánh (`400 VALIDATION_ERROR`, `details[0].field = "branchIds"`); `defaultBranchId` phải nằm trong danh sách gán. Gán lại danh sách mà chi nhánh mặc định không còn trong đó thì mặc định bị bỏ (`null`).
+- **Khóa tài khoản** (`isActive = false`): thu hồi mọi phiên ngay — access token đang cầm bị từ chối ở yêu cầu kế tiếp (`401`), không làm mới được nữa. **Không có xóa người dùng.**
+- **Đặt lại mật khẩu:** thu hồi mọi phiên của người đó; **không áp dụng cho chính mình** (dùng `POST /auth/change-password`).
+- **Ràng buộc an toàn** (`400 INVALID_STATE`): không tự khóa mình; không đổi vai trò của chính mình; không khóa hoặc hạ vai trò Quản lý hoạt động cuối cùng.
+- Mọi thay đổi ghi vào nhật ký thao tác (`audit_logs`, `entityType = "user"`), **không bao giờ ghi mật khẩu**.
 
 ---
 

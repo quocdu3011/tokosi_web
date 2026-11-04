@@ -432,6 +432,339 @@
           "Xác thực"
         ]
       }
+    },
+    "/api/v1/users": {
+      "get": {
+        "operationId": "UsersController_list",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Tìm không dấu theo mã / tên đăng nhập / họ tên / SĐT",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "manager",
+                "assistant",
+                "accountant",
+                "warehouse",
+                "driver",
+                "sales",
+                "marketing"
+              ]
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo trạng thái hoạt động",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserListDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Không có quyền `user.manage` (chỉ Quản lý)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách người dùng (tìm không dấu, lọc, phân trang)",
+        "tags": [
+          "Người dùng"
+        ]
+      },
+      "post": {
+        "description": "Tài khoản mới bị bắt đổi mật khẩu ở lần đăng nhập đầu. Bỏ trống `password` thì hệ thống sinh mật khẩu tạm và trả `temporaryPassword` (chỉ một lần).",
+        "operationId": "UsersController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserWithPasswordDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Không có quyền `user.manage` (chỉ Quản lý)"
+          },
+          "409": {
+            "description": "`DUPLICATE_USERNAME`"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tạo người dùng",
+        "tags": [
+          "Người dùng"
+        ]
+      }
+    },
+    "/api/v1/users/{id}": {
+      "get": {
+        "operationId": "UsersController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Không có quyền `user.manage` (chỉ Quản lý)"
+          },
+          "404": {
+            "description": "Không tìm thấy người dùng"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Chi tiết một người dùng",
+        "tags": [
+          "Người dùng"
+        ]
+      },
+      "patch": {
+        "description": "Không có xóa người dùng: khóa bằng `isActive = false` (thu hồi mọi phiên đăng nhập ngay). Không tự khóa hoặc đổi vai trò của mình; không khóa hay hạ Quản lý hoạt động cuối cùng (`INVALID_STATE`).",
+        "operationId": "UsersController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Không có quyền `user.manage` (chỉ Quản lý)"
+          },
+          "404": {
+            "description": "Không tìm thấy người dùng"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sửa thông tin / vai trò / khóa-mở tài khoản",
+        "tags": [
+          "Người dùng"
+        ]
+      }
+    },
+    "/api/v1/users/{id}/reset-password": {
+      "post": {
+        "description": "Đặt mật khẩu mới, bắt đổi ở lần đăng nhập kế tiếp và thu hồi mọi phiên đang đăng nhập của người đó. Không áp dụng cho chính mình (dùng `POST /auth/change-password`). Bỏ trống `newPassword` thì hệ thống sinh và trả `temporaryPassword` (chỉ một lần).",
+        "operationId": "UsersController_resetPassword",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "temporaryPassword": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Không có quyền `user.manage` (chỉ Quản lý)"
+          },
+          "404": {
+            "description": "Không tìm thấy người dùng"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Đặt lại mật khẩu",
+        "tags": [
+          "Người dùng"
+        ]
+      }
+    },
+    "/api/v1/users/{id}/branches": {
+      "put": {
+        "description": "Mọi vai trò trừ Quản lý phải có ít nhất một chi nhánh. Chi nhánh mặc định không còn được gán thì bị bỏ.",
+        "operationId": "UsersController_setBranches",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetUserBranchesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Không có quyền `user.manage` (chỉ Quản lý)"
+          },
+          "404": {
+            "description": "Không tìm thấy người dùng"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Gán chi nhánh cho người dùng (thay thế toàn bộ danh sách)",
+        "tags": [
+          "Người dùng"
+        ]
+      }
     }
   },
   "info": {
@@ -882,6 +1215,320 @@
         "required": [
           "currentPassword",
           "newPassword"
+        ]
+      },
+      "UserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "NV0002"
+          },
+          "username": {
+            "type": "string",
+            "example": "ketoan01"
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Nguyễn Văn A"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "manager",
+              "assistant",
+              "accountant",
+              "warehouse",
+              "driver",
+              "sales",
+              "marketing"
+            ]
+          },
+          "phone": {
+            "type": "object",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "mustChangePassword": {
+            "type": "boolean",
+            "description": "true = phải đổi mật khẩu ở lần đăng nhập kế tiếp"
+          },
+          "lastLoginAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "defaultBranchId": {
+            "type": "object",
+            "nullable": true
+          },
+          "branchIds": {
+            "description": "Chi nhánh được gán. Quản lý luôn làm việc được ở mọi chi nhánh bất kể danh sách này",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "username",
+          "fullName",
+          "role",
+          "phone",
+          "isActive",
+          "mustChangePassword",
+          "lastLoginAt",
+          "defaultBranchId",
+          "branchIds",
+          "createdAt"
+        ]
+      },
+      "UserListMetaDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "totalPages": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages"
+        ]
+      },
+      "UserListDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/UserListMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "CreateUserDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "example": "ketoan01",
+            "description": "Chữ thường không dấu, số, `.` `_` `-`; 3–32 ký tự. Không đổi được sau khi tạo"
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Nguyễn Văn A"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "manager",
+              "assistant",
+              "accountant",
+              "warehouse",
+              "driver",
+              "sales",
+              "marketing"
+            ]
+          },
+          "phone": {
+            "type": "string",
+            "example": "0901234567"
+          },
+          "branchIds": {
+            "description": "Chi nhánh được gán (id từ `GET /branches`). Bắt buộc có ít nhất 1 với mọi vai trò trừ Quản lý",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "defaultBranchId": {
+            "type": "string",
+            "description": "Chi nhánh mặc định; phải nằm trong `branchIds`"
+          },
+          "password": {
+            "type": "string",
+            "description": "Mật khẩu ban đầu (10–128 ký tự, không chứa tên đăng nhập). Bỏ trống để hệ thống tự sinh và trả `temporaryPassword`"
+          }
+        },
+        "required": [
+          "username",
+          "fullName",
+          "role",
+          "branchIds"
+        ]
+      },
+      "UserWithPasswordDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "NV0002"
+          },
+          "username": {
+            "type": "string",
+            "example": "ketoan01"
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Nguyễn Văn A"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "manager",
+              "assistant",
+              "accountant",
+              "warehouse",
+              "driver",
+              "sales",
+              "marketing"
+            ]
+          },
+          "phone": {
+            "type": "object",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "mustChangePassword": {
+            "type": "boolean",
+            "description": "true = phải đổi mật khẩu ở lần đăng nhập kế tiếp"
+          },
+          "lastLoginAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "defaultBranchId": {
+            "type": "object",
+            "nullable": true
+          },
+          "branchIds": {
+            "description": "Chi nhánh được gán. Quản lý luôn làm việc được ở mọi chi nhánh bất kể danh sách này",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "temporaryPassword": {
+            "type": "string",
+            "description": "Mật khẩu tạm do hệ thống sinh — **chỉ hiện đúng một lần**, hãy chuyển cho người dùng. Không có khi quản trị tự đặt mật khẩu. Người dùng bị bắt đổi ở lần đăng nhập đầu"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "username",
+          "fullName",
+          "role",
+          "phone",
+          "isActive",
+          "mustChangePassword",
+          "lastLoginAt",
+          "defaultBranchId",
+          "branchIds",
+          "createdAt"
+        ]
+      },
+      "UpdateUserDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "object",
+            "nullable": true,
+            "description": "null = xóa số"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "manager",
+              "assistant",
+              "accountant",
+              "warehouse",
+              "driver",
+              "sales",
+              "marketing"
+            ],
+            "description": "Không đổi được vai trò của chính mình"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "false = khóa tài khoản (thu hồi mọi phiên ngay). Không tự khóa mình; không khóa Quản lý cuối cùng"
+          },
+          "defaultBranchId": {
+            "type": "object",
+            "nullable": true,
+            "description": "Chi nhánh mặc định; null = bỏ"
+          }
+        }
+      },
+      "ResetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "newPassword": {
+            "type": "string",
+            "description": "Mật khẩu mới do quản trị đặt. Bỏ trống để hệ thống tự sinh và trả `temporaryPassword`"
+          }
+        }
+      },
+      "SetUserBranchesDto": {
+        "type": "object",
+        "properties": {
+          "branchIds": {
+            "description": "Danh sách chi nhánh MỚI (thay thế toàn bộ)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "defaultBranchId": {
+            "type": "object",
+            "nullable": true,
+            "description": "Chi nhánh mặc định mới. Bỏ qua = giữ nếu vẫn còn được gán, ngược lại bỏ"
+          }
+        },
+        "required": [
+          "branchIds"
         ]
       }
     }

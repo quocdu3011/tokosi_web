@@ -571,3 +571,5 @@ UPDATE "branches" SET "is_default" = false WHERE "code" = 'SG' AND "is_default" 
 
 -- ===== 0010_nha_cung_cap_nhom.sql =====
 ALTER TABLE "suppliers" ADD COLUMN "group_name" text;
+-- ===== 0011_ten_dang_nhap_khong_phan_biet_hoa_thuong.sql =====
+CREATE UNIQUE INDEX "users_username_lower_unique" ON "users" USING btree (lower("username"));

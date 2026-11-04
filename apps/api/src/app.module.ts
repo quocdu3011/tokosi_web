@@ -5,6 +5,7 @@ import { HealthModule } from './health/health.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { AuthorizationModule } from './modules/authorization/authorization.module.js';
 import { BranchesModule } from './modules/branches/branches.module.js';
+import { UsersModule } from './modules/users/users.module.js';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { BranchesModule } from './modules/branches/branches.module.js';
     AuthorizationModule,
     BranchesModule,
     AuthModule,
+    UsersModule,
   ],
 })
 export class AppModule {}

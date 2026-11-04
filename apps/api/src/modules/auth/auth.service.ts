@@ -3,11 +3,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNull, lt } from 'drizzle-orm';
 import type { Grant, Role } from '@kiot/shared';
 import { AppError } from '../../common/app-error.js';
-import {
-  MIN_PASSWORD_LENGTH,
-  hashPassword,
-  verifyPassword,
-} from '../../common/password.js';
+import { hashPassword, verifyPassword } from '../../common/password.js';
+import { passwordProblems } from '../../common/password-policy.js';
 import { APP_CONFIG, type AppConfig } from '../../config/app-config.js';
 import { DB, type Database } from '../../db/database.module.js';
 import { auditLogs, refreshTokens, users } from '../../db/schema/index.js';
@@ -20,7 +17,6 @@ import {
   hashRefreshToken,
 } from './token.service.js';
 
-export const MAX_PASSWORD_LENGTH = 128;
 /** Trong khoảng này sau khi một refresh token bị thu hồi, dùng lại nó chỉ bị từ chối (không coi là bị đánh cắp). */
 const REFRESH_REUSE_GRACE_MS = 10_000;
 
@@ -323,11 +319,13 @@ export class AuthService {
     };
   }
 
-  private async revokeAllSessions(
+  /** Thu hồi mọi phiên đăng nhập của một người dùng (đổi mật khẩu, nghi bị đánh cắp, quản trị khóa/đặt lại). */
+  async revokeAllSessions(
     userId: string,
-    reason: 'password_change' | 'reuse',
+    reason: 'password_change' | 'reuse' | 'admin',
+    db: Pick<Database, 'update'> = this.db,
   ): Promise<void> {
-    await this.db
+    await db
       .update(refreshTokens)
       .set({ revokedAt: new Date(), revokeReason: reason })
       .where(
@@ -340,30 +338,7 @@ export class AuthService {
     current: string,
     username: string,
   ): void {
-    const problems: Array<{ field: string; message: string }> = [];
-    if (next.length < MIN_PASSWORD_LENGTH) {
-      problems.push({
-        field: 'newPassword',
-        message: `Mật khẩu mới phải dài ít nhất ${MIN_PASSWORD_LENGTH} ký tự`,
-      });
-    } else if (next.length > MAX_PASSWORD_LENGTH) {
-      problems.push({
-        field: 'newPassword',
-        message: `Mật khẩu mới không được dài quá ${MAX_PASSWORD_LENGTH} ký tự`,
-      });
-    }
-    if (next === current) {
-      problems.push({
-        field: 'newPassword',
-        message: 'Mật khẩu mới phải khác mật khẩu hiện tại',
-      });
-    }
-    if (next.toLowerCase().includes(username.toLowerCase())) {
-      problems.push({
-        field: 'newPassword',
-        message: 'Mật khẩu mới không được chứa tên đăng nhập',
-      });
-    }
+    const problems = passwordProblems(next, { username, current });
     if (problems.length > 0)
       throw new AppError(
         400,
