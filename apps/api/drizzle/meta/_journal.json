@@ -64,6 +64,13 @@
       "when": 1793777353991,
       "tag": "0008_refresh_token_revoke_reason",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793779074667,
+      "tag": "0009_chi_nhanh_mac_dinh_ha_noi",
+      "breakpoints": true
     }
   ]
 }

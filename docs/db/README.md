@@ -113,7 +113,7 @@ Phiếu chuyển kho **không phải hóa đơn bán** nên không vào doanh th
 
 | Nhóm               | Nội dung                                                                                                                                                                        |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Chi nhánh          | `SG` Chi nhánh Sài Gòn (mặc định) và `HN` Chi nhánh Hà Nội                                                                                                                      |
+| Chi nhánh          | `HN` Chi nhánh Hà Nội (mặc định) và `SG` Chi nhánh Sài Gòn                                                                                                                      |
 | Khách/NCC nội bộ   | Mỗi chi nhánh có 1 khách hàng và 1 nhà cung cấp hệ thống (`CN-SG`, `CN-HN`) để chuyển kho coi chi nhánh kia là khách/nhà cung cấp                                               |
 | Bảng giá           | 7 bảng: `CHUNG` (mặc định), `LON`, `VUA`, `VIP` và 3 bản VAT `LON_VAT`, `VUA_VAT`, `VIP_VAT`                                                                                    |
 | Quỹ                | **4 quỹ**: "Tiền mặt" và "Ngân hàng" riêng cho từng chi nhánh (số dư đầu kỳ = 0, đặt lại khi cắt chuyển)                                                                        |

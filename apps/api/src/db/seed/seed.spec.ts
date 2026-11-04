@@ -68,11 +68,11 @@ describe('runSeed (CSDL thật trong bộ nhớ)', () => {
     ).toEqual(['LON_VAT', 'VIP_VAT', 'VUA_VAT']);
   });
 
-  it('hai chi nhánh (Sài Gòn mặc định, Hà Nội), mỗi chi nhánh có quỹ tiền mặt + ngân hàng riêng', async () => {
+  it('hai chi nhánh (Hà Nội mặc định, Sài Gòn), mỗi chi nhánh có quỹ tiền mặt + ngân hàng riêng', async () => {
     await runSeed(db, { adminPassword: PASSWORD, companyName: 'Công ty thử' });
     const rows = await db.select().from(branches);
     expect(rows.map((b) => b.code).sort()).toEqual(['HN', 'SG']);
-    expect(rows.filter((b) => b.isDefault).map((b) => b.code)).toEqual(['SG']);
+    expect(rows.filter((b) => b.isDefault).map((b) => b.code)).toEqual(['HN']);
 
     const accounts = await db.select().from(cashAccounts);
     expect(accounts).toHaveLength(4);
@@ -162,10 +162,10 @@ describe('runSeed (CSDL thật trong bộ nhớ)', () => {
       isActive: true,
     });
     expect(admin?.passwordHash).not.toContain(PASSWORD);
-    const sgBranch = (
-      await db.select().from(branches).where(eq(branches.code, 'SG'))
+    const hnBranch = (
+      await db.select().from(branches).where(eq(branches.code, 'HN'))
     )[0];
-    expect(admin?.defaultBranchId).toBe(sgBranch?.id);
+    expect(admin?.defaultBranchId).toBe(hnBranch?.id);
     expect(await verifyPassword(admin!.passwordHash, PASSWORD)).toBe(true);
   });
 

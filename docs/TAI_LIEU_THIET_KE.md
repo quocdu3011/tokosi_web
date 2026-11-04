@@ -127,7 +127,7 @@ Công ty có 2 chi nhánh **dùng chung một hệ thống**: cùng hàng hóa, 
 | Người dùng | Nhân viên được gán chi nhánh; Quản lý xem cả hai |
 | Trả hàng | Về chi nhánh của hóa đơn gốc |
 | Mã chứng từ | Một dãy số chung cho cả hai chi nhánh (giả định, chưa xác nhận) |
-| Dữ liệu cũ | Chi nhánh còn lại cũng ở KiotViet, nhập sau; chưa biết "Chi nhánh trung tâm" cũ là Hà Nội hay Sài Gòn (tạm đặt Sài Gòn là mặc định) |
+| Dữ liệu cũ | Chi nhánh còn lại cũng ở KiotViet, nhập sau; **chi nhánh mặc định là Hà Nội** (chủ dự án chốt 04/11/2026) |
 
 **Ảnh hưởng lịch 2 tháng:** thêm khoảng 5–7 ngày (giá/tồn/nợ/quỹ theo chi nhánh 3–4 ngày, chuyển kho 2–3 ngày; chuyển kho vốn thuộc Phase 2). Phần lược đồ, seed, tồn kho theo chi nhánh, chuyển kho và quyền truy cập chi nhánh đã làm xong ở backend (tuần 1); còn lại là các màn hình và gắn `branch_id` vào từng phân hệ khi xây. Nếu trễ: cắt Trả hàng nhập và biểu đồ Dashboard trước.
 

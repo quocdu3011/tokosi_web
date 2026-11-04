@@ -564,3 +564,7 @@ DROP INDEX "price_book_items_product_idx";DROP INDEX "debt_ledger_party_idx";ALT
 ALTER TABLE "customers" DROP COLUMN "credit_limit";ALTER TABLE "customers" DROP COLUMN "payment_term_days";
 -- ===== 0008_refresh_token_revoke_reason.sql =====
 ALTER TABLE "refresh_tokens" ADD COLUMN "revoke_reason" text;
+-- ===== 0009_chi_nhanh_mac_dinh_ha_noi.sql =====
+-- Chủ dự án chốt (04/11/2026): chi nhánh mặc định là Hà Nội (trước đó tạm đặt Sài Gòn).
+-- Chỉ ảnh hưởng CSDL đã seed; CSDL mới do seed tạo sẵn đúng. Bỏ cờ cũ trước vì chỉ mục duy nhất một chi nhánh mặc định.
+UPDATE "branches" SET "is_default" = false WHERE "code" = 'SG' AND "is_default" = true;UPDATE "branches" SET "is_default" = true WHERE "code" = 'HN' AND NOT EXISTS (SELECT 1 FROM "branches" WHERE "is_default" = true);

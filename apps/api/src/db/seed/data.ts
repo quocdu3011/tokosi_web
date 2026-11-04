@@ -6,12 +6,12 @@ import { USER_CODE_PREFIX } from '@kiot/shared';
 
 /**
  * Hai chi nhánh dùng chung một hệ thống (cùng hàng hóa, khách hàng, nhà cung cấp) nhưng khác giá, tồn kho,
- * công nợ, quỹ và đơn hàng. Chi nhánh mặc định = Sài Gòn (đa số khách trong dữ liệu KiotViet có tiền tố "SG");
+ * công nợ, quỹ và đơn hàng. Chi nhánh mặc định = Hà Nội (chủ dự án chốt 04/11/2026);
  * chưa xác nhận "Chi nhánh trung tâm" cũ là chi nhánh nào — xử lý khi nhập dữ liệu (docs/TAI_LIEU_THIET_KE.md).
  */
 export const BRANCHES = [
-  { code: 'SG', name: 'Chi nhánh Sài Gòn', isDefault: true },
-  { code: 'HN', name: 'Chi nhánh Hà Nội', isDefault: false },
+  { code: 'SG', name: 'Chi nhánh Sài Gòn', isDefault: false },
+  { code: 'HN', name: 'Chi nhánh Hà Nội', isDefault: true },
 ] as const;
 
 /**

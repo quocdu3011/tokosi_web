@@ -91,7 +91,7 @@ export async function runSeed(
   let generatedAdminPassword: string | undefined;
 
   await db.transaction(async (tx) => {
-    // Chi nhánh (Sài Gòn mặc định, Hà Nội)
+    // Chi nhánh (Hà Nội mặc định, Sài Gòn)
     report.branches = (
       await tx
         .insert(branches)
