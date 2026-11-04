@@ -57,6 +57,13 @@
       "when": 1793755209271,
       "tag": "0007_bo_han_muc_chung",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793777353991,
+      "tag": "0008_refresh_token_revoke_reason",
+      "breakpoints": true
     }
   ]
 }

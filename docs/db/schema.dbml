@@ -691,6 +691,7 @@ Table refresh_tokens {
   token_hash text [not null, unique]
   expires_at timestamptz [not null]
   revoked_at timestamptz
+  revoke_reason text
   user_agent text
   ip text
   created_at timestamptz [not null, default: `now()`]

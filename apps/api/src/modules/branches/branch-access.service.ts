@@ -34,6 +34,26 @@ export class BranchAccessService {
     return rows.map((r) => r.id);
   }
 
+  /** Chi nhánh người dùng được phép, kèm thông tin hiển thị (sắp theo mã). */
+  async listAllowed(
+    user: AuthUser,
+  ): Promise<
+    Array<{ id: string; code: string; name: string; isDefault: boolean }>
+  > {
+    const ids = await this.allowedBranchIds(user);
+    if (ids.length === 0) return [];
+    return this.db
+      .select({
+        id: branches.id,
+        code: branches.code,
+        name: branches.name,
+        isDefault: branches.isDefault,
+      })
+      .from(branches)
+      .where(inArray(branches.id, ids))
+      .orderBy(branches.code);
+  }
+
   /** Ném 403 `BRANCH_FORBIDDEN` nếu người dùng không được phép dùng chi nhánh này. */
   async assertAccess(user: AuthUser, branchId: string): Promise<void> {
     const allowed = await this.allowedBranchIds(user);

@@ -72,6 +72,8 @@ export const refreshTokens = pgTable(
     tokenHash: text().notNull().unique(),
     expiresAt: tstz().notNull(),
     revokedAt: tstz(),
+    /** Lý do thu hồi: rotated | logout | password_change | reuse. Chỉ `rotated` bị dùng lại mới coi là nghi bị đánh cắp. */
+    revokeReason: text(),
     userAgent: text(),
     ip: text(),
     createdAt: tstz().notNull().defaultNow(),

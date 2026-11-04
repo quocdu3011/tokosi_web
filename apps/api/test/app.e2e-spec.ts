@@ -6,6 +6,8 @@ import { AppModule } from './../src/app.module.js';
 import { configureApp } from './../src/app.setup.js';
 
 process.env.DATABASE_URL ??= 'postgresql://test:test@localhost:5432/test';
+process.env.JWT_ACCESS_SECRET ??=
+  'e2e-test-secret-not-for-production-0123456789';
 
 describe('API (e2e)', () => {
   let app: INestApplication<App>;

@@ -48,10 +48,15 @@ Công ty có **2 chi nhánh dùng chung một hệ thống**. Người dùng là
 
 ## 2. Xác thực
 
-- Đăng nhập nhận `accessToken` (JWT, sống ngắn ~15 phút) trong body. `refreshToken` nằm trong **cookie httpOnly** (`SameSite=Lax`) — frontend **không** đọc được và **không** cần lưu.
-- Khi API trả `401` với `code = TOKEN_EXPIRED`: gọi `POST /auth/refresh` (trình duyệt tự gửi cookie, cần `credentials: 'include'`), nhận `accessToken` mới rồi **thử lại đúng 1 lần** yêu cầu cũ. Nếu refresh cũng `401` → về trang đăng nhập.
-- Lưu `accessToken` trong **bộ nhớ** (biến/state), không lưu `localStorage`.
-- CORS: backend cho phép origin của web (`http://localhost:3000` khi dev) kèm credentials.
+Chi tiết endpoint và ví dụ: [`endpoints.md`](endpoints.md) mục 1. Quy tắc chung:
+
+- Đăng nhập nhận `accessToken` (**JWT HS256, sống 15 phút**) trong body, gửi trong header `Authorization: Bearer …`. Token chỉ chứa id người dùng; **vai trò, quyền, trạng thái tài khoản và chi nhánh luôn được server đọc lại ở mỗi yêu cầu** nên khóa tài khoản hay đổi vai trò/quyền có hiệu lực ngay.
+- **Refresh token** là chuỗi ngẫu nhiên (không phải JWT) nằm trong **cookie httpOnly** `refresh_token` (`SameSite=Lax`, `Path=/api/v1/auth`, sống 14 ngày; có cờ `Secure` ở production). Frontend **không đọc được và không cần lưu**; chỉ cần gọi `fetch(..., { credentials: 'include' })` tới `/auth/*`.
+- Khi API trả `401` với `code = TOKEN_EXPIRED`: gọi `POST /auth/refresh`, nhận `accessToken` mới rồi **thử lại đúng 1 lần** yêu cầu cũ. Nếu refresh cũng `401` → xóa mọi trạng thái đăng nhập và về trang đăng nhập. Các `401` khác (`UNAUTHENTICATED`) → về trang đăng nhập luôn.
+- Lưu `accessToken` trong **bộ nhớ** (biến/state), không lưu `localStorage`/`sessionStorage`. Sau khi tải lại trang thì gọi `POST /auth/refresh` để lấy lại token (cookie vẫn còn).
+- **Gom các lần refresh:** nếu nhiều yêu cầu cùng nhận `TOKEN_EXPIRED`, chỉ gọi refresh **một lần** (chia sẻ một Promise). Gọi song song có thể khiến một lời gọi bị từ chối.
+- Sai mật khẩu nhiều lần bị chặn tạm (`429 RATE_LIMITED`). Đăng nhập, làm mới, đăng xuất, health là endpoint **công khai**; mọi endpoint còn lại cần token.
+- CORS: backend cho phép origin của web (`http://localhost:3000` khi dev, biến `WEB_ORIGIN`) kèm credentials. Production cần HTTPS cho cookie `Secure`.
 
 ## 3. Kiểu dữ liệu
 
@@ -121,26 +126,27 @@ Mọi lỗi có cùng cấu trúc:
 - `details`: tùy lỗi; với lỗi dữ liệu nhập là mảng `{ field, message }` để gắn vào từng ô.
 - `requestId`: gửi kèm khi báo lỗi cho backend.
 
-| HTTP | `code`                  | Ý nghĩa / cách xử lý                                                     |
-| ---- | ----------------------- | ------------------------------------------------------------------------ |
-| 400  | `VALIDATION_ERROR`      | Dữ liệu sai; `details` chỉ rõ từng field                                 |
-| 400  | `INVALID_STATE`         | Thao tác không hợp lệ với trạng thái hiện tại (vd sửa đơn đã hoàn thành) |
-| 401  | `UNAUTHENTICATED`       | Chưa đăng nhập / token sai → về trang đăng nhập                          |
-| 401  | `TOKEN_EXPIRED`         | Gọi `/auth/refresh` rồi thử lại 1 lần                                    |
-| 403  | `FORBIDDEN`             | Không đủ quyền; ẩn/khóa chức năng tương ứng                              |
-| 404  | `NOT_FOUND`             | Không tồn tại hoặc đã bị xóa                                             |
-| 409  | `DUPLICATE_CODE`        | Trùng mã (sản phẩm, khách…)                                              |
-| 409  | `DUPLICATE_PHONE`       | Trùng số điện thoại khách hàng                                           |
-| 409  | `IDEMPOTENCY_CONFLICT`  | Cùng `Idempotency-Key` nhưng nội dung khác                               |
-| 409  | `VERSION_CONFLICT`      | Dữ liệu đã bị người khác sửa (gửi lại `updatedAt` mới nhất)              |
-| 422  | `STOCK_NOT_ENOUGH`      | Không đủ tồn để xuất hóa đơn                                             |
-| 422  | `CREDIT_LIMIT_EXCEEDED` | Vượt hạn mức công nợ **(cảnh báo mềm ở MVP: xem `warnings` ở endpoint)** |
-| 422  | `PRICE_NOT_FOUND`       | Sản phẩm không có giá ở bảng giá và cả bảng chung                        |
-| 422  | `ALLOCATION_EXCEEDS`    | Số tiền cấn trừ lớn hơn số còn nợ của hóa đơn                            |
-| 400  | `BRANCH_REQUIRED`       | Cần chọn chi nhánh làm việc (gửi `X-Branch-Id`)                          |
-| 403  | `BRANCH_FORBIDDEN`      | Không được phép làm việc với chi nhánh này                               |
-| 429  | `RATE_LIMITED`          | Gọi quá nhanh; thử lại sau                                               |
-| 500  | `INTERNAL_ERROR`        | Lỗi hệ thống; báo kèm `requestId`                                        |
+| HTTP | `code`                     | Ý nghĩa / cách xử lý                                                                    |
+| ---- | -------------------------- | --------------------------------------------------------------------------------------- |
+| 400  | `VALIDATION_ERROR`         | Dữ liệu sai; `details` chỉ rõ từng field                                                |
+| 400  | `INVALID_STATE`            | Thao tác không hợp lệ với trạng thái hiện tại (vd sửa đơn đã hoàn thành)                |
+| 401  | `UNAUTHENTICATED`          | Chưa đăng nhập / token sai → về trang đăng nhập                                         |
+| 401  | `TOKEN_EXPIRED`            | Gọi `/auth/refresh` rồi thử lại 1 lần                                                   |
+| 403  | `FORBIDDEN`                | Không đủ quyền; ẩn/khóa chức năng tương ứng                                             |
+| 403  | `PASSWORD_CHANGE_REQUIRED` | Phải đổi mật khẩu trước (`user.mustChangePassword`) → chuyển sang màn hình đổi mật khẩu |
+| 404  | `NOT_FOUND`                | Không tồn tại hoặc đã bị xóa                                                            |
+| 409  | `DUPLICATE_CODE`           | Trùng mã (sản phẩm, khách…)                                                             |
+| 409  | `DUPLICATE_PHONE`          | Trùng số điện thoại khách hàng                                                          |
+| 409  | `IDEMPOTENCY_CONFLICT`     | Cùng `Idempotency-Key` nhưng nội dung khác                                              |
+| 409  | `VERSION_CONFLICT`         | Dữ liệu đã bị người khác sửa (gửi lại `updatedAt` mới nhất)                             |
+| 422  | `STOCK_NOT_ENOUGH`         | Không đủ tồn để xuất hóa đơn                                                            |
+| 422  | `CREDIT_LIMIT_EXCEEDED`    | Vượt hạn mức công nợ **(cảnh báo mềm ở MVP: xem `warnings` ở endpoint)**                |
+| 422  | `PRICE_NOT_FOUND`          | Sản phẩm không có giá ở bảng giá và cả bảng chung                                       |
+| 422  | `ALLOCATION_EXCEEDS`       | Số tiền cấn trừ lớn hơn số còn nợ của hóa đơn                                           |
+| 400  | `BRANCH_REQUIRED`          | Cần chọn chi nhánh làm việc (gửi `X-Branch-Id`)                                         |
+| 403  | `BRANCH_FORBIDDEN`         | Không được phép làm việc với chi nhánh này                                              |
+| 429  | `RATE_LIMITED`             | Gọi quá nhanh; thử lại sau                                                              |
+| 500  | `INTERNAL_ERROR`           | Lỗi hệ thống; báo kèm `requestId`                                                       |
 
 ## 6. Idempotency (chống tạo trùng)
 
@@ -288,3 +294,4 @@ Dùng để khởi tạo lần đầu (`pnpm db:seed`) và cho nút "Khôi phụ
 | 2026-11-03 | Đổi vai trò từ 4 sang 7 theo cơ cấu công ty: `manager`, `assistant`, `accountant`, `warehouse`, `driver`, `sales`, `marketing`; thêm khái niệm dữ liệu "của mình" cho Sale; cập nhật bảng phân quyền (đề xuất)                                                                                                                                                                                                                                                                                                                                                                                         |
 | 2026-11-03 | **Phân quyền cấu hình được:** quyền từng vai trò lưu trong CSDL, Quản lý chỉnh qua API mới (`/permissions/catalog`, `/roles…`, endpoints.md mục 10); `GET /auth/me` trả `permissions` dạng `[{ code, scope }]` (trước đây là mảng chuỗi); phạm vi `all`/`own`; quyền đi kèm `requires`; tách `report.view` thành `dashboard.view`, `report.sales/inventory/debt/cash`; thêm `debt.view`, `delivery.view`, `product.content.edit`, `price.override`; một số trường chỉ có khi đủ quyền                                                                                                                  |
 | 2026-11-04 | **Nhiều chi nhánh (Hà Nội, Sài Gòn):** giá bán, tồn kho, giá vốn, công nợ, hạn mức, quỹ riêng từng chi nhánh; `X-Branch-Id` bắt buộc cho thao tác ghi; `GET /auth/me` trả `branches`; sản phẩm tách trường dùng chung và theo chi nhánh, thêm `GET/PUT /products/:id/branches…`; lưới giá nhận `branchId`, thêm `POST /price-books/copy-branch`; khách/nhà cung cấp trả `balances`/`terms` theo chi nhánh và cờ `isInternalBranch`; mọi chứng từ có `branch`; **chuyển kho** hai bước (`/stock-transfers…`, mục 11) và quyền `transfer.view/create/receive`; lỗi `BRANCH_REQUIRED`, `BRANCH_FORBIDDEN` |
+| 2026-11-04 | **Đăng nhập JWT đã triển khai:** `/auth/login`, `/auth/refresh` (xoay vòng refresh token, phát hiện dùng lại), `/auth/logout` (công khai, dùng cookie → `204`), `/auth/me`, `/auth/change-password`, `GET /branches`; `user` có thêm `username`; mã lỗi mới `PASSWORD_CHANGE_REQUIRED` (403); `RATE_LIMITED` khi sai mật khẩu quá 5 lần; refresh token không còn là JWT nên bỏ `JWT_REFRESH_SECRET`                                                                                                                                                                                                    |

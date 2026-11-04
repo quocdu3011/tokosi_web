@@ -247,6 +247,191 @@
           "Phân quyền"
         ]
       }
+    },
+    "/api/v1/branches": {
+      "get": {
+        "operationId": "BranchesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BranchDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Chi nhánh người dùng được phép làm việc (Quản lý: tất cả)",
+        "tags": [
+          "Chi nhánh"
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "description": "Trả access token (JWT) trong body; refresh token nằm trong cookie httpOnly `refresh_token` (frontend không đọc được). Sai tài khoản hoặc mật khẩu luôn trả cùng một thông báo. Sai quá nhiều lần → 429.",
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`UNAUTHENTICATED`: sai tên đăng nhập hoặc mật khẩu"
+          },
+          "429": {
+            "description": "`RATE_LIMITED`: đăng nhập sai quá nhiều lần"
+          }
+        },
+        "summary": "Đăng nhập",
+        "tags": [
+          "Xác thực"
+        ]
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "description": "Dùng cookie `refresh_token` (trình duyệt tự gửi, cần `credentials: include`). Mỗi lần gọi thu hồi refresh token cũ và cấp cái mới (xoay vòng).",
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Cookie thiếu/hết hạn/đã thu hồi → về trang đăng nhập"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Lấy access token mới",
+        "tags": [
+          "Xác thực"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Đăng xuất (thu hồi phiên hiện tại, xóa cookie)",
+        "tags": [
+          "Xác thực"
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthUserDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Thông tin người dùng hiện tại, quyền và chi nhánh được phép",
+        "tags": [
+          "Xác thực"
+        ]
+      }
+    },
+    "/api/v1/auth/change-password": {
+      "post": {
+        "description": "Thu hồi MỌI phiên cũ (mọi thiết bị) và cấp phiên mới cho thiết bị đang dùng; gỡ cờ `mustChangePassword`. Trả access token mới.",
+        "operationId": "AuthController_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Đổi mật khẩu",
+        "tags": [
+          "Xác thực"
+        ]
+      }
     }
   },
   "info": {
@@ -512,6 +697,191 @@
           "locked",
           "permissions",
           "autoAdded"
+        ]
+      },
+      "BranchDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "SG"
+          },
+          "name": {
+            "type": "string",
+            "example": "Chi nhánh Sài Gòn"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Chi nhánh mặc định của hệ thống"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "isDefault"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "example": "quanly",
+            "description": "Tên đăng nhập (không phân biệt hoa thường)"
+          },
+          "password": {
+            "type": "string",
+            "example": "••••••••••"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ]
+      },
+      "BranchSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "SG"
+          },
+          "name": {
+            "type": "string",
+            "example": "Chi nhánh Sài Gòn"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name"
+        ]
+      },
+      "AuthUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "NV0001"
+          },
+          "username": {
+            "type": "string",
+            "example": "quanly"
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Quản lý"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "manager",
+              "assistant",
+              "accountant",
+              "warehouse",
+              "driver",
+              "sales",
+              "marketing"
+            ]
+          },
+          "mustChangePassword": {
+            "type": "boolean",
+            "description": "true → chỉ gọi được /auth/me, /auth/change-password, /auth/logout cho tới khi đổi mật khẩu"
+          },
+          "permissions": {
+            "description": "Quyền hiện tại của vai trò (Quản lý chỉnh được). Frontend ẩn/khóa chức năng theo danh sách này.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrantDto"
+            }
+          },
+          "defaultBranchId": {
+            "type": "string",
+            "nullable": true
+          },
+          "branches": {
+            "description": "Chi nhánh được làm việc (Quản lý: tất cả)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BranchSummaryDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "username",
+          "fullName",
+          "role",
+          "mustChangePassword",
+          "permissions",
+          "defaultBranchId",
+          "branches"
+        ]
+      },
+      "SessionResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "JWT, gửi trong header `Authorization: Bearer …`. Lưu trong bộ nhớ, không lưu localStorage."
+          },
+          "expiresIn": {
+            "type": "number",
+            "example": 900,
+            "description": "Số giây access token còn hiệu lực"
+          },
+          "user": {
+            "$ref": "#/components/schemas/AuthUserDto"
+          }
+        },
+        "required": [
+          "accessToken",
+          "expiresIn",
+          "user"
+        ]
+      },
+      "RefreshResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "expiresIn": {
+            "type": "number",
+            "example": 900
+          }
+        },
+        "required": [
+          "accessToken",
+          "expiresIn"
+        ]
+      },
+      "ChangePasswordDto": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "description": "Mật khẩu hiện tại"
+          },
+          "newPassword": {
+            "type": "string",
+            "description": "Mật khẩu mới: 10–128 ký tự, khác mật khẩu cũ, không chứa tên đăng nhập"
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
         ]
       }
     }

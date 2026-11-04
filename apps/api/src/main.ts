@@ -1,3 +1,5 @@
+// Nạp .env (không ghi đè biến môi trường đã có, nên production dùng biến môi trường thật)
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
 import { configureApp } from './app.setup.js';

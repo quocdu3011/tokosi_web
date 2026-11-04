@@ -11,6 +11,9 @@ import { configureApp } from './app.setup.js';
 import { createOpenApiDocument } from './openapi.js';
 
 process.env.DATABASE_URL ??= 'postgresql://export:export@localhost:5432/export';
+// Khóa giả chỉ để dựng ứng dụng khi xuất đặc tả (không dùng để ký token thật)
+process.env.JWT_ACCESS_SECRET ??=
+  'openapi-export-placeholder-secret-0123456789';
 
 const outFile = resolve(process.argv[2] ?? '../../docs/api/openapi.json');
 

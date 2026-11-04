@@ -94,6 +94,7 @@ Refresh token (lưu băm, không lưu token thô).
 | `token_hash` | text |  |  | unique |
 | `expires_at` | timestamptz |  |  |  |
 | `revoked_at` | timestamptz | ✔ |  |  |
+| `revoke_reason` | text | ✔ |  |  |
 | `user_agent` | text | ✔ |  |  |
 | `ip` | text | ✔ |  |  |
 | `created_at` | timestamptz |  | `now()` |  |

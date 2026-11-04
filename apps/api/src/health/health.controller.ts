@@ -5,6 +5,7 @@ import {
   ApiProperty,
   ApiTags,
 } from '@nestjs/swagger';
+import { Public } from '../modules/auth/auth.decorators.js';
 
 export class HealthResponse {
   @ApiProperty({ example: 'ok' })
@@ -18,6 +19,7 @@ export class HealthResponse {
 }
 
 @ApiTags('Hệ thống')
+@Public()
 @Controller('health')
 export class HealthController {
   @Get()

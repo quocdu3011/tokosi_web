@@ -21,39 +21,41 @@ Ký hiệu: `?` = tùy chọn · `[]` = mảng · tiền/giá/số lượng là 
 
 ## 1. Hệ thống & xác thực
 
-| Method         | Đường dẫn                   | Mô tả                                                     | Quyền         | Mốc |
-| -------------- | --------------------------- | --------------------------------------------------------- | ------------- | --- |
-| GET            | `/health`                   | Kiểm tra sống (không cần token)                           | —             | W1  |
-| POST           | `/auth/login`               | Đăng nhập                                                 | —             | W1  |
-| POST           | `/auth/refresh`             | Lấy access token mới (dùng cookie)                        | —             | W1  |
-| POST           | `/auth/logout`              | Đăng xuất, xóa cookie                                     | đã đăng nhập  | W1  |
-| GET            | `/auth/me`                  | Thông tin người dùng hiện tại + quyền                     | đã đăng nhập  | W1  |
-| POST           | `/auth/change-password`     | Đổi mật khẩu                                              | đã đăng nhập  | W1  |
-| GET            | `/branches`                 | Chi nhánh người dùng được phép làm việc (Quản lý: tất cả) | đã đăng nhập  | W1  |
-| GET/POST/PATCH | `/users`, `/users/:id`      | Quản lý người dùng                                        | `user.manage` | W8  |
-| POST           | `/users/:id/reset-password` | Đặt lại mật khẩu                                          | `user.manage` | W8  |
-| PUT            | `/users/:id/branches`       | Gán chi nhánh cho người dùng `{ branchIds: [...] }`       | `user.manage` | W8  |
+> **Trạng thái: đã triển khai** (có trong Swagger `/api/docs` và `openapi.json`) — `/health`, `/auth/*`, `/branches`, `/roles…`, `/permissions/catalog`.
+
+| Method         | Đường dẫn                   | Mô tả                                                     | Quyền                   | Mốc |
+| -------------- | --------------------------- | --------------------------------------------------------- | ----------------------- | --- |
+| GET            | `/health`                   | Kiểm tra sống                                             | công khai               | ✔   |
+| POST           | `/auth/login`               | Đăng nhập                                                 | công khai               | ✔   |
+| POST           | `/auth/refresh`             | Lấy access token mới (dùng cookie `refresh_token`)        | công khai (cần cookie)  | ✔   |
+| POST           | `/auth/logout`              | Đăng xuất: thu hồi phiên hiện tại, xóa cookie             | công khai (dùng cookie) | ✔   |
+| GET            | `/auth/me`                  | Thông tin người dùng + quyền + chi nhánh hiện tại         | đã đăng nhập            | ✔   |
+| POST           | `/auth/change-password`     | Đổi mật khẩu (thu hồi mọi phiên cũ, cấp phiên mới)        | đã đăng nhập            | ✔   |
+| GET            | `/branches`                 | Chi nhánh người dùng được phép làm việc (Quản lý: tất cả) | đã đăng nhập            | ✔   |
+| GET/POST/PATCH | `/users`, `/users/:id`      | Quản lý người dùng                                        | `user.manage`           | W8  |
+| POST           | `/users/:id/reset-password` | Đặt lại mật khẩu (đặt lại cờ `mustChangePassword`)        | `user.manage`           | W8  |
+| PUT            | `/users/:id/branches`       | Gán chi nhánh cho người dùng `{ branchIds: [...] }`       | `user.manage`           | W8  |
 
 **POST `/auth/login`**
 
-```json
-// request
+```jsonc
+// request  (tên đăng nhập không phân biệt hoa thường; khoảng trắng hai đầu được bỏ)
 { "username": "ketoan01", "password": "••••••••" }
 
-// 200 response (kèm Set-Cookie: refresh_token=...; HttpOnly)
+// 200 response  — kèm  Set-Cookie: refresh_token=…; HttpOnly; SameSite=Lax; Path=/api/v1/auth; Expires=…
 {
-  "accessToken": "eyJhbGciOi…",
-  "expiresIn": 900,
+  "accessToken": "eyJhbGciOi…",            // JWT, gửi trong header  Authorization: Bearer …
+  "expiresIn": 900,                        // giây (15 phút)
   "user": {
-    "id": "0192…", "code": "NV0001", "fullName": "Nguyễn Văn A",
-    "mustChangePassword": false,           // true → bắt người dùng sang màn hình đổi mật khẩu trước khi làm việc
+    "id": "0192…", "code": "NV0001", "username": "ketoan01", "fullName": "Nguyễn Văn A",
     "role": "accountant",
+    "mustChangePassword": false,           // true → chỉ gọi được /auth/me, /auth/change-password, /auth/logout
     "permissions": [                       // theo cấu hình hiện tại của vai trò (Quản lý chỉnh được)
       { "code": "invoice.view",   "scope": "own" },   // "own" = chỉ dữ liệu của mình
       { "code": "invoice.create", "scope": "own" },
       { "code": "product.view",   "scope": "all" }
     ],
-    "defaultBranchId": "0192…",
+    "defaultBranchId": "0192…",            // null nếu chưa có chi nhánh mặc định → người dùng phải chọn
     "branches": [                          // chi nhánh người dùng được làm việc (Quản lý: tất cả)
       { "id": "0192…", "code": "SG", "name": "Chi nhánh Sài Gòn" },
       { "id": "0193…", "code": "HN", "name": "Chi nhánh Hà Nội" }
@@ -62,9 +64,44 @@ Ký hiệu: `?` = tùy chọn · `[]` = mảng · tiền/giá/số lượng là 
 }
 ```
 
-Lỗi: `401 UNAUTHENTICATED` (sai tài khoản/mật khẩu — thông báo chung, không nói rõ cái nào sai).
+| HTTP | `code`             | Khi nào                                                                                                    |
+| ---- | ------------------ | ---------------------------------------------------------------------------------------------------------- |
+| 401  | `UNAUTHENTICATED`  | Sai tên đăng nhập, sai mật khẩu hoặc tài khoản bị khóa — **luôn cùng một thông báo**, không nói rõ cái nào |
+| 429  | `RATE_LIMITED`     | Sai quá 5 lần trong 15 phút (theo IP + tên đăng nhập); `details.retryAfterSeconds` = số giây phải chờ      |
+| 400  | `VALIDATION_ERROR` | Thiếu `username` / `password` hoặc sai kiểu                                                                |
 
-**GET `/auth/me`** → đối tượng `user` như trên.
+**POST `/auth/refresh`** — không có body; trình duyệt tự gửi cookie (frontend gọi với `credentials: 'include'`).
+
+```jsonc
+// 200  — kèm Set-Cookie: refresh_token=… (cookie MỚI; cái cũ đã bị thu hồi)
+{ "accessToken": "eyJhbGciOi…", "expiresIn": 900 }
+// 401 UNAUTHENTICATED: thiếu cookie / hết hạn / đã thu hồi / tài khoản bị khóa → về trang đăng nhập (cookie bị xóa)
+```
+
+- **Xoay vòng:** mỗi lần làm mới sinh refresh token mới. **Không gọi refresh song song** từ nhiều tab/nơi cùng lúc; hãy gom thành một lời gọi duy nhất (dùng chung một Promise) rồi thử lại các yêu cầu đang chờ.
+- Dùng lại một refresh token đã bị thu hồi từ lâu (dấu hiệu bị đánh cắp) → **mọi phiên của người dùng đó bị đăng xuất**.
+
+**POST `/auth/logout`** → `204`. Thu hồi phiên hiện tại và xóa cookie; gọi lặp lại hoặc khi không có cookie vẫn trả `204`. Access token đang cầm vẫn còn hiệu lực tới khi hết hạn (tối đa 15 phút) nên frontend phải **xóa nó khỏi bộ nhớ**.
+
+**GET `/auth/me`** → đối tượng `user` như trên (quyền và chi nhánh luôn là giá trị **hiện tại**). Gọi lại khi tải trang, khi nhận `403 FORBIDDEN`, hoặc sau khi Quản lý đổi phân quyền.
+
+**POST `/auth/change-password`**
+
+```jsonc
+// request
+{ "currentPassword": "••••••••", "newPassword": "••••••••••••" }
+
+// 200 — cùng cấu trúc như login (access token MỚI + cookie MỚI); mustChangePassword = false
+{ "accessToken": "…", "expiresIn": 900, "user": { /* như trên */ } }
+```
+
+- Mật khẩu mới: **10–128 ký tự**, khác mật khẩu hiện tại, **không chứa tên đăng nhập**. Sai → `400 VALIDATION_ERROR` kèm `details: [{ field, message }]` để gắn vào từng ô.
+- Mật khẩu hiện tại sai → `400 VALIDATION_ERROR`, `details[0].field = "currentPassword"`.
+- Thu hồi **mọi phiên cũ ở mọi thiết bị**; thiết bị đang đổi mật khẩu nhận phiên mới ngay.
+
+**Tài khoản bị bắt đổi mật khẩu (`mustChangePassword = true`)** — gặp ở tài khoản Quản lý khởi tạo và tài khoản vừa được đặt lại mật khẩu. Mọi endpoint khác ngoài `/auth/me`, `/auth/change-password`, `/auth/logout` trả `403 PASSWORD_CHANGE_REQUIRED`. Frontend: sau khi đăng nhập, nếu `user.mustChangePassword` là true thì chuyển thẳng sang màn hình đổi mật khẩu.
+
+**GET `/branches`** → `[ { "id": "…", "code": "SG", "name": "Chi nhánh Sài Gòn", "isDefault": true } ]` — chỉ các chi nhánh người dùng được phép (đã sắp theo mã).
 
 ---
 
