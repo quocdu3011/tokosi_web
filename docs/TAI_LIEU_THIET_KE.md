@@ -270,7 +270,7 @@ Các file chứng từ đều là dạng **phẳng**: thông tin phiếu lặp l
 - Công thức dòng hàng: `Đơn giá` (giá niêm yết theo bảng giá) − `Giảm giá` (**số tiền trên 1 đơn vị**, không dùng %: cột % luôn 0) = `Giá bán`; `Thành tiền = SL × Giá bán`. Kiểm tra: tổng thành tiền các dòng = `Tổng tiền hàng` ở cả 129/129 HĐ.
 - **Không có bằng chứng về giá bậc thang theo số lượng** → hạ xuống "tùy chọn", không làm ở MVP.
 - Có dòng giá bằng 0 (32 dòng đơn đặt hàng, 1 dòng hóa đơn) → hàng tặng/chưa định giá; cần cờ `is_gift` hoặc cho phép giá 0.
-- File khách hàng **không có cột bảng giá mặc định**. Tuy nhiên cột **Email của khách chứa giá trị giả dạng `Vừa@gmail.com`, `Lớn@gmail.com`, `Mới@gmail.com`** (1.318 / 114 / 92 khách) — nhiều khả năng đây là cách công ty đang *ghi hạng giá* vào ô email. **Giả thuyết cần xác nhận** trước khi dùng để suy ra `default_price_book_id`; tuyệt đối không import chúng làm email thật.
+- File khách hàng **không có cột bảng giá mặc định**. Tuy nhiên cột **Email của khách chứa giá trị giả dạng `Vừa@gmail.com`, `Lớn@gmail.com`, `Mới@gmail.com`** (1.318 / 114 / 92 khách) — từng nghi là cách công ty *ghi hạng giá* vào ô email. **Đã xác nhận 04/11/2026 (mục 5.8 câu 1): đó chỉ là email thử, không mang thông tin hạng giá** → bỏ qua khi import, không suy ra `default_price_book_id`, tuyệt đối không import làm email thật.
 
 **C. Khách hàng**
 - Điện thoại **không trùng** giữa 1.665 khách (có thể đặt unique), nhưng 4 định dạng (`0xxxxxxxxx`, thiếu số 0 đầu, `xxxx.xxx.xxx`, `+84…`) → chuẩn hóa trước khi lưu.
@@ -438,13 +438,15 @@ Sau import: đối chiếu số lượng bản ghi, tổng tồn × giá vốn, 
 **Dữ liệu còn thiếu cần xuất thêm từ KiotViet:** (1) giá của 6 bảng giá còn lại; (2) danh sách nhân viên + phân quyền; (3) bảng giá áp dụng cho từng khách (nếu có ngoài email giả); (4) hạn mức/kỳ hạn công nợ (nếu có ghi nhận); (5) lịch sử hóa đơn dài hơn 2 ngày để kiểm tra các giả định về hành vi mua; (6) danh mục tài khoản quỹ (tiền mặt, ngân hàng).
 
 ### 5.8 Câu hỏi cần xác nhận từ dữ liệu
-1. Email dạng `Vừa@gmail.com`/`Lớn@gmail.com`/`Mới@gmail.com` có đúng là **hạng giá của khách** không? Hạng "Mới" ứng với bảng giá nào?
-2. Tiền tố tên khách "SG", "MN", "KH", "NN", "HN" nghĩa là gì (khu vực? loại khách?).
-3. Số 10 chữ số đi sau tên nhân viên là gì (mã nhân viên, điện thoại, ID KiotViet)?
-4. `CTMTH…` là loại phiếu chi gì?
-5. Có cần hóa đơn VAT/HĐĐT không? (có 3 bảng giá VAT và 9 khách công ty nhưng cột trạng thái HĐĐT rỗng và chỉ 1 khách có MST).
-6. Các "nhà cung cấp" nhóm Lái xe và "tạm giữ lương": công ty muốn theo dõi nợ/ứng của tài xế và nhân viên **trong cùng hệ thống** không?
-7. Sau khi chuyển đổi có giữ lịch sử chứng từ trong hệ thống mới không, và giữ bao lâu?
+> Trả lời của chủ dự án ngày 04/11/2026. Câu 3, 4, 5 tạm hoãn.
+
+1. ✅ **Email `Vừa@gmail.com`/`Lớn@gmail.com`/`Mới@gmail.com` là email thử (test), KHÔNG phải hạng giá.** Khi import: **bỏ qua** các giá trị này (không nhập làm email thật, không suy ra bảng giá). Dữ liệu cũ **không cho biết** khách nào dùng bảng giá nào → khách import về mặc định dùng Bảng giá chung của chi nhánh; bảng giá riêng gán sau trong hệ thống mới.
+2. ✅ Tiền tố tên khách: **SG** = Sài Gòn, **MN** = Miền Nam, **KH** = khách hàng, **HN** = Hà Nội; **NN** chưa xác nhận được. Đây chỉ là cách gõ tên, không tạo trường mới; khi import giữ nguyên tên khách.
+3. ⏳ Số 10 chữ số đi sau tên nhân viên là gì (mã nhân viên, điện thoại, ID KiotViet)? — _trả lời sau_
+4. ⏳ `CTMTH…` là loại phiếu chi gì? — _trả lời sau_
+5. ⏳ Có cần hóa đơn VAT/HĐĐT không? (có 3 bảng giá VAT và 9 khách công ty nhưng cột trạng thái HĐĐT rỗng và chỉ 1 khách có MST). — _trả lời sau_
+6. ✅ **Không cần quan tâm nhóm nhà cung cấp** (Lái xe, "tạm giữ lương"): không theo dõi nợ/ứng của tài xế, nhân viên trong hệ thống. Khi import **bỏ qua** các nhà cung cấp thuộc các nhóm này (cùng NCC kiểm kê ảo); không cần `party_type = employee`, không cần `suppliers.kind`.
+7. ✅ **Giữ lịch sử chứng từ, thời gian tạm thời là không giới hạn** (không xóa/đưa vào kho lưu trữ theo hạn). Phù hợp quy tắc không xóa cứng chứng từ.
 
 ---
 
@@ -785,7 +787,7 @@ Go-live                                                                         
 #### M0 – Chuẩn bị (W1–W2: 09/11 – 20/11/2026)
 | Việc | Phụ trách | Đầu ra |
 |---|---|---|
-| Trả lời câu hỏi mục 5.8 với kế toán/chủ; xác nhận giả thuyết email = hạng giá | Dev A | Biên bản chốt nghiệp vụ |
+| Trả lời câu hỏi mục 5.8 với kế toán/chủ (còn lại câu 3, 4, 5; giả thuyết email = hạng giá đã bác bỏ) | Dev A | Biên bản chốt nghiệp vụ |
 | Xuất bổ sung từ KiotViet: 6 bảng giá còn lại, nhân viên, tài khoản quỹ, **hóa đơn 3–6 tháng gần nhất** | Dev B | Bộ dữ liệu mở rộng (cất ngoài repo) |
 | ERD chi tiết từ mục 5.3–5.4 (AI dự thảo, người duyệt), chốt quy tắc làm tròn, tính giá, giá vốn | Dev A + AI | `docs/erd`, `docs/rules.md` |
 | Wireframe 5–6 màn hình: **tạo đơn sỉ**, danh sách hóa đơn, công nợ khách, nhập hàng, sổ quỹ, hàng hóa | Dev B | Wireframe được kế toán duyệt |
