@@ -113,6 +113,24 @@ Bán sỉ khác bán lẻ ở chỗ: **ít đơn, giá trị lớn, khách quen,
 - **Đơn hàng có vòng đời nhiều bước** → dùng state machine (trạng thái + chuyển trạng thái hợp lệ + log).
 - Bắt buộc **in khổ A4** và xuất PDF đẹp; in nhiệt K80 chỉ phụ.
 
+### 2.5 Hai chi nhánh (Hà Nội, Sài Gòn)
+
+Công ty có 2 chi nhánh **dùng chung một hệ thống**: cùng hàng hóa, khách hàng, nhà cung cấp, nhưng khác giá, tồn kho, giá vốn, công nợ, quỹ và đơn hàng. Các quyết định đã chốt (chi tiết kỹ thuật: `docs/db/README.md`, hợp đồng API: `docs/api/README.md` mục "Nhiều chi nhánh"):
+
+| Vấn đề | Quyết định |
+| --- | --- |
+| Giá | Khác cả **giá bán** lẫn **giá nhập / giá vốn**. Giá bán: 7 hạng giá dùng chung, số tiền từng ô riêng chi nhánh. Giá vốn bình quân tính riêng từ phiếu nhập của từng chi nhánh |
+| Hạng giá của khách | Giống nhau ở hai chi nhánh (chỉ khác số tiền) |
+| Công nợ | Tách biệt hoàn toàn theo chi nhánh; hạn mức và kỳ hạn công nợ cũng riêng |
+| Tồn kho và quỹ | Riêng từng chi nhánh (4 quỹ: tiền mặt + ngân hàng × 2) |
+| Chuyển kho | Có, **hai bước** (gửi → nhận). Hai chi nhánh coi nhau là khách hàng / nhà cung cấp nội bộ. Giá nhập kho bên nhận = giá gốc bên gửi **cộng phí vận chuyển**; phí vẫn được ghi riêng |
+| Người dùng | Nhân viên được gán chi nhánh; Quản lý xem cả hai |
+| Trả hàng | Về chi nhánh của hóa đơn gốc |
+| Mã chứng từ | Một dãy số chung cho cả hai chi nhánh (giả định, chưa xác nhận) |
+| Dữ liệu cũ | Chi nhánh còn lại cũng ở KiotViet, nhập sau; chưa biết "Chi nhánh trung tâm" cũ là Hà Nội hay Sài Gòn (tạm đặt Sài Gòn là mặc định) |
+
+**Ảnh hưởng lịch 2 tháng:** thêm khoảng 5–7 ngày (giá/tồn/nợ/quỹ theo chi nhánh 3–4 ngày, chuyển kho 2–3 ngày; chuyển kho vốn thuộc Phase 2). Phần lược đồ, seed, tồn kho theo chi nhánh, chuyển kho và quyền truy cập chi nhánh đã làm xong ở backend (tuần 1); còn lại là các màn hình và gắn `branch_id` vào từng phân hệ khi xây. Nếu trễ: cắt Trả hàng nhập và biểu đồ Dashboard trước.
+
 ---
 
 ## 3. Kiến trúc hệ thống
@@ -286,7 +304,7 @@ Các file chứng từ đều là dạng **phẳng**: thông tin phiếu lặp l
 - 4 dòng không có mã cuối file là **dòng tổng kết** (quỹ đầu kỳ 369.310.338; tổng thu 364.836.707; tổng chi −541.385.251; tồn quỹ cuối 192.761.794 — các con số khớp nhau: 369,31 + 364,84 − 541,39 = 192,76 triệu) → **bỏ khi import**, dùng để đối chiếu.
 
 **F. Khác**
-- Chỉ **1 chi nhánh** ("Chi nhánh trung tâm") trong toàn bộ dữ liệu → vẫn giữ `branch_id` (chi phí thấp, khó thêm về sau) nhưng UI mặc định ẩn chọn chi nhánh khi chỉ có 1.
+- KiotViet hiện chỉ có **1 chi nhánh** ("Chi nhánh trung tâm") nhưng công ty thực tế có **2** (Hà Nội, Sài Gòn); chi nhánh còn lại cũng quản lý ở KiotViet và sẽ nhập sau. Xem mục 2.5.
 - Nhân viên xuất hiện dạng chuỗi "Họ tên - số 10 chữ số"; **không có file nhân viên** → tạo `users` từ danh sách giá trị distinct, cần xác nhận số đi kèm là gì (mã nhân viên? điện thoại?).
 - Nhóm hàng chính: Nhà cửa đời sống, Mẹ bé, Điện gia dụng, Nhà bếp… (hàng gia dụng tổng hợp). Không có hàng cần lô/HSD hay serial → **đã chốt: không làm lô/HSD**.
 
@@ -314,7 +332,7 @@ Hệ thống  : company_profile, branches, users, roles, permissions, user_roles
             user_branches, audit_logs, settings, code_sequences, attachments
 Hàng hóa  : categories (cây, parent_id), products, product_images,
             price_books (7 bảng giá), price_book_items
-Tồn kho   : stocks (branch_id, product_id, on_hand),
+Tồn kho   : stocks (branch_id, product_id, on_hand, cost_price, ...),
             stock_movements (sổ cái, chỉ thêm),
             stock_takes, stock_take_items        -- [Phase 2] kiểm kho, thay NCC ảo
 Đối tác   : customers, customer_invoice_profiles, suppliers
@@ -338,10 +356,10 @@ Quy ước: `NUMERIC(18,0)` = tiền chứng từ (đồng); `NUMERIC(18,4)` = �
 
 | Bảng | Cột chính |
 |---|---|
-| `products` | `code` (unique, ≤30), `name`, `category_id`, `unit` (text, mặc định "Cái"), `base_price` (bảng giá chung), `cost_price` (BQ gia quyền, `NUMERIC(18,4)`), `last_purchase_price`, `max_stock`, `min_stock`, `location` (vị trí kho), `description`, `weight_g`, `is_active`, `is_sellable`, `vat_rate` (nullable) |
+| `products` | **Chỉ thông tin dùng chung:** `code` (unique, ≤30), `name`, `category_id`, `unit` (text, mặc định "Cái"), `description`, `weight_g`, `is_active`, `is_sellable`. Giá bán ở `price_book_items`; tồn, giá vốn, giá nhập cuối, tồn min/max, vị trí kho ở `stocks` (theo chi nhánh) |
 | `price_books` | `code`, `name`, `with_vat` (bool), `is_default`. Seed: Chung, Lớn, Vừa, VIP, Lớn VAT, Vừa VAT, VIP VAT |
-| `price_book_items` | `price_book_id`, `product_id`, `price` — nếu sản phẩm không có dòng giá trong bảng → **lùi về bảng chung** |
-| `customers` | `code`, `name`, `type` (`individual`/`company`), `phone` (unique, đã chuẩn hóa), `address`, `facebook`, `sales_owner_id` → `users` (nhân viên phụ trách), `default_price_book_id`, `credit_limit`, `payment_term_days`, `note`, `is_active` |
+| `price_book_items` | `price_book_id`, **`branch_id`**, `product_id`, `price` — thiếu giá trong bảng → **lùi về bảng chung CỦA CÙNG chi nhánh** |
+| `customers` | `code`, `name`, `type` (`individual`/`company`), `phone` (unique, đã chuẩn hóa), `address`, `facebook`, `sales_owner_id` → `users` (nhân viên phụ trách), `default_price_book_id`, `note`, `is_active` |
 | `customer_invoice_profiles` | `customer_id`, `buyer_name`, `company_name`, `tax_code`, `address`, `email`, `phone`, `bank_name`, `bank_account` |
 | `suppliers` | `code`, `name`, `kind` (`goods`/`driver`/`other`), `phone` (không validate), `address`, `tax_code`, `note`, `is_active` |
 | `orders` | `code`, `branch_id`, `customer_id`, `status` (`draft`/`completed`/`cancelled`), `order_date`, `seller_id`, `price_book_id`, `subtotal`, `discount`, `total`, `deposit_paid`, `note`; giao hàng: `ship_to_name`, `ship_to_phone`, `ship_to_address`, `package_count`, `weight_g` |
@@ -358,7 +376,7 @@ Quy ước: `NUMERIC(18,0)` = tiền chứng từ (đồng); `NUMERIC(18,4)` = �
 | `cash_accounts` | `name`, `type` (`cash`/`bank`), `branch_id` |
 | `cash_categories` | `name`, `direction` (`in`/`out`), `is_system` |
 | `cash_transactions` | `code`, `direction`, `amount` (> 0), `category_id`, `account_id`, `occurred_at`, `party_type`, `party_id` (nullable), `party_name_text` (khi không link được), `vehicle_ref` (nullable), `ref_type`/`ref_id`, `note` |
-| `debt_ledger` | `party_type` (`customer`/`supplier`/`employee`), `party_id`, `entry_type` (`opening`/`invoice`/`payment`/`return`/`adjustment`), `ref_type`/`ref_id`, `amount` **có dấu** (+ tăng nợ, − giảm nợ), `occurred_at`. Số dư = tổng; **được phép âm** |
+| `debt_ledger` | **`branch_id`**, `party_type` (`customer`/`supplier`/`employee`), `party_id`, `entry_type` (`opening`/`invoice`/`payment`/`return`/`adjustment`/`transfer`), `ref_type`/`ref_id`, `amount` **có dấu** (+ tăng nợ, − giảm nợ), `occurred_at`. Số dư = tổng **theo từng chi nhánh**; được phép âm |
 | `payment_allocations` | `cash_transaction_id`, `invoice_id`, `amount` — phục vụ tuổi nợ/đối chiếu theo hóa đơn; mặc định tự phân bổ vào hóa đơn cũ nhất |
 
 ### 5.5 Quy tắc chung
@@ -779,7 +797,7 @@ Go-live                                                                         
 #### M1 – Nền tảng & danh mục (W3–W6: 23/11 – 18/12/2026)
 | Việc | Phụ trách |
 |---|---|
-| Auth (JWT + refresh), người dùng, vai trò/quyền, nhật ký thao tác, chi nhánh (1 chi nhánh nhưng đủ cấu trúc) | Dev A + AI |
+| Auth (JWT + refresh), người dùng, vai trò/quyền, nhật ký thao tác, 2 chi nhánh (Hà Nội, Sài Gòn) và gán người dùng theo chi nhánh | Dev A + AI |
 | Khung giao diện: layout, bảng dữ liệu dùng chung (lọc/sắp xếp/chọn cột/xuất Excel), form, phím tắt | Dev B + AI |
 | Nhóm hàng (cây), sản phẩm, ảnh, vị trí kho; 7 bảng giá + `price_book_items` | Dev A + Dev B |
 | Khách hàng, nhà cung cấp, hồ sơ xuất hóa đơn | Dev B + AI |
@@ -887,7 +905,7 @@ Mốc khó nhất; **ưu tiên đúng nghiệp vụ hơn đẹp giao diện**.
 | ADR-02 | TypeScript full-stack (Next.js + NestJS) | Chia sẻ type/validator, thống nhất đội ngũ |
 | ADR-03 | PostgreSQL làm CSDL duy nhất cho dữ liệu nghiệp vụ | ACID, RLS, báo cáo, tránh phức tạp đa CSDL |
 | ADR-04 | Tồn kho dạng ledger append-only | Truy vết, đối soát, an toàn dữ liệu |
-| ADR-05 | Single-tenant (nội bộ công ty), multi-branch/kho từ đầu | Đơn giản hơn; đa chi nhánh khó bổ sung về sau |
+| ADR-05 | Single-tenant (nội bộ công ty), multi-branch/kho từ đầu (nay là 2 chi nhánh: Hà Nội, Sài Gòn) | Đơn giản hơn; đa chi nhánh khó bổ sung về sau |
 | ADR-06 | ~~POS offline ở Phase 2~~ → hạ xuống Phase 3; ưu tiên quy trình đơn sỉ + công nợ | Chốt bán sỉ: ít đơn/giá trị lớn, thường có mạng |
 | ADR-07 | Engine giá riêng (khách > nhóm > chung; bậc thang; đơn vị) | Bán sỉ phụ thuộc bảng giá phức tạp |
 | ADR-08 | Đơn hàng dùng state machine, hỗ trợ giao từng phần | Vòng đời đơn sỉ nhiều bước |
@@ -898,5 +916,8 @@ Mốc khó nhất; **ưu tiên đúng nghiệp vụ hơn đẹp giao diện**.
 | ADR-13 | "Nhóm khách hàng" của KiotViet → `sales_owner_id`; hạng giá là trường riêng | Dữ liệu cho thấy nhóm = tên nhân viên phụ trách |
 | ADR-14 | Tải ảnh sản phẩm về kho file riêng trước khi ngừng KiotViet | Ảnh đang nằm trên CDN KiotViet |
 | ADR-15 | ORM là Drizzle (bản ổn định 0.45), không dùng Prisma | Đội dùng AI agent: SQL-first, migration đọc được; Prisma `latest` hiện là 8.0 RC |
+| ADR-16 | Hai chi nhánh dùng chung dữ liệu gốc; giá bán, tồn kho, giá vốn, công nợ, quỹ và chứng từ tách theo `branch_id` | Giá và tồn khác nhau; công nợ tách biệt hoàn toàn |
+| ADR-17 | Giá vốn bình quân gia quyền lưu ở `stocks` (theo chi nhánh), không ở `products` | Mỗi chi nhánh nhập và giữ hàng riêng |
+| ADR-18 | Chuyển kho là chứng từ riêng (không phải hóa đơn/phiếu nhập), 2 bước; chi nhánh là khách/nhà cung cấp nội bộ; phí vận chuyển cộng vào giá nhập bên nhận | Không làm sai doanh thu; theo dõi được công nợ và phí giữa 2 chi nhánh |
 
 > Các quyết định trên có thể thay đổi sau khi trả lời các câu hỏi ở mục 1.3.

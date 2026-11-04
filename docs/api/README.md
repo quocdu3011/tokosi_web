@@ -22,11 +22,29 @@ Phạm vi nghiệp vụ và lý do thiết kế: [`../TAI_LIEU_THIET_KE.md`](../
 
 ### Header
 
-| Header                                | Khi nào                                                                               |
-| ------------------------------------- | ------------------------------------------------------------------------------------- |
-| `Authorization: Bearer <accessToken>` | Mọi endpoint trừ `/auth/login`, `/auth/refresh`, `/health`                            |
-| `Idempotency-Key: <uuid>`             | **Bắt buộc** khi tạo hóa đơn, phiếu thu/chi, nhập hàng, trả hàng (xem mục 6)          |
-| `X-Branch-Id: <uuid>`                 | Tùy chọn. Chi nhánh đang làm việc; bỏ qua thì dùng chi nhánh mặc định (hiện chỉ có 1) |
+| Header                                | Khi nào                                                                                                                                   |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `Authorization: Bearer <accessToken>` | Mọi endpoint trừ `/auth/login`, `/auth/refresh`, `/health`                                                                                |
+| `Idempotency-Key: <uuid>`             | **Bắt buộc** khi tạo hóa đơn, phiếu thu/chi, nhập hàng, trả hàng (xem mục 6)                                                              |
+| `X-Branch-Id: <uuid>`                 | **Chi nhánh đang làm việc** (Hà Nội / Sài Gòn). Bắt buộc với thao tác ghi và khi người dùng có nhiều chi nhánh; xem mục "Nhiều chi nhánh" |
+
+### Nhiều chi nhánh (Hà Nội, Sài Gòn)
+
+Công ty có **2 chi nhánh dùng chung một hệ thống**. Người dùng làm việc trong **một chi nhánh tại một thời điểm**; giao diện cần một ô chọn chi nhánh (lấy danh sách từ `GET /auth/me` → `branches`) và gửi `X-Branch-Id` trong mọi yêu cầu.
+
+| Dữ liệu                                                                                            | Dùng chung hay riêng chi nhánh                                           |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Hàng hóa (mã, tên, nhóm, đơn vị, ảnh), khách hàng, nhà cung cấp, 7 hạng giá, danh mục thu chi      | **Dùng chung**                                                           |
+| Giá bán (từng ô trong lưới giá), tồn kho, giá vốn, giá nhập cuối, tồn tối thiểu/tối đa, vị trí kho | **Riêng từng chi nhánh**                                                 |
+| Công nợ khách hàng và nhà cung cấp, hạn mức và kỳ hạn công nợ                                      | **Riêng từng chi nhánh**, tách biệt hoàn toàn (không cấn trừ chéo)       |
+| Đơn hàng, hóa đơn, trả hàng, phiếu nhập, sổ quỹ (quỹ tiền mặt, ngân hàng), phiếu thu/chi           | **Riêng từng chi nhánh** — mỗi chứng từ có `branch` (Hà Nội hay Sài Gòn) |
+
+- **`X-Branch-Id` thiếu** và người dùng chỉ có 1 chi nhánh (hoặc đã có chi nhánh mặc định) → dùng chi nhánh đó. Có nhiều chi nhánh mà không gửi → `400 BRANCH_REQUIRED`. Gửi chi nhánh không được phép → `403 BRANCH_FORBIDDEN`.
+- **Ai thấy chi nhánh nào:** nhân viên chỉ thấy chi nhánh được gán; **Quản lý thấy cả hai**. Mọi danh sách chứng từ mặc định lọc theo chi nhánh làm việc; người có từ 2 chi nhánh trở lên có thể truyền `?branchId=<uuid>` hoặc `?branchId=all` (xem gộp). Báo cáo và Dashboard cũng nhận `branchId` như vậy.
+- **Mọi danh sách chứng từ có cột chi nhánh** (`branch.code`/`branch.name`), có bộ lọc chi nhánh, và file Excel xuất ra có cột **Chi nhánh**.
+- **Số liệu theo chi nhánh trả về dạng mảng:** `balances` (công nợ), `terms` (hạn mức), …, mỗi phần tử có `branchId` + `branchCode`. Frontend tự hiển thị từng chi nhánh và dòng tổng (cộng các phần tử); server không trả sẵn tổng chéo để tránh cộng nhầm.
+- **Chuyển kho giữa 2 chi nhánh** coi chi nhánh kia là khách/nhà cung cấp nội bộ (`isInternalBranch = true`): không phải bán hàng nên **không tính vào doanh thu/lãi gộp**; các danh sách khách/nhà cung cấp và báo cáo mặc định ẩn các đối tác nội bộ. Xem `endpoints.md` mục 11.
+- Chứng từ **không đổi chi nhánh** sau khi tạo. Trả hàng bán về **chi nhánh của hóa đơn gốc**; thu nợ chỉ cấn trừ hóa đơn **cùng chi nhánh**.
 
 ## 2. Xác thực
 
@@ -119,6 +137,8 @@ Mọi lỗi có cùng cấu trúc:
 | 422  | `CREDIT_LIMIT_EXCEEDED` | Vượt hạn mức công nợ **(cảnh báo mềm ở MVP: xem `warnings` ở endpoint)** |
 | 422  | `PRICE_NOT_FOUND`       | Sản phẩm không có giá ở bảng giá và cả bảng chung                        |
 | 422  | `ALLOCATION_EXCEEDS`    | Số tiền cấn trừ lớn hơn số còn nợ của hóa đơn                            |
+| 400  | `BRANCH_REQUIRED`       | Cần chọn chi nhánh làm việc (gửi `X-Branch-Id`)                          |
+| 403  | `BRANCH_FORBIDDEN`      | Không được phép làm việc với chi nhánh này                               |
 | 429  | `RATE_LIMITED`          | Gọi quá nhanh; thử lại sau                                               |
 | 500  | `INTERNAL_ERROR`        | Lỗi hệ thống; báo kèm `requestId`                                        |
 
@@ -200,6 +220,10 @@ Dùng để khởi tạo lần đầu (`pnpm db:seed`) và cho nút "Khôi phụ
 | `purchase.view` Xem mua hàng                                 |    ✔    |   ✔    |    ✔    |  ✔  |        |          |           |
 | `purchase.edit` Nhập hàng / trả hàng nhập / sửa nhà cung cấp |    ✔    |   ✔    |    ✔    |  ✔  |        |          |           |
 | `purchase.cancel` Hủy phiếu nhập / phiếu trả nhập            |    ✔    |        |    ✔    |     |        |          |           |
+| **Kho & chuyển kho**                                         |         |        |         |     |        |          |           |
+| `transfer.view` Xem phiếu chuyển kho                         |    ✔    |   ✔    |    ✔    |  ✔  |        |          |           |
+| `transfer.create` Lập/hủy phiếu chuyển kho (bên gửi)         |    ✔    |   ✔    |         |  ✔  |        |          |           |
+| `transfer.receive` Xác nhận nhận hàng chuyển kho (bên nhận)  |    ✔    |   ✔    |         |  ✔  |        |          |           |
 | **Khách hàng**                                               |         |        |         |     |        |          |           |
 | `customer.view` Xem khách hàng                               |    ✔    |   ✔    |    ✔    |  ✔  |        | của mình |     ✔     |
 | `customer.edit` Thêm/sửa khách hàng                          |    ✔    |   ✔    |         |     |        | của mình |           |
@@ -245,6 +269,7 @@ Dùng để khởi tạo lần đầu (`pnpm db:seed`) và cho nút "Khôi phụ
 6. **Thu nợ khách** tạo phiếu thu gắn theo khách; server tự cấn trừ vào hóa đơn cũ nhất còn nợ, trừ khi client gửi `allocations` chọn tay.
 7. Mã chứng từ do server cấp (`code`), frontend không tự sinh.
 8. Danh sách lớn (sản phẩm 2.787, khách 1.665): luôn phân trang + tìm theo `q`; ô chọn hàng/khách trong màn hình tạo đơn dùng endpoint `lookup` nhẹ hơn.
+9. **Nhiều chi nhánh:** mọi dữ liệu theo chi nhánh (giá, tồn, giá vốn, công nợ, chứng từ, quỹ) tính theo chi nhánh làm việc (`X-Branch-Id`). Không tự cộng gộp hai chi nhánh ở frontend khi chưa chắc: dùng `branchId=all` của báo cáo, hoặc cộng các phần tử `balances` có cùng loại tiền. Giá của chi nhánh này **không bao giờ** được dùng cho chi nhánh kia.
 
 ## 10. Làm việc song song frontend ↔ backend
 
@@ -256,9 +281,10 @@ Dùng để khởi tạo lần đầu (`pnpm db:seed`) và cho nút "Khôi phụ
 
 ## Nhật ký thay đổi
 
-| Ngày       | Thay đổi                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-11-03 | Tạo bản thảo hợp đồng API đầu tiên (chưa triển khai)                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| 2026-11-03 | Cài Swagger: giao diện `/api/docs`, JSON `/api/docs-json`, file `openapi.json`; triển khai `GET /health`; tiền tố `/api/v1`, CORS có credentials, kiểm tra dữ liệu vào bằng DTO                                                                                                                                                                                                                                                                                                       |
-| 2026-11-03 | Đổi vai trò từ 4 sang 7 theo cơ cấu công ty: `manager`, `assistant`, `accountant`, `warehouse`, `driver`, `sales`, `marketing`; thêm khái niệm dữ liệu "của mình" cho Sale; cập nhật bảng phân quyền (đề xuất)                                                                                                                                                                                                                                                                        |
-| 2026-11-03 | **Phân quyền cấu hình được:** quyền từng vai trò lưu trong CSDL, Quản lý chỉnh qua API mới (`/permissions/catalog`, `/roles…`, endpoints.md mục 10); `GET /auth/me` trả `permissions` dạng `[{ code, scope }]` (trước đây là mảng chuỗi); phạm vi `all`/`own`; quyền đi kèm `requires`; tách `report.view` thành `dashboard.view`, `report.sales/inventory/debt/cash`; thêm `debt.view`, `delivery.view`, `product.content.edit`, `price.override`; một số trường chỉ có khi đủ quyền |
+| Ngày       | Thay đổi                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-11-03 | Tạo bản thảo hợp đồng API đầu tiên (chưa triển khai)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 2026-11-03 | Cài Swagger: giao diện `/api/docs`, JSON `/api/docs-json`, file `openapi.json`; triển khai `GET /health`; tiền tố `/api/v1`, CORS có credentials, kiểm tra dữ liệu vào bằng DTO                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 2026-11-03 | Đổi vai trò từ 4 sang 7 theo cơ cấu công ty: `manager`, `assistant`, `accountant`, `warehouse`, `driver`, `sales`, `marketing`; thêm khái niệm dữ liệu "của mình" cho Sale; cập nhật bảng phân quyền (đề xuất)                                                                                                                                                                                                                                                                                                                                                                                         |
+| 2026-11-03 | **Phân quyền cấu hình được:** quyền từng vai trò lưu trong CSDL, Quản lý chỉnh qua API mới (`/permissions/catalog`, `/roles…`, endpoints.md mục 10); `GET /auth/me` trả `permissions` dạng `[{ code, scope }]` (trước đây là mảng chuỗi); phạm vi `all`/`own`; quyền đi kèm `requires`; tách `report.view` thành `dashboard.view`, `report.sales/inventory/debt/cash`; thêm `debt.view`, `delivery.view`, `product.content.edit`, `price.override`; một số trường chỉ có khi đủ quyền                                                                                                                  |
+| 2026-11-04 | **Nhiều chi nhánh (Hà Nội, Sài Gòn):** giá bán, tồn kho, giá vốn, công nợ, hạn mức, quỹ riêng từng chi nhánh; `X-Branch-Id` bắt buộc cho thao tác ghi; `GET /auth/me` trả `branches`; sản phẩm tách trường dùng chung và theo chi nhánh, thêm `GET/PUT /products/:id/branches…`; lưới giá nhận `branchId`, thêm `POST /price-books/copy-branch`; khách/nhà cung cấp trả `balances`/`terms` theo chi nhánh và cờ `isInternalBranch`; mọi chứng từ có `branch`; **chuyển kho** hai bước (`/stock-transfers…`, mục 11) và quyền `transfer.view/create/receive`; lỗi `BRANCH_REQUIRED`, `BRANCH_FORBIDDEN` |

@@ -36,6 +36,27 @@
       "when": 1793698755721,
       "tag": "0004_phan_quyen_theo_vai_tro",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793753271691,
+      "tag": "0005_seed_nen",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793755195865,
+      "tag": "0006_nhieu_chi_nhanh",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793755209271,
+      "tag": "0007_bo_han_muc_chung",
+      "breakpoints": true
     }
   ]
 }

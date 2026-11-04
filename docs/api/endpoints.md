@@ -21,17 +21,18 @@ Ký hiệu: `?` = tùy chọn · `[]` = mảng · tiền/giá/số lượng là 
 
 ## 1. Hệ thống & xác thực
 
-| Method         | Đường dẫn                   | Mô tả                                 | Quyền         | Mốc |
-| -------------- | --------------------------- | ------------------------------------- | ------------- | --- |
-| GET            | `/health`                   | Kiểm tra sống (không cần token)       | —             | W1  |
-| POST           | `/auth/login`               | Đăng nhập                             | —             | W1  |
-| POST           | `/auth/refresh`             | Lấy access token mới (dùng cookie)    | —             | W1  |
-| POST           | `/auth/logout`              | Đăng xuất, xóa cookie                 | đã đăng nhập  | W1  |
-| GET            | `/auth/me`                  | Thông tin người dùng hiện tại + quyền | đã đăng nhập  | W1  |
-| POST           | `/auth/change-password`     | Đổi mật khẩu                          | đã đăng nhập  | W1  |
-| GET            | `/branches`                 | Danh sách chi nhánh (hiện 1)          | đã đăng nhập  | W1  |
-| GET/POST/PATCH | `/users`, `/users/:id`      | Quản lý người dùng                    | `user.manage` | W8  |
-| POST           | `/users/:id/reset-password` | Đặt lại mật khẩu                      | `user.manage` | W8  |
+| Method         | Đường dẫn                   | Mô tả                                                     | Quyền         | Mốc |
+| -------------- | --------------------------- | --------------------------------------------------------- | ------------- | --- |
+| GET            | `/health`                   | Kiểm tra sống (không cần token)                           | —             | W1  |
+| POST           | `/auth/login`               | Đăng nhập                                                 | —             | W1  |
+| POST           | `/auth/refresh`             | Lấy access token mới (dùng cookie)                        | —             | W1  |
+| POST           | `/auth/logout`              | Đăng xuất, xóa cookie                                     | đã đăng nhập  | W1  |
+| GET            | `/auth/me`                  | Thông tin người dùng hiện tại + quyền                     | đã đăng nhập  | W1  |
+| POST           | `/auth/change-password`     | Đổi mật khẩu                                              | đã đăng nhập  | W1  |
+| GET            | `/branches`                 | Chi nhánh người dùng được phép làm việc (Quản lý: tất cả) | đã đăng nhập  | W1  |
+| GET/POST/PATCH | `/users`, `/users/:id`      | Quản lý người dùng                                        | `user.manage` | W8  |
+| POST           | `/users/:id/reset-password` | Đặt lại mật khẩu                                          | `user.manage` | W8  |
+| PUT            | `/users/:id/branches`       | Gán chi nhánh cho người dùng `{ branchIds: [...] }`       | `user.manage` | W8  |
 
 **POST `/auth/login`**
 
@@ -45,13 +46,18 @@ Ký hiệu: `?` = tùy chọn · `[]` = mảng · tiền/giá/số lượng là 
   "expiresIn": 900,
   "user": {
     "id": "0192…", "code": "NV0001", "fullName": "Nguyễn Văn A",
+    "mustChangePassword": false,           // true → bắt người dùng sang màn hình đổi mật khẩu trước khi làm việc
     "role": "accountant",
     "permissions": [                       // theo cấu hình hiện tại của vai trò (Quản lý chỉnh được)
       { "code": "invoice.view",   "scope": "own" },   // "own" = chỉ dữ liệu của mình
       { "code": "invoice.create", "scope": "own" },
       { "code": "product.view",   "scope": "all" }
     ],
-    "branchId": "0192…"
+    "defaultBranchId": "0192…",
+    "branches": [                          // chi nhánh người dùng được làm việc (Quản lý: tất cả)
+      { "id": "0192…", "code": "SG", "name": "Chi nhánh Sài Gòn" },
+      { "id": "0193…", "code": "HN", "name": "Chi nhánh Hà Nội" }
+    ]
   }
 }
 ```
@@ -90,16 +96,18 @@ Lỗi: `401 UNAUTHENTICATED` (sai tài khoản/mật khẩu — thông báo chun
 
 ### 2.2 Danh sách hàng hóa
 
-| Method | Đường dẫn                          | Mô tả                                                        | Quyền          | Mốc |
-| ------ | ---------------------------------- | ------------------------------------------------------------ | -------------- | --- |
-| GET    | `/products`                        | Danh sách, lọc, phân trang                                   | đăng nhập      | W2  |
-| GET    | `/products/lookup?q=`              | Tìm nhanh cho ô chọn hàng (tối đa 20 dòng, không phân trang) | đăng nhập      | W2  |
-| GET    | `/products/:id`                    | Chi tiết                                                     | đăng nhập      | W2  |
-| POST   | `/products`                        | Tạo                                                          | `product.edit` | W2  |
-| PATCH  | `/products/:id`                    | Sửa (gồm ngưng bán `isActive=false`)                         | `product.edit` | W2  |
-| POST   | `/products/:id/images`             | Tải ảnh (`multipart/form-data`, field `file`)                | `product.edit` | W3  |
-| DELETE | `/products/:id/images/:imageId`    | Xóa ảnh                                                      | `product.edit` | W3  |
-| GET    | `/products/:id/stock-card?from&to` | **Thẻ kho**: lịch sử nhập–xuất                               | đăng nhập      | W4  |
+| Method | Đường dẫn                          | Mô tả                                                                        | Quyền          | Mốc |
+| ------ | ---------------------------------- | ---------------------------------------------------------------------------- | -------------- | --- |
+| GET    | `/products`                        | Danh sách, lọc, phân trang                                                   | đăng nhập      | W2  |
+| GET    | `/products/lookup?q=`              | Tìm nhanh cho ô chọn hàng (tối đa 20 dòng, không phân trang)                 | đăng nhập      | W2  |
+| GET    | `/products/:id`                    | Chi tiết                                                                     | đăng nhập      | W2  |
+| POST   | `/products`                        | Tạo                                                                          | `product.edit` | W2  |
+| PATCH  | `/products/:id`                    | Sửa (gồm ngưng bán `isActive=false`)                                         | `product.edit` | W2  |
+| POST   | `/products/:id/images`             | Tải ảnh (`multipart/form-data`, field `file`)                                | `product.edit` | W3  |
+| DELETE | `/products/:id/images/:imageId`    | Xóa ảnh                                                                      | `product.edit` | W3  |
+| GET    | `/products/:id/stock-card?from&to` | **Thẻ kho**: lịch sử nhập–xuất                                               | đăng nhập      | W4  |
+| GET    | `/products/:id/branches`           | Chi tiết theo từng chi nhánh người dùng được phép: giá, tồn, giá vốn, vị trí | đăng nhập      | W4  |
+| PUT    | `/products/:id/branches/:branchId` | Đặt tồn tối thiểu/tối đa và vị trí kho của một chi nhánh                     | `product.edit` | W4  |
 
 Bộ lọc `GET /products`: `q`, `categoryId` (gồm cả nhóm con), `isActive`, `inStock` (`true` = còn tồn), `sort` (`code`, `name`, `onHand`, `createdAt`).
 
@@ -112,9 +120,10 @@ Bộ lọc `GET /products`: `q`, `categoryId` (gồm cả nhóm con), `isActive`
   "categoryId": "…",
   "categoryPath": "ĐIỆN GIA DỤNG > Quạt điện",
   "unit": "Cái",
-  "basePrice": "33500",
-  "costPrice": "21800.5000", // vắng mặt nếu thiếu quyền product.cost.view
-  "lastPurchasePrice": "21500.0000", // như trên
+  "branchId": "…", // chi nhánh mà các trường giá/tồn/vị trí dưới đây tính cho (= X-Branch-Id)
+  "basePrice": "33500", // giá Bảng giá chung TẠI chi nhánh này
+  "costPrice": "21800.5000", // giá vốn bình quân CỦA chi nhánh này; vắng mặt nếu thiếu quyền product.cost.view
+  "lastPurchasePrice": "21500.0000", // giá nhập cuối của chi nhánh này; như trên
   "onHand": "515",
   "reserved": "40",
   "available": "475",
@@ -139,14 +148,16 @@ Bộ lọc `GET /products`: `q`, `categoryId` (gồm cả nhóm con), `isActive`
   "name": "…",
   "categoryId": "…",
   "unit": "Cái",
-  "basePrice": "33500",
-  "location": "11",
   "description": null,
-  "maxStock": null,
+  "weightG": null,
   "isSellable": true
 }
+// Body chỉ chứa thông tin DÙNG CHUNG cho cả hai chi nhánh. Giá bán đặt qua lưới giá (mục 2.3);
+// tồn tối thiểu/tối đa và vị trí kho đặt riêng từng chi nhánh qua PUT /products/:id/branches/:branchId.
 // Lỗi: 409 DUPLICATE_CODE
 ```
+
+**Phân biệt dữ liệu dùng chung và theo chi nhánh:** mã, tên, nhóm, đơn vị, ảnh, mô tả dùng chung; **giá bán, tồn kho, giá vốn, giá nhập cuối, tồn tối thiểu/tối đa, vị trí kho riêng từng chi nhánh**. Các trường theo chi nhánh trong response của `GET /products…` luôn tính cho chi nhánh làm việc (`X-Branch-Id`); muốn xem cả hai chi nhánh dùng `GET /products/:id/branches`.
 
 Quy ước: `code` duy nhất, tối đa 30 ký tự, chỉ chữ/số/`-`/`_`/`.`, không dấu cách; **không đổi sau khi đã có giao dịch**. `onHand/reserved/available/onOrder` chỉ đọc.
 
@@ -197,13 +208,14 @@ Quy ước: `code` duy nhất, tối đa 30 ký tự, chỉ chữ/số/`-`/`_`/`
 
 Có **7 bảng giá**: Chung (mặc định), Lớn, Vừa, VIP, và 3 bản VAT. Mỗi sản phẩm có thể chưa có giá ở một bảng; khi bán, bảng nào thiếu giá thì **lùi về Bảng giá chung**.
 
-| Method | Đường dẫn                  | Mô tả                                                     | Quyền        | Mốc |
-| ------ | -------------------------- | --------------------------------------------------------- | ------------ | --- |
-| GET    | `/price-books`             | Danh sách bảng giá                                        | đăng nhập    | W2  |
-| PATCH  | `/price-books/:id`         | Đổi tên / bật tắt                                         | `price.edit` | W3  |
-| GET    | `/price-books/grid`        | **Lưới giá**: mỗi dòng = 1 sản phẩm, mỗi cột = 1 bảng giá | đăng nhập    | W3  |
-| PUT    | `/price-books/grid`        | Lưu nhiều ô giá cùng lúc                                  | `price.edit` | W3  |
-| POST   | `/price-books/bulk-adjust` | Tăng/giảm giá hàng loạt (có chế độ xem trước)             | `price.edit` | W3  |
+| Method | Đường dẫn                  | Mô tả                                                                         | Quyền        | Mốc |
+| ------ | -------------------------- | ----------------------------------------------------------------------------- | ------------ | --- |
+| GET    | `/price-books`             | Danh sách bảng giá                                                            | đăng nhập    | W2  |
+| PATCH  | `/price-books/:id`         | Đổi tên / bật tắt                                                             | `price.edit` | W3  |
+| GET    | `/price-books/grid`        | **Lưới giá**: mỗi dòng = 1 sản phẩm, mỗi cột = 1 bảng giá                     | đăng nhập    | W3  |
+| PUT    | `/price-books/grid`        | Lưu nhiều ô giá cùng lúc                                                      | `price.edit` | W3  |
+| POST   | `/price-books/bulk-adjust` | Tăng/giảm giá hàng loạt (có chế độ xem trước)                                 | `price.edit` | W3  |
+| POST   | `/price-books/copy-branch` | Sao chép giá từ chi nhánh này sang chi nhánh kia (khởi tạo giá chi nhánh mới) | `price.edit` | W3  |
 
 ```json
 // GET /price-books
@@ -236,8 +248,9 @@ Có **7 bảng giá**: Chung (mặc định), Lớn, Vừa, VIP, và 3 bản VAT
 ```
 
 ```json
-// GET /price-books/grid?q=&categoryId=&page=1&limit=50
+// GET /price-books/grid?branchId=…&q=&categoryId=&page=1&limit=50   (branchId mặc định = chi nhánh làm việc)
 {
+  "branchId": "…",
   "books": [
     { "id": "…", "code": "CHUNG", "name": "Bảng giá chung" },
     { "id": "…", "code": "LON", "name": "Lớn" }
@@ -261,13 +274,14 @@ Có **7 bảng giá**: Chung (mặc định), Lớn, Vừa, VIP, và 3 bản VAT
 
 ```json
 // PUT /price-books/grid  (chỉ gửi các ô thay đổi; price = null nghĩa là xóa giá, lùi về bảng chung)
-{ "changes": [{ "productId": "…", "priceBookId": "…", "price": "33000" }] }
+{ "branchId": "…", "changes": [{ "productId": "…", "priceBookId": "…", "price": "33000" }] }
 // 200: { "updated": 1 }
 ```
 
 ```json
 // POST /price-books/bulk-adjust
 {
+  "branchId": "…", // chi nhánh được điều chỉnh giá
   "priceBookId": "…",
   "categoryId": "…?",
   "mode": "percent", // "percent" | "amount"
@@ -278,13 +292,21 @@ Có **7 bảng giá**: Chung (mặc định), Lớn, Vừa, VIP, và 3 bản VAT
 // 200: { "affected": 54, "preview": [{ "productId": "…", "code": "…", "oldPrice": "33000", "newPrice": "34700" }] }
 ```
 
+**Giá theo chi nhánh:** 7 hạng giá dùng chung cho hai chi nhánh, nhưng **số tiền của từng ô giá là riêng từng chi nhánh**. Màn hình lưới giá cần chọn chi nhánh (tab/ô chọn). Khi bán, giá tra theo chi nhánh của đơn → hạng giá của khách → nếu thiếu thì lùi về Bảng giá chung **của cùng chi nhánh** (không lấy giá chi nhánh kia).
+
+```json
+// POST /price-books/copy-branch
+{ "fromBranchId": "…", "toBranchId": "…", "priceBookId": "…?", "overwrite": false }
+// overwrite=false: chỉ chép các ô chi nhánh đích chưa có giá. 200: { "copied": 1840, "skipped": 120 }
+```
+
 ### 2.4 Báo giá cho màn hình tạo đơn
 
 | Method | Đường dẫn        | Mô tả                                                              | Quyền     | Mốc |
 | ------ | ---------------- | ------------------------------------------------------------------ | --------- | --- |
 | POST   | `/pricing/quote` | Tính giá niêm yết, tồn và cảnh báo cho các dòng hàng của một khách | đăng nhập | W3  |
 
-Dùng khi người dùng chọn khách / thêm hàng để **hiển thị đúng giá và tồn tức thì**. Đây chỉ là báo giá; khi lưu đơn server tính lại.
+Dùng khi người dùng chọn khách / thêm hàng để **hiển thị đúng giá và tồn tức thì**. Đây chỉ là báo giá; khi lưu đơn server tính lại. **Giá, tồn và công nợ tính theo chi nhánh làm việc (`X-Branch-Id`)** — công nợ và hạn mức là của khách tại chi nhánh đó.
 
 ```json
 // request
@@ -326,7 +348,12 @@ Dùng khi người dùng chọn khách / thêm hàng để **hiển thị đúng
   "address": null,
   "taxCode": null,
   "note": null,
-  "balance": "240000000", // + = mình còn nợ NCC; có thể âm
+  "isInternalBranch": false, // true = nhà cung cấp hệ thống đại diện một chi nhánh (chuyển kho nội bộ)
+  "balances": [
+    // công nợ TÁCH BIỆT theo chi nhánh (chỉ các chi nhánh người dùng được phép); + = mình còn nợ NCC; có thể âm
+    { "branchId": "…", "branchCode": "SG", "balance": "240000000" },
+    { "branchId": "…", "branchCode": "HN", "balance": "0" }
+  ],
   "isActive": true,
   "createdAt": "…"
 }
@@ -474,9 +501,17 @@ Bộ lọc `GET /customers`: `q`, `type`, `salesOwnerId`, `priceBookId`, `hasDeb
   "facebook": null,
   "salesOwner": { "id": "…", "fullName": "Trần Văn B" }, // nhân viên phụ trách
   "defaultPriceBookId": "…",
-  "creditLimit": "50000000",
-  "paymentTermDays": 15, // null = không giới hạn
-  "balance": "12500000", // phải thu; ÂM = khách đang dư/ứng trước
+  "isInternalBranch": false, // true = khách hàng hệ thống đại diện một chi nhánh (chuyển kho nội bộ)
+  "terms": [
+    // hạn mức & kỳ hạn công nợ RIÊNG từng chi nhánh; không có dòng = không giới hạn
+    { "branchId": "…", "branchCode": "SG", "creditLimit": "50000000", "paymentTermDays": 15 },
+    { "branchId": "…", "branchCode": "HN", "creditLimit": null, "paymentTermDays": null }
+  ],
+  "balances": [
+    // công nợ TÁCH BIỆT theo chi nhánh; phải thu; ÂM = khách đang dư/ứng trước
+    { "branchId": "…", "branchCode": "SG", "balance": "12500000" },
+    { "branchId": "…", "branchCode": "HN", "balance": "0" }
+  ],
   "lastTransactionAt": "…",
   "totalSales": "1200000000",
   "note": null,
@@ -495,6 +530,8 @@ Bộ lọc `GET /customers`: `q`, `type`, `salesOwnerId`, `priceBookId`, `hasDeb
   "updatedAt": "…"
 }
 ```
+
+**Công nợ theo chi nhánh:** khách hàng và nhà cung cấp là dữ liệu dùng chung, nhưng **mỗi chi nhánh có sổ công nợ riêng**, không cấn trừ chéo (thu nợ ở Hà Nội không giảm nợ Sài Gòn). `balances` và `GET …/ledger`, `…/aging`, `…/statement` nhận `branchId` (mặc định = chi nhánh làm việc). Danh sách khách/nhà cung cấp mặc định **không gồm** các đối tác nội bộ (`isInternalBranch = true`); thêm `?includeInternal=true` nếu cần. `hasDebt` tính theo chi nhánh làm việc.
 
 Quy ước: `phone` được chuẩn hóa về dạng `0xxxxxxxxx` và **không trùng** (lỗi `409 DUPLICATE_PHONE`, `details` kèm khách đã có). `balance` chỉ đọc.
 
@@ -566,6 +603,7 @@ Không gửi `listPrice`/`unitPrice`/`lineTotal`: server tự tính. Tùy chọn
 // Order (response)
 {
   "id": "…", "code": "DH022295", "status": "draft",
+  "branch": { "id": "…", "code": "SG", "name": "Chi nhánh Sài Gòn" }, // chi nhánh của đơn = X-Branch-Id lúc tạo; không đổi được
   "customer": { "id": "…", "code": "KH000002", "name": "Cửa hàng Ví Dụ 2", "phone": "…" },
   "priceBook": { "id": "…", "name": "Lớn" },
   "seller": { "id": "…", "fullName": "…" },
@@ -618,6 +656,7 @@ Không gửi `listPrice`/`unitPrice`/`lineTotal`: server tự tính. Tùy chọn
   "id": "…",
   "code": "HD016890",
   "status": "completed",
+  "branch": { "id": "…", "code": "SG", "name": "Chi nhánh Sài Gòn" }, // = chi nhánh của đơn gốc
   "orderId": "…",
   "orderCode": "DH022215",
   "customer": {
@@ -941,3 +980,71 @@ Lỗi thường gặp:
 - Có hiệu lực **ngay** cho mọi người dùng thuộc vai trò đó, không cần đăng nhập lại. Frontend nên gọi lại `GET /auth/me` khi nhận `403 FORBIDDEN` hoặc khi tải lại trang để cập nhật menu/nút.
 - Nên cảnh báo khi Quản lý bỏ quyền làm vai trò đó mất khả năng làm việc (vd bỏ `product.view` của Sale) — server vẫn cho phép.
 - Mọi thay đổi được ghi vào nhật ký thao tác (ai đổi, trước/sau).
+
+---
+
+## 11. Chi nhánh và chuyển kho
+
+Công ty có **2 chi nhánh dùng chung một hệ thống** (Hà Nội, Sài Gòn). Quy tắc chung cho mọi endpoint: [`README.md`](README.md) mục "Nhiều chi nhánh".
+
+### 11.1 Chuyển kho giữa hai chi nhánh
+
+Quy trình **hai bước**: chi nhánh gửi lập phiếu (trừ tồn bên gửi, hàng "đang đi đường") → chi nhánh nhận xác nhận (cộng tồn bên nhận, tính giá vốn, ghi công nợ đối ứng). Mã phiếu `CH000001`.
+
+| Method | Đường dẫn                      | Mô tả                                                        | Quyền              | Mốc |
+| ------ | ------------------------------ | ------------------------------------------------------------ | ------------------ | --- |
+| GET    | `/stock-transfers`             | Danh sách (`status`, `direction=out\|in`, `from`, `to`, `q`) | `transfer.view`    | W5  |
+| GET    | `/stock-transfers/:id`         | Chi tiết                                                     | `transfer.view`    | W5  |
+| POST   | `/stock-transfers`             | **Bước 1 — gửi hàng** (**Idempotency-Key**)                  | `transfer.create`  | W5  |
+| POST   | `/stock-transfers/:id/receive` | **Bước 2 — nhận hàng** (**Idempotency-Key**)                 | `transfer.receive` | W5  |
+| POST   | `/stock-transfers/:id/cancel`  | Hủy khi còn đang đi đường `{ reason }` (bắt buộc lý do)      | `transfer.create`  | W5  |
+| GET    | `/stock-transfers/:id/print`   | PDF phiếu chuyển kho                                         | `transfer.view`    | W5  |
+
+Người dùng thấy phiếu mà chi nhánh **gửi hoặc nhận** nằm trong chi nhánh họ được phép. Chỉ người thuộc **chi nhánh gửi** mới tạo/hủy phiếu; chỉ người thuộc **chi nhánh nhận** mới xác nhận nhận (Quản lý làm được cả hai).
+
+```jsonc
+// POST /stock-transfers   — chi nhánh gửi = chi nhánh làm việc (X-Branch-Id)
+{
+  "toBranchId": "…",
+  "items": [
+    { "productId": "…", "qty": "40" },
+    { "productId": "…", "qty": "10" }
+  ],
+  "shippingFee": "1000",             // phí vận chuyển, số nguyên đồng; mặc định "0"
+  "shippingPaidBy": "sender",        // "sender" (mặc định) | "receiver": bên ứng tiền trả xe
+  "note": "Xe tải 51D-xxxxx"
+}
+
+// 201
+{
+  "id": "…", "code": "CH000001", "status": "in_transit",       // in_transit | received | cancelled
+  "fromBranch": { "id": "…", "code": "SG", "name": "Chi nhánh Sài Gòn" },
+  "toBranch":   { "id": "…", "code": "HN", "name": "Chi nhánh Hà Nội" },
+  "sentAt": "…", "receivedAt": null,
+  "goodsValue": "60000",             // theo giá vốn bên gửi — vắng mặt nếu thiếu quyền product.cost.view
+  "shippingFee": "1000", "shippingPaidBy": "sender",
+  "debtAmount": null,                // có giá trị sau khi nhận: tiền hàng (+ phí nếu bên gửi ứng)
+  "items": [
+    { "productId": "…", "code": "QKBSP", "name": "…", "qty": "40",
+      "unitCostSent": "1000.0000",       // giá vốn — chỉ có khi có product.cost.view
+      "shippingShare": "667",            // phần phí phân bổ cho dòng này, theo tỷ lệ giá trị hàng
+      "unitCostReceived": null }         // = unitCostSent + shippingShare / qty, có sau khi nhận
+  ],
+  "note": "…", "createdBy": { "id": "…", "fullName": "…" }, "createdAt": "…"
+}
+```
+
+**Quy tắc nghiệp vụ**
+
+- Giá nhập kho bên nhận = **giá vốn bên gửi + phí vận chuyển phân bổ** (theo tỷ lệ giá trị từng dòng); giá vốn bình quân của bên nhận được tính lại. Phí vẫn được lưu riêng ở `shippingFee`.
+- Nhận hàng **phải đủ** số lượng ghi trên phiếu (chưa hỗ trợ nhận thiếu). Sai lệch thì hủy phiếu khi còn đi đường rồi lập lại.
+- Công nợ đối ứng ghi **khi nhận**: chi nhánh gửi thấy chi nhánh nhận là **khách hàng nội bộ** (phải thu), chi nhánh nhận thấy chi nhánh gửi là **nhà cung cấp nội bộ** (phải trả). Thanh toán công nợ này bằng phiếu thu/chi thường ở Sổ quỹ.
+- Phiếu chuyển kho **không phải hóa đơn bán**: không tính vào doanh thu, lãi gộp hay Dashboard; báo cáo gộp hai chi nhánh phải loại các đối tác nội bộ.
+- Hàng đang đi đường đã trừ tồn bên gửi và chưa cộng bên nhận; hiển thị ở màn hình phiếu (trạng thái `in_transit`), không nằm trong tồn của chi nhánh nào.
+
+| HTTP | `code`             | Khi nào                                                                                    |
+| ---- | ------------------ | ------------------------------------------------------------------------------------------ |
+| 422  | `STOCK_NOT_ENOUGH` | Bên gửi không đủ tồn (`details.available`)                                                 |
+| 400  | `INVALID_STATE`    | Nhận/hủy phiếu không còn đang đi đường (đã nhận hoặc đã hủy)                               |
+| 400  | `VALIDATION_ERROR` | Gửi và nhận cùng chi nhánh; danh sách rỗng; trùng mặt hàng; số lượng sai; phí không hợp lệ |
+| 403  | `BRANCH_FORBIDDEN` | Không thuộc chi nhánh gửi (khi tạo/hủy) hoặc chi nhánh nhận (khi nhận)                     |

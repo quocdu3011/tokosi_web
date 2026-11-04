@@ -5,6 +5,13 @@ Tài liệu thiết kế gốc: [`docs/TAI_LIEU_THIET_KE.md`](docs/TAI_LIEU_THIE
 (phạm vi: mục 2.2; dữ liệu: mục 5; lộ trình 2 tháng: mục 13).
 Đối với những chức năng chưa quen thuộc, **đừng viết từ con số 0**. Hãy tìm kiếm các dự án mã nguồn mở trên GitHub để so sánh ý tưởng, cách tổ chức và các bẫy thường gặp trước khi bắt tay làm.
 
+## Đọc trước khi làm
+
+> Hai file dưới đây là **tài liệu làm việc cục bộ của dev backend**, nằm trong `.gitignore` (không có trên GitHub). Nếu không thấy file trên máy thì bỏ qua.
+
+- [`CURRENT.md`](CURRENT.md): hiện trạng và nhật ký theo ngày — **đọc đầu tiên**; cuối mỗi ngày làm việc **thêm một mục mới ở đầu danh sách ngày** và cập nhật "Hiện trạng", "Việc tiếp theo".
+- [`MEMORY.md`](MEMORY.md): quyết định đã chốt, điều còn mở, bẫy kỹ thuật đã gặp. Khi chốt quyết định mới hoặc gặp bẫy mới, ghi vào đó (sửa/xóa mục lỗi thời).
+
 ## Cấu trúc
 
 ```
@@ -25,7 +32,7 @@ docs/           Tài liệu thiết kế, ERD, ADR
 | `pnpm db:up` / `pnpm db:down`                               | Bật/tắt PostgreSQL cục bộ (cần Docker)                               |
 | `pnpm --filter @kiot/api test`                              | Chạy test của một gói                                                |
 | `pnpm --filter @kiot/api test:e2e`                          | Test e2e của API (không cần CSDL thật)                               |
-| `pnpm --filter @kiot/api db:seed`                           | Dữ liệu khởi tạo (quyền mặc định); chạy lại an toàn                  |
+| `pnpm --filter @kiot/api db:seed`                           | Dữ liệu khởi tạo đầy đủ (xem `docs/db/README.md`); chạy lại an toàn  |
 | `pnpm --filter @kiot/api openapi:export`                    | Xuất `docs/api/openapi.json` (chạy khi đổi endpoint/DTO, commit kèm) |
 
 Mọi PR phải qua: `lint`, `typecheck`, `test`, `build` (CI chạy đúng bộ này).
@@ -45,6 +52,14 @@ Mọi PR phải qua: `lint`, `typecheck`, `test`, `build` (CI chạy đúng bộ
 - Trường nhạy cảm (giá vốn, công nợ…) chỉ trả về khi đủ quyền tương ứng — xem `docs/api/README.md` mục 8.
 - Thêm quyền mới: thêm vào danh mục + `DEFAULT_ROLE_PERMISSIONS` (nếu muốn cấp mặc định), cập nhật `docs/api/`. Cài đặt đã chạy rồi thì quyền mới chỉ Quản lý có cho tới khi được cấp (seed không ghi đè cấu hình hiện có).
 - `AuthGuard` (JWT) phải đăng ký `APP_GUARD` **trước** `PermissionGuard`.
+
+## Nhiều chi nhánh (Hà Nội, Sài Gòn)
+
+- Dùng chung: hàng hóa, khách hàng, nhà cung cấp, hạng giá. **Riêng từng chi nhánh:** giá bán (`price_book_items.branch_id`), tồn kho + **giá vốn** + vị trí (`stocks`), công nợ (`debt_ledger.branch_id`), hạn mức (`customer_branch_terms`), quỹ, mọi chứng từ. **Không bao giờ dùng giá/tồn/công nợ của chi nhánh này cho chi nhánh kia**; thiếu giá thì lùi về Bảng giá chung của CÙNG chi nhánh.
+- Mọi truy vấn dữ liệu theo chi nhánh phải qua `BranchAccessService` (`resolveWorkingBranch` từ header `X-Branch-Id`, `assertAccess`). Nhân viên chỉ thấy chi nhánh được gán; Quản lý thấy cả hai.
+- Thay đổi tồn kho **chỉ** qua `InventoryService.applyMovement` (khóa dòng, không âm, cập nhật giá vốn bình quân của chi nhánh, ghi sổ cái) trong transaction của chứng từ. Cấp mã chứng từ qua `nextDocumentCode`. Tính tiền/giá vốn bằng `common/costing.ts` (Decimal), không dùng `number`.
+- Chuyển kho giữa 2 chi nhánh: `StockTransfersService` (2 bước gửi → nhận; giá nhập bên nhận = giá vốn gửi + phí phân bổ; công nợ đối ứng qua khách/NCC nội bộ có `linked_branch_id`). Đó **không phải hóa đơn bán**: mọi báo cáo doanh số/công nợ/danh sách khách, NCC phải **loại đối tác nội bộ** (`linked_branch_id IS NOT NULL`).
+- Trả hàng bán về chi nhánh của hóa đơn gốc; thu nợ chỉ cấn trừ hóa đơn cùng chi nhánh.
 
 ## Quy tắc BẮT BUỘC (nghiệp vụ tiền / kho / công nợ)
 

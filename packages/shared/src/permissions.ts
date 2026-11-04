@@ -38,6 +38,7 @@ export type PermissionScope = 'all' | 'own';
 export const PERMISSION_MODULES = [
   { key: 'product', label: 'Hàng hóa' },
   { key: 'purchase', label: 'Mua hàng' },
+  { key: 'stock', label: 'Kho & chuyển kho' },
   { key: 'customer', label: 'Khách hàng' },
   { key: 'sales', label: 'Đơn hàng' },
   { key: 'cash', label: 'Sổ quỹ & công nợ' },
@@ -119,6 +120,26 @@ export const PERMISSIONS = [
     module: 'purchase',
     label: 'Hủy phiếu nhập / phiếu trả nhập',
     requires: ['purchase.view'],
+  },
+  // ---- Kho & chuyển kho (giữa các chi nhánh)
+  {
+    code: 'transfer.view',
+    module: 'stock',
+    label: 'Xem phiếu chuyển kho',
+    description: 'Phiếu chuyển kho gửi đi hoặc nhận về của chi nhánh mình được gán',
+    requires: ['product.view'],
+  },
+  {
+    code: 'transfer.create',
+    module: 'stock',
+    label: 'Lập/hủy phiếu chuyển kho (bên gửi)',
+    requires: ['transfer.view'],
+  },
+  {
+    code: 'transfer.receive',
+    module: 'stock',
+    label: 'Xác nhận nhận hàng chuyển kho (bên nhận)',
+    requires: ['transfer.view'],
   },
   // ---- Khách hàng
   {
@@ -252,6 +273,9 @@ const own = (codes: readonly PermissionCode[]): RoleDefaults =>
  */
 export const DEFAULT_ROLE_PERMISSIONS: Record<Exclude<Role, 'manager'>, RoleDefaults> = {
   assistant: all([
+    'transfer.view',
+    'transfer.create',
+    'transfer.receive',
     'product.view',
     'product.edit',
     'purchase.view',
@@ -273,6 +297,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Exclude<Role, 'manager'>, RoleDefa
     'purchase.view',
     'purchase.edit',
     'purchase.cancel',
+    'transfer.view',
     'customer.view',
     'order.view',
     'invoice.view',
@@ -290,6 +315,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Exclude<Role, 'manager'>, RoleDefa
     'report.cash',
   ]),
   warehouse: all([
+    'transfer.view',
+    'transfer.create',
+    'transfer.receive',
     'product.view',
     'product.edit',
     'purchase.view',

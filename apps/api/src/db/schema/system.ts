@@ -48,6 +48,8 @@ export const users = pgTable(
     username: text().notNull().unique(),
     fullName: text().notNull(),
     passwordHash: text().notNull(),
+    /** Bắt đổi mật khẩu ở lần đăng nhập kế tiếp (tài khoản mới tạo / vừa đặt lại). */
+    mustChangePassword: boolean().notNull().default(false),
     role: userRole().notNull(),
     phone: text(),
     defaultBranchId: uuid().references(() => branches.id),
@@ -160,6 +162,27 @@ export const importJobs = pgTable('import_jobs', {
   createdAt: tstz().notNull().defaultNow(),
   finishedAt: tstz(),
 });
+
+/**
+ * Chi nhánh mà người dùng được phép làm việc. Vai trò `manager` luôn thấy mọi chi nhánh (không cần dòng ở đây).
+ * Người dùng khác chỉ thấy dữ liệu của các chi nhánh được gán.
+ */
+export const userBranches = pgTable(
+  'user_branches',
+  {
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    branchId: uuid()
+      .notNull()
+      .references(() => branches.id),
+    createdAt: tstz().notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.branchId] }),
+    index('user_branches_branch_idx').on(t.branchId),
+  ],
+);
 
 /**
  * Quyền của từng vai trò — do Quản lý chỉnh. Vai trò `manager` KHÔNG lưu ở đây (luôn có mọi quyền).

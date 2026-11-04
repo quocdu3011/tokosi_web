@@ -49,6 +49,7 @@ enum ledger_entry_type {
   "payment"
   "return"
   "adjustment"
+  "transfer"
 }
 
 enum order_status {
@@ -78,6 +79,11 @@ enum return_settlement {
   "refund"
 }
 
+enum shipping_payer {
+  "sender"
+  "receiver"
+}
+
 enum stock_ref_type {
   "opening"
   "goods_receipt"
@@ -85,12 +91,21 @@ enum stock_ref_type {
   "sales_return"
   "purchase_return"
   "adjustment"
+  "transfer_out"
+  "transfer_in"
+  "transfer_cancel"
 }
 
 enum supplier_kind {
   "goods"
   "driver"
   "other"
+}
+
+enum transfer_status {
+  "in_transit"
+  "received"
+  "cancelled"
 }
 
 enum user_role {
@@ -137,7 +152,7 @@ Table branches {
     (is_default) [name: 'branches_one_default', unique]
   }
 
-  Note: '''Chi nhánh/kho. Hiện chỉ có 1 nhưng mọi chứng từ đều gắn chi nhánh.'''
+  Note: '''Chi nhánh/kho (Hà Nội, Sài Gòn). Giá bán, tồn kho, giá vốn, công nợ, quỹ và mọi chứng từ đều tách theo chi nhánh.'''
 }
 
 Table cash_accounts {
@@ -155,6 +170,7 @@ Table cash_accounts {
 
 Table cash_categories {
   id uuid [pk, default: `gen_random_uuid()`]
+  code text [unique]
   name text [not null]
   direction cash_direction [not null]
   is_system boolean [not null, default: false]
@@ -238,6 +254,20 @@ Table company_profile {
   Note: '''Thông tin công ty (1 dòng) dùng cho mẫu in.'''
 }
 
+Table customer_branch_terms {
+  customer_id uuid [not null]
+  branch_id uuid [not null]
+  credit_limit numeric(18,0) [note: 'Hạn mức công nợ tại chi nhánh này (cảnh báo mềm)']
+  payment_term_days integer
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (customer_id, branch_id) [pk]
+  }
+
+  Note: '''Hạn mức và kỳ hạn công nợ của khách, riêng từng chi nhánh.'''
+}
+
 Table customer_invoice_profiles {
   customer_id uuid [pk]
   buyer_name text
@@ -262,8 +292,7 @@ Table customers {
   facebook text
   sales_owner_id uuid [note: 'Nhân viên phụ trách (ở KiotViet là "Nhóm khách hàng")']
   default_price_book_id uuid [note: 'Bảng giá tự áp khi đặt hàng']
-  credit_limit numeric(18,0) [note: 'Hạn mức công nợ (cảnh báo mềm)']
-  payment_term_days integer
+  linked_branch_id uuid [unique, note: 'Khách hàng hệ thống đại diện một chi nhánh (chuyển kho nội bộ)']
   note text
   is_active boolean [not null, default: true]
   created_by uuid
@@ -282,6 +311,7 @@ Table customers {
 
 Table debt_ledger {
   id uuid [pk, default: `gen_random_uuid()`]
+  branch_id uuid [not null, note: 'Công nợ tách biệt theo chi nhánh']
   party_type party_type [not null]
   party_id uuid [not null, note: 'Đa hình theo party_type (không có khóa ngoại)']
   entry_type ledger_entry_type [not null]
@@ -295,7 +325,8 @@ Table debt_ledger {
   created_by uuid
 
   indexes {
-    (party_type, party_id, occurred_at) [name: 'debt_ledger_party_idx']
+    (party_type, party_id, branch_id, occurred_at) [name: 'debt_ledger_party_idx']
+    (branch_id, occurred_at) [name: 'debt_ledger_branch_idx']
     (ref_type, ref_id) [name: 'debt_ledger_ref_idx']
   }
 
@@ -541,17 +572,18 @@ CHECK payment_allocations_amount_pos: amount > 0'''
 
 Table price_book_items {
   price_book_id uuid [not null]
+  branch_id uuid [not null]
   product_id uuid [not null]
-  price numeric(18,4) [not null]
+  price numeric(18,4) [not null, note: 'Giá bán tại chi nhánh (branch_id) trong bảng giá (price_book_id)']
   updated_by uuid
   updated_at timestamptz [not null, default: `now()`]
 
   indexes {
-    (price_book_id, product_id) [pk]
-    (product_id) [name: 'price_book_items_product_idx']
+    (price_book_id, branch_id, product_id) [pk]
+    (branch_id, product_id) [name: 'price_book_items_branch_product_idx']
   }
 
-  Note: '''Giá của từng sản phẩm trong từng bảng giá.'''
+  Note: '''Giá bán của từng sản phẩm trong từng bảng giá, TẠI TỪNG CHI NHÁNH.'''
 }
 
 Table price_books {
@@ -593,12 +625,6 @@ Table products {
   name text [not null]
   category_id uuid
   unit text [not null, default: 'Cái', note: 'Đơn vị tính (quy cách thường nằm trong tên hàng)']
-  base_price numeric(18,4) [not null, default: 0, note: 'Giá bán trong Bảng giá chung']
-  cost_price numeric(18,4) [not null, default: 0, note: 'Giá vốn bình quân gia quyền']
-  last_purchase_price numeric(18,4)
-  min_stock numeric(14,3)
-  max_stock numeric(14,3)
-  location text
   description text
   weight_g numeric(12,2)
   is_active boolean [not null, default: true]
@@ -614,7 +640,7 @@ Table products {
     (is_active) [name: 'products_active_idx']
   }
 
-  Note: '''Hàng hóa. Mỗi quy cách là một SKU riêng; tồn kho ở bảng stocks.'''
+  Note: '''Hàng hóa — chỉ thông tin DÙNG CHUNG giữa các chi nhánh. Giá bán ở price_book_items, tồn kho/giá vốn/vị trí ở stocks (theo chi nhánh).'''
 }
 
 Table purchase_return_items {
@@ -687,6 +713,8 @@ Table role_permissions {
     (role, permission_code) [pk]
     (role) [name: 'role_permissions_role_idx']
   }
+
+  Note: '''Quyền của từng vai trò do Quản lý cấu hình (vai trò manager luôn đủ quyền, không lưu ở đây).'''
 }
 
 Table sales_return_items {
@@ -757,17 +785,71 @@ Table stock_movements {
 CHECK stock_movements_nonzero: qtyDelta <> 0'''
 }
 
+Table stock_transfer_items {
+  id uuid [pk, default: `gen_random_uuid()`]
+  transfer_id uuid [not null]
+  product_id uuid [not null]
+  qty numeric(14,3) [not null]
+  unit_cost_sent numeric(18,4) [not null]
+  shipping_share numeric(18,0) [not null, default: 0]
+  unit_cost_received numeric(18,4) [note: 'Giá nhập kho bên nhận = giá vốn gửi + phí phân bổ / số lượng']
+
+  indexes {
+    (transfer_id) [name: 'stock_transfer_items_transfer_idx']
+    (product_id) [name: 'stock_transfer_items_product_idx']
+  }
+
+  Note: '''Dòng hàng chuyển kho: giá vốn bên gửi, phần phí phân bổ và giá nhập kho của bên nhận.
+CHECK stock_transfer_items_qty_pos: qty > 0'''
+}
+
+Table stock_transfers {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code text [not null, unique]
+  from_branch_id uuid [not null]
+  to_branch_id uuid [not null]
+  status transfer_status [not null, default: 'in_transit']
+  sent_at timestamptz [not null]
+  received_at timestamptz
+  goods_value numeric(18,0) [not null, note: 'Tổng tiền hàng theo giá vốn bên gửi tại thời điểm gửi']
+  shipping_fee numeric(18,0) [not null, default: 0, note: 'Phí vận chuyển; cộng vào giá nhập kho của bên nhận']
+  shipping_paid_by shipping_payer [not null, default: 'sender', note: 'Bên ứng tiền trả xe; sender → công nợ đối ứng gồm cả phí']
+  debt_amount numeric(18,0) [note: 'Công nợ đối ứng đã ghi khi nhận hàng']
+  note text
+  created_by uuid
+  received_by uuid
+  cancelled_at timestamptz
+  cancel_reason text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (from_branch_id, sent_at) [name: 'stock_transfers_from_idx']
+    (to_branch_id, sent_at) [name: 'stock_transfers_to_idx']
+    (status) [name: 'stock_transfers_status_idx']
+  }
+
+  Note: '''Phiếu chuyển kho giữa 2 chi nhánh, 2 bước (đang đi đường → đã nhận). Không phải hóa đơn bán. Giá nhập bên nhận = giá vốn bên gửi + phí vận chuyển phân bổ.
+CHECK stock_transfers_branches_differ: fromBranchId <> toBranchId
+CHECK stock_transfers_fee_nonneg: shippingFee >= 0'''
+}
+
 Table stocks {
   branch_id uuid [not null]
   product_id uuid [not null]
   on_hand numeric(14,3) [not null, default: 0, note: 'Tồn thực tế; không âm (CHECK)']
+  cost_price numeric(18,4) [not null, default: 0, note: 'Giá vốn bình quân gia quyền CỦA chi nhánh này']
+  last_purchase_price numeric(18,4) [note: 'Giá nhập cuối của chi nhánh này']
+  min_stock numeric(14,3)
+  max_stock numeric(14,3)
+  location text [note: 'Vị trí kho tại chi nhánh này']
   updated_at timestamptz [not null, default: `now()`]
 
   indexes {
     (branch_id, product_id) [pk]
   }
 
-  Note: '''Tồn hiện tại theo chi nhánh. Chỉ cập nhật cùng transaction với stock_movements.
+  Note: '''Kho theo (chi nhánh, sản phẩm): tồn, giá vốn bình quân, giá nhập cuối, tồn tối thiểu/tối đa, vị trí kho. Chỉ cập nhật cùng transaction với stock_movements.
 CHECK stocks_on_hand_nonneg: onHand >= 0'''
 }
 
@@ -779,6 +861,7 @@ Table suppliers {
   phone text
   address text
   tax_code text
+  linked_branch_id uuid [unique, note: 'Nhà cung cấp hệ thống đại diện một chi nhánh (chuyển kho nội bộ)']
   note text
   is_active boolean [not null, default: true]
   created_by uuid
@@ -794,12 +877,26 @@ Table suppliers {
   Note: '''Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng khác.'''
 }
 
+Table user_branches {
+  user_id uuid [not null]
+  branch_id uuid [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, branch_id) [pk]
+    (branch_id) [name: 'user_branches_branch_idx']
+  }
+
+  Note: '''Chi nhánh người dùng được làm việc (Quản lý thấy tất cả, không cần dòng ở đây).'''
+}
+
 Table users {
   id uuid [pk, default: `gen_random_uuid()`]
   code text [not null, unique]
   username text [not null, unique]
   full_name text [not null]
   password_hash text [not null]
+  must_change_password boolean [not null, default: false]
   role user_role [not null]
   phone text
   default_branch_id uuid
@@ -823,10 +920,14 @@ Ref: cash_transactions.category_id > cash_categories.id
 Ref: cash_transactions.account_id > cash_accounts.id
 Ref: cash_transactions.created_by > users.id
 Ref: categories.parent_id > categories.id
+Ref: customer_branch_terms.customer_id > customers.id [delete: cascade]
+Ref: customer_branch_terms.branch_id > branches.id
 Ref: customer_invoice_profiles.customer_id > customers.id [delete: cascade]
 Ref: customers.sales_owner_id > users.id
 Ref: customers.default_price_book_id > price_books.id
+Ref: customers.linked_branch_id > branches.id
 Ref: customers.created_by > users.id
+Ref: debt_ledger.branch_id > branches.id
 Ref: debt_ledger.created_by > users.id
 Ref: goods_receipt_items.receipt_id > goods_receipts.id [delete: cascade]
 Ref: goods_receipt_items.product_id > products.id
@@ -858,6 +959,7 @@ Ref: orders.created_by > users.id
 Ref: payment_allocations.cash_transaction_id > cash_transactions.id
 Ref: payment_allocations.invoice_id > invoices.id
 Ref: price_book_items.price_book_id > price_books.id [delete: cascade]
+Ref: price_book_items.branch_id > branches.id
 Ref: price_book_items.product_id > products.id [delete: cascade]
 Ref: price_book_items.updated_by > users.id
 Ref: product_images.product_id > products.id [delete: cascade]
@@ -883,9 +985,18 @@ Ref: sales_returns.created_by > users.id
 Ref: stock_movements.branch_id > branches.id
 Ref: stock_movements.product_id > products.id
 Ref: stock_movements.created_by > users.id
+Ref: stock_transfer_items.transfer_id > stock_transfers.id [delete: cascade]
+Ref: stock_transfer_items.product_id > products.id
+Ref: stock_transfers.from_branch_id > branches.id
+Ref: stock_transfers.to_branch_id > branches.id
+Ref: stock_transfers.created_by > users.id
+Ref: stock_transfers.received_by > users.id
 Ref: stocks.branch_id > branches.id
 Ref: stocks.product_id > products.id
+Ref: suppliers.linked_branch_id > branches.id
 Ref: suppliers.created_by > users.id
+Ref: user_branches.user_id > users.id [delete: cascade]
+Ref: user_branches.branch_id > branches.id
 Ref: users.default_branch_id > branches.id
 
 TableGroup "Hệ thống" {
@@ -897,6 +1008,8 @@ TableGroup "Hệ thống" {
   company_profile
   idempotency_keys
   import_jobs
+  user_branches
+  role_permissions
 }
 
 TableGroup "Hàng hóa & giá" {
@@ -907,13 +1020,16 @@ TableGroup "Hàng hóa & giá" {
   price_book_items
 }
 
-TableGroup "Tồn kho" {
+TableGroup "Tồn kho & chuyển kho" {
   stocks
   stock_movements
+  stock_transfers
+  stock_transfer_items
 }
 
 TableGroup "Đối tác" {
   customers
+  customer_branch_terms
   customer_invoice_profiles
   suppliers
 }

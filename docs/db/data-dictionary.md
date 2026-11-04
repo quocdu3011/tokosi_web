@@ -2,14 +2,14 @@
 
 > **Sinh tự động** từ `apps/api/src/db/schema` bằng `pnpm db:docs` — không sửa tay. Tổng quan và cách xem sơ đồ: [`README.md`](README.md).
 
-**35 bảng · 15 kiểu liệt kê (enum)**
+**39 bảng · 17 kiểu liệt kê (enum)**
 
 ## Mục lục
 
-- **Hệ thống**: [`branches`](#branches), [`users`](#users), [`refresh_tokens`](#refresh_tokens), [`audit_logs`](#audit_logs), [`code_sequences`](#code_sequences), [`company_profile`](#company_profile), [`idempotency_keys`](#idempotency_keys), [`import_jobs`](#import_jobs)
+- **Hệ thống**: [`branches`](#branches), [`users`](#users), [`refresh_tokens`](#refresh_tokens), [`audit_logs`](#audit_logs), [`code_sequences`](#code_sequences), [`company_profile`](#company_profile), [`idempotency_keys`](#idempotency_keys), [`import_jobs`](#import_jobs), [`user_branches`](#user_branches), [`role_permissions`](#role_permissions)
 - **Hàng hóa & giá**: [`categories`](#categories), [`products`](#products), [`product_images`](#product_images), [`price_books`](#price_books), [`price_book_items`](#price_book_items)
-- **Tồn kho**: [`stocks`](#stocks), [`stock_movements`](#stock_movements)
-- **Đối tác**: [`customers`](#customers), [`customer_invoice_profiles`](#customer_invoice_profiles), [`suppliers`](#suppliers)
+- **Tồn kho & chuyển kho**: [`stocks`](#stocks), [`stock_movements`](#stock_movements), [`stock_transfers`](#stock_transfers), [`stock_transfer_items`](#stock_transfer_items)
+- **Đối tác**: [`customers`](#customers), [`customer_branch_terms`](#customer_branch_terms), [`customer_invoice_profiles`](#customer_invoice_profiles), [`suppliers`](#suppliers)
 - **Đơn hàng**: [`orders`](#orders), [`order_items`](#order_items), [`invoices`](#invoices), [`invoice_items`](#invoice_items), [`invoice_payments`](#invoice_payments), [`sales_returns`](#sales_returns), [`sales_return_items`](#sales_return_items)
 - **Mua hàng**: [`goods_receipts`](#goods_receipts), [`goods_receipt_items`](#goods_receipt_items), [`purchase_returns`](#purchase_returns), [`purchase_return_items`](#purchase_return_items)
 - **Sổ quỹ & công nợ**: [`cash_accounts`](#cash_accounts), [`cash_categories`](#cash_categories), [`cash_transactions`](#cash_transactions), [`debt_ledger`](#debt_ledger), [`payment_allocations`](#payment_allocations)
@@ -24,21 +24,23 @@
 | `doc_status` | `completed`, `cancelled` |
 | `import_status` | `queued`, `running`, `completed`, `failed` |
 | `import_type` | `products`, `customers`, `suppliers`, `price-books` |
-| `ledger_entry_type` | `opening`, `invoice`, `payment`, `return`, `adjustment` |
+| `ledger_entry_type` | `opening`, `invoice`, `payment`, `return`, `adjustment`, `transfer` |
 | `order_status` | `draft`, `completed`, `cancelled` |
 | `party_type` | `customer`, `supplier`, `employee` |
 | `payment_method` | `cash`, `bank` |
 | `permission_scope` | `all`, `own` |
 | `return_settlement` | `offset_debt`, `refund` |
-| `stock_ref_type` | `opening`, `goods_receipt`, `invoice`, `sales_return`, `purchase_return`, `adjustment` |
+| `shipping_payer` | `sender`, `receiver` |
+| `stock_ref_type` | `opening`, `goods_receipt`, `invoice`, `sales_return`, `purchase_return`, `adjustment`, `transfer_out`, `transfer_in`, `transfer_cancel` |
 | `supplier_kind` | `goods`, `driver`, `other` |
+| `transfer_status` | `in_transit`, `received`, `cancelled` |
 | `user_role` | `manager`, `assistant`, `accountant`, `warehouse`, `driver`, `sales`, `marketing` |
 
 ## Hệ thống
 
 ### branches
 
-Chi nhánh/kho. Hiện chỉ có 1 nhưng mọi chứng từ đều gắn chi nhánh.
+Chi nhánh/kho (Hà Nội, Sài Gòn). Giá bán, tồn kho, giá vốn, công nợ, quỹ và mọi chứng từ đều tách theo chi nhánh.
 
 | Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
 | --- | --- | :-: | --- | --- |
@@ -67,6 +69,7 @@ Người dùng đăng nhập. Vai trò cố định (enum user_role).
 | `username` | text |  |  | unique |
 | `full_name` | text |  |  |  |
 | `password_hash` | text |  |  |  |
+| `must_change_password` | boolean |  | `false` |  |
 | `role` | user_role |  |  |  |
 | `phone` | text | ✔ |  |  |
 | `default_branch_id` | uuid | ✔ |  | → `branches.id` |
@@ -192,6 +195,40 @@ Công việc import Excel chạy nền.
 | `created_at` | timestamptz |  | `now()` |  |
 | `finished_at` | timestamptz | ✔ |  |  |
 
+### user_branches
+
+Chi nhánh người dùng được làm việc (Quản lý thấy tất cả, không cần dòng ở đây).
+
+| Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
+| --- | --- | :-: | --- | --- |
+| `user_id` | uuid |  |  | **PK**; → `users.id` (on delete cascade) |
+| `branch_id` | uuid |  |  | **PK**; → `branches.id` |
+| `created_at` | timestamptz |  | `now()` |  |
+
+**Khóa chính ghép:** (`user_id`, `branch_id`)
+
+**Chỉ mục:**
+
+- `user_branches_branch_idx`: `branch_id`
+
+### role_permissions
+
+Quyền của từng vai trò do Quản lý cấu hình (vai trò manager luôn đủ quyền, không lưu ở đây).
+
+| Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
+| --- | --- | :-: | --- | --- |
+| `role` | user_role |  |  | **PK** |
+| `permission_code` | text |  |  | **PK** |
+| `scope` | permission_scope |  | `'all'` |  |
+| `updated_by` | uuid | ✔ |  | → `users.id` (on delete set null) |
+| `updated_at` | timestamptz |  | `now()` |  |
+
+**Khóa chính ghép:** (`role`, `permission_code`)
+
+**Chỉ mục:**
+
+- `role_permissions_role_idx`: `role`
+
 ## Hàng hóa & giá
 
 ### categories
@@ -214,7 +251,7 @@ Nhóm hàng dạng cây (parent_id).
 
 ### products
 
-Hàng hóa. Mỗi quy cách là một SKU riêng; tồn kho ở bảng stocks.
+Hàng hóa — chỉ thông tin DÙNG CHUNG giữa các chi nhánh. Giá bán ở price_book_items, tồn kho/giá vốn/vị trí ở stocks (theo chi nhánh).
 
 | Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
 | --- | --- | :-: | --- | --- |
@@ -223,12 +260,6 @@ Hàng hóa. Mỗi quy cách là một SKU riêng; tồn kho ở bảng stocks.
 | `name` | text |  |  |  |
 | `category_id` | uuid | ✔ |  | → `categories.id` |
 | `unit` | text |  | `'Cái'` | Đơn vị tính (quy cách thường nằm trong tên hàng) |
-| `base_price` | numeric(18,4) |  | `0` | Giá bán trong Bảng giá chung |
-| `cost_price` | numeric(18,4) |  | `0` | Giá vốn bình quân gia quyền |
-| `last_purchase_price` | numeric(18,4) | ✔ |  |  |
-| `min_stock` | numeric(14,3) | ✔ |  |  |
-| `max_stock` | numeric(14,3) | ✔ |  |  |
-| `location` | text | ✔ |  |  |
 | `description` | text | ✔ |  |  |
 | `weight_g` | numeric(12,2) | ✔ |  |  |
 | `is_active` | boolean |  | `true` |  |
@@ -283,33 +314,39 @@ Bảng giá theo hạng khách (Chung, Lớn, Vừa, VIP và 3 bản VAT). Thi�
 
 ### price_book_items
 
-Giá của từng sản phẩm trong từng bảng giá.
+Giá bán của từng sản phẩm trong từng bảng giá, TẠI TỪNG CHI NHÁNH.
 
 | Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
 | --- | --- | :-: | --- | --- |
 | `price_book_id` | uuid |  |  | **PK**; → `price_books.id` (on delete cascade) |
+| `branch_id` | uuid |  |  | **PK**; → `branches.id` |
 | `product_id` | uuid |  |  | **PK**; → `products.id` (on delete cascade) |
-| `price` | numeric(18,4) |  |  |  |
+| `price` | numeric(18,4) |  |  | Giá bán tại chi nhánh (branch_id) trong bảng giá (price_book_id) |
 | `updated_by` | uuid | ✔ |  | → `users.id` |
 | `updated_at` | timestamptz |  | `now()` |  |
 
-**Khóa chính ghép:** (`price_book_id`, `product_id`)
+**Khóa chính ghép:** (`price_book_id`, `branch_id`, `product_id`)
 
 **Chỉ mục:**
 
-- `price_book_items_product_idx`: `product_id`
+- `price_book_items_branch_product_idx`: `branch_id`, `product_id`
 
-## Tồn kho
+## Tồn kho & chuyển kho
 
 ### stocks
 
-Tồn hiện tại theo chi nhánh. Chỉ cập nhật cùng transaction với stock_movements.
+Kho theo (chi nhánh, sản phẩm): tồn, giá vốn bình quân, giá nhập cuối, tồn tối thiểu/tối đa, vị trí kho. Chỉ cập nhật cùng transaction với stock_movements.
 
 | Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
 | --- | --- | :-: | --- | --- |
 | `branch_id` | uuid |  |  | **PK**; → `branches.id` |
 | `product_id` | uuid |  |  | **PK**; → `products.id` |
 | `on_hand` | numeric(14,3) |  | `0` | Tồn thực tế; không âm (CHECK) |
+| `cost_price` | numeric(18,4) |  | `0` | Giá vốn bình quân gia quyền CỦA chi nhánh này |
+| `last_purchase_price` | numeric(18,4) | ✔ |  | Giá nhập cuối của chi nhánh này |
+| `min_stock` | numeric(14,3) | ✔ |  |  |
+| `max_stock` | numeric(14,3) | ✔ |  |  |
+| `location` | text | ✔ |  | Vị trí kho tại chi nhánh này |
 | `updated_at` | timestamptz |  | `now()` |  |
 
 **Khóa chính ghép:** (`branch_id`, `product_id`)
@@ -345,6 +382,65 @@ Sổ cái kho — chỉ thêm. Phục vụ thẻ kho.
 
 - `stock_movements_nonzero`: `qtyDelta <> 0`
 
+### stock_transfers
+
+Phiếu chuyển kho giữa 2 chi nhánh, 2 bước (đang đi đường → đã nhận). Không phải hóa đơn bán. Giá nhập bên nhận = giá vốn bên gửi + phí vận chuyển phân bổ.
+
+| Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
+| --- | --- | :-: | --- | --- |
+| `id` | uuid |  | `gen_random_uuid()` | **PK** |
+| `code` | text |  |  | unique |
+| `from_branch_id` | uuid |  |  | → `branches.id` |
+| `to_branch_id` | uuid |  |  | → `branches.id` |
+| `status` | transfer_status |  | `'in_transit'` |  |
+| `sent_at` | timestamptz |  |  |  |
+| `received_at` | timestamptz | ✔ |  |  |
+| `goods_value` | numeric(18,0) |  |  | Tổng tiền hàng theo giá vốn bên gửi tại thời điểm gửi |
+| `shipping_fee` | numeric(18,0) |  | `0` | Phí vận chuyển; cộng vào giá nhập kho của bên nhận |
+| `shipping_paid_by` | shipping_payer |  | `'sender'` | Bên ứng tiền trả xe; sender → công nợ đối ứng gồm cả phí |
+| `debt_amount` | numeric(18,0) | ✔ |  | Công nợ đối ứng đã ghi khi nhận hàng |
+| `note` | text | ✔ |  |  |
+| `created_by` | uuid | ✔ |  | → `users.id` |
+| `received_by` | uuid | ✔ |  | → `users.id` |
+| `cancelled_at` | timestamptz | ✔ |  |  |
+| `cancel_reason` | text | ✔ |  |  |
+| `created_at` | timestamptz |  | `now()` |  |
+| `updated_at` | timestamptz |  | `now()` |  |
+
+**Chỉ mục:**
+
+- `stock_transfers_from_idx`: `from_branch_id`, `sent_at`
+- `stock_transfers_to_idx`: `to_branch_id`, `sent_at`
+- `stock_transfers_status_idx`: `status`
+
+**Ràng buộc CHECK:**
+
+- `stock_transfers_branches_differ`: `fromBranchId <> toBranchId`
+- `stock_transfers_fee_nonneg`: `shippingFee >= 0`
+
+### stock_transfer_items
+
+Dòng hàng chuyển kho: giá vốn bên gửi, phần phí phân bổ và giá nhập kho của bên nhận.
+
+| Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
+| --- | --- | :-: | --- | --- |
+| `id` | uuid |  | `gen_random_uuid()` | **PK** |
+| `transfer_id` | uuid |  |  | → `stock_transfers.id` (on delete cascade) |
+| `product_id` | uuid |  |  | → `products.id` |
+| `qty` | numeric(14,3) |  |  |  |
+| `unit_cost_sent` | numeric(18,4) |  |  |  |
+| `shipping_share` | numeric(18,0) |  | `0` |  |
+| `unit_cost_received` | numeric(18,4) | ✔ |  | Giá nhập kho bên nhận = giá vốn gửi + phí phân bổ / số lượng |
+
+**Chỉ mục:**
+
+- `stock_transfer_items_transfer_idx`: `transfer_id`
+- `stock_transfer_items_product_idx`: `product_id`
+
+**Ràng buộc CHECK:**
+
+- `stock_transfer_items_qty_pos`: `qty > 0`
+
 ## Đối tác
 
 ### customers
@@ -362,8 +458,7 @@ Khách hàng. Công nợ không lưu ở đây: số dư = tổng debt_ledger (c
 | `facebook` | text | ✔ |  |  |
 | `sales_owner_id` | uuid | ✔ |  | → `users.id`; Nhân viên phụ trách (ở KiotViet là "Nhóm khách hàng") |
 | `default_price_book_id` | uuid | ✔ |  | → `price_books.id`; Bảng giá tự áp khi đặt hàng |
-| `credit_limit` | numeric(18,0) | ✔ |  | Hạn mức công nợ (cảnh báo mềm) |
-| `payment_term_days` | integer | ✔ |  |  |
+| `linked_branch_id` | uuid | ✔ |  | unique; → `branches.id`; Khách hàng hệ thống đại diện một chi nhánh (chuyển kho nội bộ) |
 | `note` | text | ✔ |  |  |
 | `is_active` | boolean |  | `true` |  |
 | `created_by` | uuid | ✔ |  | → `users.id` |
@@ -376,6 +471,20 @@ Khách hàng. Công nợ không lưu ở đây: số dư = tổng debt_ledger (c
 - `customers_search_trgm`: `f_search_text(code || ' ' || name || ' ' || coalesce(phone, '')) gin_trgm_ops`
 - `customers_sales_owner_idx`: `sales_owner_id`
 - `customers_price_book_idx`: `default_price_book_id`
+
+### customer_branch_terms
+
+Hạn mức và kỳ hạn công nợ của khách, riêng từng chi nhánh.
+
+| Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
+| --- | --- | :-: | --- | --- |
+| `customer_id` | uuid |  |  | **PK**; → `customers.id` (on delete cascade) |
+| `branch_id` | uuid |  |  | **PK**; → `branches.id` |
+| `credit_limit` | numeric(18,0) | ✔ |  | Hạn mức công nợ tại chi nhánh này (cảnh báo mềm) |
+| `payment_term_days` | integer | ✔ |  |  |
+| `updated_at` | timestamptz |  | `now()` |  |
+
+**Khóa chính ghép:** (`customer_id`, `branch_id`)
 
 ### customer_invoice_profiles
 
@@ -406,6 +515,7 @@ Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng 
 | `phone` | text | ✔ |  |  |
 | `address` | text | ✔ |  |  |
 | `tax_code` | text | ✔ |  |  |
+| `linked_branch_id` | uuid | ✔ |  | unique; → `branches.id`; Nhà cung cấp hệ thống đại diện một chi nhánh (chuyển kho nội bộ) |
 | `note` | text | ✔ |  |  |
 | `is_active` | boolean |  | `true` |  |
 | `created_by` | uuid | ✔ |  | → `users.id` |
@@ -755,6 +865,7 @@ Danh mục thu chi chuẩn.
 | Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
 | --- | --- | :-: | --- | --- |
 | `id` | uuid |  | `gen_random_uuid()` | **PK** |
+| `code` | text | ✔ |  | unique |
 | `name` | text |  |  |  |
 | `direction` | cash_direction |  |  |  |
 | `is_system` | boolean |  | `false` |  |
@@ -806,6 +917,7 @@ Sổ cái công nợ — chỉ thêm. amount có dấu (+ tăng nợ, − giảm
 | Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
 | --- | --- | :-: | --- | --- |
 | `id` | uuid |  | `gen_random_uuid()` | **PK** |
+| `branch_id` | uuid |  |  | → `branches.id`; Công nợ tách biệt theo chi nhánh |
 | `party_type` | party_type |  |  |  |
 | `party_id` | uuid |  |  | Đa hình theo party_type (không có khóa ngoại) |
 | `entry_type` | ledger_entry_type |  |  |  |
@@ -820,7 +932,8 @@ Sổ cái công nợ — chỉ thêm. amount có dấu (+ tăng nợ, − giảm
 
 **Chỉ mục:**
 
-- `debt_ledger_party_idx`: `party_type`, `party_id`, `occurred_at`
+- `debt_ledger_party_idx`: `party_type`, `party_id`, `branch_id`, `occurred_at`
+- `debt_ledger_branch_idx`: `branch_id`, `occurred_at`
 - `debt_ledger_ref_idx`: `ref_type`, `ref_id`
 
 **Ràng buộc CHECK:**

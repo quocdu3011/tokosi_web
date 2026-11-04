@@ -1,6 +1,6 @@
 # Thiết kế cơ sở dữ liệu
 
-**34 bảng · 14 enum · 70 khóa ngoại**, PostgreSQL 17. Nguồn sự thật là mã Drizzle ở [`apps/api/src/db/schema/`](../../apps/api/src/db/schema); ba file dưới đây được **sinh tự động**, đừng sửa tay.
+**39 bảng · 17 enum · 85 khóa ngoại**, PostgreSQL 17. Nguồn sự thật là mã Drizzle ở [`apps/api/src/db/schema/`](../../apps/api/src/db/schema); ba file dưới đây được **sinh tự động**, đừng sửa tay.
 
 | File                                       | Dùng để                                                                    | Mở bằng                                                   |
 | ------------------------------------------ | -------------------------------------------------------------------------- | --------------------------------------------------------- |
@@ -70,7 +70,7 @@ erDiagram
 - **Kiểu số:** tiền chứng từ `numeric(18,0)`; đơn giá/giá vốn `numeric(18,4)`; số lượng `numeric(14,3)`. API trả về dạng chuỗi.
 - **Hóa đơn lưu bản sao** mã/tên/đơn vị/giá vốn của từng dòng tại thời điểm bán (`invoice_items`) để in lại và tính lãi gộp không bị ảnh hưởng khi sản phẩm đổi.
 - **Khóa chính UUID** (`gen_random_uuid()`); PostgreSQL 17 chưa có uuidv7 gốc, đổi sang `uuidv7()` khi lên PostgreSQL 18.
-- **Nhiều chi nhánh:** chứng từ và tồn kho có `branch_id` (hiện chỉ có 1 chi nhánh).
+- **Nhiều chi nhánh (Hà Nội, Sài Gòn):** xem mục "Nhiều chi nhánh" bên dưới.
 
 ## Tìm kiếm không dấu (tiếng Việt)
 
@@ -80,8 +80,56 @@ erDiagram
 - **Không viết tay `LIKE`/`ILIKE` trên cột `name`** — sẽ không dùng được chỉ mục và không bỏ dấu. Biểu thức trong chỉ mục và trong truy vấn phải giống hệt nhau; `search.spec.ts` kiểm tra bằng `EXPLAIN`.
 - Từ khóa dưới 3 ký tự không tận dụng được chỉ mục trigram (vẫn đúng kết quả, chỉ quét tuần tự); ở quy mô ~2.800 hàng / ~1.700 khách là không đáng kể.
 
+## Nhiều chi nhánh (Hà Nội, Sài Gòn)
+
+Hai chi nhánh dùng chung một hệ thống. **Dùng chung:** hàng hóa, khách hàng, nhà cung cấp, 7 hạng giá, danh mục thu chi. **Riêng từng chi nhánh:**
+
+| Dữ liệu                                                                         | Nằm ở                                                                                     | Khóa chi nhánh                      |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------- |
+| Giá bán                                                                         | `price_book_items` (khóa chính: hạng giá, chi nhánh, sản phẩm)                            | `branch_id`                         |
+| Tồn kho, **giá vốn bình quân**, giá nhập cuối, tồn tối thiểu/tối đa, vị trí kho | `stocks` (khóa chính: chi nhánh, sản phẩm)                                                | `branch_id`                         |
+| Công nợ khách / nhà cung cấp                                                    | `debt_ledger` — số dư = tổng theo (đối tác, chi nhánh); **tách biệt, không cấn trừ chéo** | `branch_id`                         |
+| Hạn mức, kỳ hạn công nợ                                                         | `customer_branch_terms`                                                                   | `branch_id`                         |
+| Đơn hàng, hóa đơn, trả hàng, phiếu nhập, sổ quỹ                                 | các bảng chứng từ, `cash_accounts`, `cash_transactions`                                   | `branch_id` (không đổi sau khi tạo) |
+| Người dùng được vào chi nhánh nào                                               | `user_branches` (Quản lý thấy tất cả, không cần dòng)                                     | `branch_id`                         |
+
+**Chuyển kho giữa 2 chi nhánh** (`stock_transfers`, `stock_transfer_items`, mã `CH`), hai bước:
+
+1. **Gửi:** trừ tồn bên gửi theo giá vốn bên gửi; phiếu `in_transit` (hàng đang đi đường, không nằm trong tồn chi nhánh nào).
+2. **Nhận:** cộng tồn bên nhận với **giá nhập = giá vốn bên gửi + phí vận chuyển phân bổ** (chia theo tỷ lệ giá trị từng dòng); tính lại giá vốn bình quân của bên nhận; ghi **công nợ đối ứng** — chi nhánh gửi coi chi nhánh nhận là khách (`customers.linked_branch_id`), chi nhánh nhận coi chi nhánh gửi là nhà cung cấp (`suppliers.linked_branch_id`). Số nợ = tiền hàng, cộng phí nếu bên gửi ứng tiền trả xe (`shipping_paid_by`).
+3. Có thể **hủy** khi còn đang đi đường: trả hàng về kho bên gửi.
+
+Phiếu chuyển kho **không phải hóa đơn bán** nên không vào doanh thu; **mọi báo cáo doanh số/công nợ phải loại các khách/nhà cung cấp có `linked_branch_id` khác rỗng**, và báo cáo gộp hai chi nhánh phải loại trừ công nợ nội bộ (nợ của SG với HN bù trừ với nợ của HN với SG).
+
+**Điều khác cần biết:**
+
+- Mọi thay đổi tồn kho đi qua `InventoryService.applyMovement` (`apps/api/src/modules/inventory`): khóa dòng tồn, không cho âm, cập nhật giá vốn bình quân của đúng chi nhánh, ghi sổ cái — cùng transaction với chứng từ.
+- Các bảng mới `branch_id NOT NULL` (`price_book_items`, `debt_ledger`) chỉ thêm được vì lúc migrate chưa có dữ liệu; nếu sau này cần migrate khi đã có dữ liệu thì phải điền giá trị trước.
+- Dữ liệu KiotViet hiện chỉ có 1 chi nhánh ("Chi nhánh trung tâm"); chi nhánh còn lại cũng đang ở KiotViet và sẽ nhập sau. Công cụ import cần tham số chi nhánh đích.
+
+## Dữ liệu khởi tạo (seed)
+
+`pnpm --filter @kiot/api db:seed` (sau `db:migrate`) nạp dữ liệu nền cần để hệ thống chạy. **Chạy lại bao nhiêu lần cũng an toàn:** chỉ thêm cái còn thiếu theo mã, không ghi đè thứ đã chỉnh (giá, tên, quyền, mật khẩu…). Nội dung nằm ở [`apps/api/src/db/seed/data.ts`](../../apps/api/src/db/seed/data.ts), có test.
+
+| Nhóm               | Nội dung                                                                                                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chi nhánh          | `SG` Chi nhánh Sài Gòn (mặc định) và `HN` Chi nhánh Hà Nội                                                                                                                      |
+| Khách/NCC nội bộ   | Mỗi chi nhánh có 1 khách hàng và 1 nhà cung cấp hệ thống (`CN-SG`, `CN-HN`) để chuyển kho coi chi nhánh kia là khách/nhà cung cấp                                               |
+| Bảng giá           | 7 bảng: `CHUNG` (mặc định), `LON`, `VUA`, `VIP` và 3 bản VAT `LON_VAT`, `VUA_VAT`, `VIP_VAT`                                                                                    |
+| Quỹ                | **4 quỹ**: "Tiền mặt" và "Ngân hàng" riêng cho từng chi nhánh (số dư đầu kỳ = 0, đặt lại khi cắt chuyển)                                                                        |
+| Danh mục thu chi   | 15 danh mục, có `code` ổn định; 4 danh mục hệ thống (`customer_payment`, `supplier_refund`, `supplier_payment`, `customer_refund`)                                              |
+| Bộ đếm mã chứng từ | `KH`, `NCC`, `DH`, `HD`, `TH`, `PDN`, `PN`, `THN`, `TT`, `CTM`, `CH` (chuyển kho) (6 chữ số) và `NV` (4 chữ số). Số bắt đầu = mã lớn nhất trong dữ liệu KiotViet 03/11/2026 + 1 |
+| Thông tin công ty  | 1 dòng (tên lấy từ `SEED_COMPANY_NAME`, sửa sau trong Thiết lập)                                                                                                                |
+| Quyền mặc định     | Cho 6 vai trò (trừ Quản lý) — chỉ khi bảng `role_permissions` còn trống                                                                                                         |
+| Quản lý đầu tiên   | Tài khoản `NV0001` vai trò `manager`, **bắt buộc đổi mật khẩu** ở lần đăng nhập đầu; chỉ tạo khi hệ thống chưa có Quản lý nào                                                   |
+
+**Mật khẩu Quản lý đầu tiên:** không có mật khẩu mặc định nào trong mã nguồn. Đặt `SEED_ADMIN_PASSWORD` (≥ 10 ký tự) trong `.env`, hoặc để trống để hệ thống **sinh ngẫu nhiên và ghi vào `apps/api/.seed-admin-credentials.txt`** (git bỏ qua, quyền 0600) — không in ra màn hình. Đăng nhập, đổi mật khẩu rồi xóa file đó. Mật khẩu được băm bằng argon2id.
+
+**Việc phải làm khi cắt chuyển khỏi KiotViet:** cập nhật `CODE_SEQUENCES` (bộ đếm mã) theo số liệu mới nhất và đặt số dư đầu kỳ của quỹ, kẻo mã mới trùng mã cũ. Chưa biết khách hạng "Mới" (trong dữ liệu cũ) dùng bảng giá nào nên chưa seed bảng giá riêng cho hạng này.
+
+**Cấp mã chứng từ trong mã:** dùng `nextDocumentCode(tx, 'HD')` (`apps/api/src/db/code-sequence.ts`) bên trong transaction của chứng từ — nguyên tử, không trùng khi nhiều yêu cầu cùng lúc, rollback thì trả lại số.
+
 ## Chưa có trong lược đồ (sẽ thêm khi cần)
 
-- ~~Tìm không dấu~~ → **đã có** (xem mục dưới).
-- Dữ liệu khởi tạo (seed): 7 bảng giá, vai trò/tài khoản chủ, danh mục thu chi, quỹ tiền mặt, chi nhánh trung tâm, bộ đếm mã chứng từ.
+- ~~Tìm không dấu~~ → **đã có** (xem mục "Tìm kiếm không dấu" ở trên).
 - Phase 2: kiểm kho, đặt hàng nhập, quy đổi đơn vị, bản sửa hóa đơn `.nn` (đã có sẵn cột `root_invoice_id`/`revision_no`), phân bổ chi phí nhập hàng.

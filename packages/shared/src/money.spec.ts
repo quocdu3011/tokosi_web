@@ -6,6 +6,7 @@ describe('formatDocumentCode', () => {
   it('đệm số 0 đến 6 chữ số', () => {
     expect(formatDocumentCode('HD', 16890)).toBe('HD016890');
     expect(formatDocumentCode('KH', 7)).toBe('KH000007');
+    expect(formatDocumentCode('NV', 1, 4)).toBe('NV0001');
   });
 });
 

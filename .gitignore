@@ -27,3 +27,10 @@ data/
 
 # Công cụ phân tích cục bộ
 _rea/
+
+# Mật khẩu Quản lý do seed sinh ra
+.seed-admin-credentials.txt
+
+# Nhật ký và bộ nhớ làm việc cá nhân của dev backend (chỉ lưu cục bộ, không đưa lên git)
+CURRENT.md
+MEMORY.md

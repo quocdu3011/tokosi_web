@@ -94,6 +94,7 @@ describe('RolesController (HTTP, CSDL trong bộ nhớ)', () => {
     expect(modules.map((m) => m.key)).toEqual([
       'product',
       'purchase',
+      'stock',
       'customer',
       'sales',
       'cash',

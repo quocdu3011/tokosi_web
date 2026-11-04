@@ -49,6 +49,7 @@ export const ledgerEntryType = pgEnum('ledger_entry_type', [
   'payment',
   'return',
   'adjustment',
+  'transfer',
 ]);
 
 export const stockRefType = pgEnum('stock_ref_type', [
@@ -58,6 +59,9 @@ export const stockRefType = pgEnum('stock_ref_type', [
   'sales_return',
   'purchase_return',
   'adjustment',
+  'transfer_out',
+  'transfer_in',
+  'transfer_cancel',
 ]);
 
 export const importType = pgEnum('import_type', [
@@ -75,3 +79,13 @@ export const importStatus = pgEnum('import_status', [
 
 /** Phạm vi của một quyền: toàn bộ dữ liệu hoặc chỉ dữ liệu của chính người dùng. */
 export const permissionScope = pgEnum('permission_scope', ['all', 'own']);
+
+/** Phiếu chuyển kho giữa chi nhánh: đang đi đường (bên gửi đã trừ tồn) → bên nhận đã nhận / hủy. */
+export const transferStatus = pgEnum('transfer_status', [
+  'in_transit',
+  'received',
+  'cancelled',
+]);
+
+/** Ai ứng tiền trả phí vận chuyển của phiếu chuyển kho. */
+export const shippingPayer = pgEnum('shipping_payer', ['sender', 'receiver']);

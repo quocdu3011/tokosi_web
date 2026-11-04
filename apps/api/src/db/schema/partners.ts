@@ -3,18 +3,21 @@ import {
   index,
   integer,
   pgTable,
+  primaryKey,
   text,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { customerType, supplierKind } from './enums.js';
-import { money, pk, softDelete, timestamps } from './_helpers.js';
+import { money, pk, softDelete, timestamps, tstz } from './_helpers.js';
 import { partySearchExpr, trgmIndex } from './_search.js';
 import { priceBooks } from './catalog.js';
-import { users } from './system.js';
+import { branches, users } from './system.js';
 
 /**
  * Khách hàng. `salesOwnerId` = nhân viên phụ trách (ở KiotViet gọi nhầm là "Nhóm khách hàng").
- * Công nợ KHÔNG lưu ở đây: số dư = tổng `debt_ledger` của khách (có thể âm).
+ * Công nợ KHÔNG lưu ở đây: số dư = tổng `debt_ledger` của khách THEO TỪNG CHI NHÁNH (có thể âm).
+ * `linkedBranchId` có giá trị khi đây là khách hàng hệ thống đại diện cho một chi nhánh (chuyển kho nội bộ).
+ * Hạn mức/kỳ hạn công nợ riêng từng chi nhánh: bảng `customer_branch_terms`.
  */
 export const customers = pgTable(
   'customers',
@@ -28,8 +31,9 @@ export const customers = pgTable(
     facebook: text(),
     salesOwnerId: uuid().references(() => users.id),
     defaultPriceBookId: uuid().references(() => priceBooks.id),
-    creditLimit: money(),
-    paymentTermDays: integer(),
+    linkedBranchId: uuid()
+      .unique('customers_linked_branch_unique')
+      .references(() => branches.id),
     note: text(),
     isActive: boolean().notNull().default(true),
     createdBy: uuid().references(() => users.id),
@@ -41,6 +45,23 @@ export const customers = pgTable(
     index('customers_sales_owner_idx').on(t.salesOwnerId),
     index('customers_price_book_idx').on(t.defaultPriceBookId),
   ],
+);
+
+/** Hạn mức và kỳ hạn công nợ của một khách TẠI MỘT CHI NHÁNH (không có dòng = không giới hạn). */
+export const customerBranchTerms = pgTable(
+  'customer_branch_terms',
+  {
+    customerId: uuid()
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    branchId: uuid()
+      .notNull()
+      .references(() => branches.id),
+    creditLimit: money(),
+    paymentTermDays: integer(),
+    updatedAt: tstz().notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.customerId, t.branchId] })],
 );
 
 /** Thông tin xuất hóa đơn VAT/điện tử (MST, tên công ty…). */
@@ -58,7 +79,10 @@ export const customerInvoiceProfiles = pgTable('customer_invoice_profiles', {
   bankAccount: text(),
 });
 
-/** Nhà cung cấp. `kind` phân biệt NCC hàng hóa với lái xe/đối tượng khác cần theo dõi công nợ. */
+/**
+ * Nhà cung cấp. `kind` phân biệt NCC hàng hóa với lái xe/đối tượng khác cần theo dõi công nợ.
+ * `linkedBranchId` có giá trị khi đây là nhà cung cấp hệ thống đại diện cho một chi nhánh (chuyển kho nội bộ).
+ */
 export const suppliers = pgTable(
   'suppliers',
   {
@@ -69,6 +93,9 @@ export const suppliers = pgTable(
     phone: text(),
     address: text(),
     taxCode: text(),
+    linkedBranchId: uuid()
+      .unique('suppliers_linked_branch_unique')
+      .references(() => branches.id),
     note: text(),
     isActive: boolean().notNull().default(true),
     createdBy: uuid().references(() => users.id),

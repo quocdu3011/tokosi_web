@@ -34,6 +34,8 @@ export const cashAccounts = pgTable('cash_accounts', {
 /** Danh mục thu chi chuẩn (thay cho chuỗi tự do của KiotViet). */
 export const cashCategories = pgTable('cash_categories', {
   id: pk(),
+  /** Khóa ổn định cho danh mục hệ thống mà mã nghiệp vụ dựa vào (vd `customer_payment`). */
+  code: text().unique(),
   name: text().notNull(),
   direction: cashDirection().notNull(),
   isSystem: boolean().notNull().default(false),
@@ -85,11 +87,15 @@ export const cashTransactions = pgTable(
 /**
  * Sổ cái công nợ: chỉ thêm. `amount` có dấu (+ tăng nợ, − giảm nợ), số dư = tổng, ĐƯỢC PHÉP ÂM.
  * `partyId` đa hình theo `partyType` (khách / NCC / nhân viên) nên không có khóa ngoại.
+ * `branchId`: công nợ TÁCH BIỆT theo chi nhánh; dư nợ của một đối tác = tổng theo từng (đối tác, chi nhánh).
  */
 export const debtLedger = pgTable(
   'debt_ledger',
   {
     id: pk(),
+    branchId: uuid()
+      .notNull()
+      .references(() => branches.id),
     partyType: partyType().notNull(),
     partyId: uuid().notNull(),
     entryType: ledgerEntryType().notNull(),
@@ -103,7 +109,13 @@ export const debtLedger = pgTable(
     createdBy: uuid().references(() => users.id),
   },
   (t) => [
-    index('debt_ledger_party_idx').on(t.partyType, t.partyId, t.occurredAt),
+    index('debt_ledger_party_idx').on(
+      t.partyType,
+      t.partyId,
+      t.branchId,
+      t.occurredAt,
+    ),
+    index('debt_ledger_branch_idx').on(t.branchId, t.occurredAt),
     index('debt_ledger_ref_idx').on(t.refType, t.refId),
     check('debt_ledger_nonzero', sql`${t.amount} <> 0`),
   ],

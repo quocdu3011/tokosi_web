@@ -11,16 +11,9 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import {
-  pk,
-  price,
-  quantity,
-  softDelete,
-  timestamps,
-  tstz,
-} from './_helpers.js';
+import { pk, price, softDelete, timestamps, tstz } from './_helpers.js';
 import { productSearchExpr, trgmIndex } from './_search.js';
-import { users } from './system.js';
+import { branches, users } from './system.js';
 
 /** Nhóm hàng dạng cây (hiện tối đa 2 cấp, hỗ trợ nhiều cấp). */
 export const categories = pgTable(
@@ -38,7 +31,8 @@ export const categories = pgTable(
 
 /**
  * Hàng hóa. Mỗi quy cách là một SKU riêng (đơn vị nằm trong tên), không có biến thể/combo/lô.
- * `costPrice` = giá vốn bình quân gia quyền; tồn kho ở bảng `stocks` (không lưu ở đây).
+ * Chỉ chứa thông tin DÙNG CHUNG giữa các chi nhánh. Giá bán nằm ở `price_book_items` (theo chi nhánh);
+ * tồn kho, giá vốn bình quân, giá nhập cuối, tồn tối thiểu/tối đa và vị trí kho nằm ở `stocks` (theo chi nhánh).
  */
 export const products = pgTable(
   'products',
@@ -48,12 +42,6 @@ export const products = pgTable(
     name: text().notNull(),
     categoryId: uuid().references(() => categories.id),
     unit: text().notNull().default('Cái'),
-    basePrice: price().notNull().default('0'),
-    costPrice: price().notNull().default('0'),
-    lastPurchasePrice: price(),
-    minStock: quantity(),
-    maxStock: quantity(),
-    location: text(),
     description: text(),
     weightG: numeric({ precision: 12, scale: 2 }),
     isActive: boolean().notNull().default(true),
@@ -107,12 +95,16 @@ export const priceBooks = pgTable(
   ],
 );
 
+/** Giá bán của từng sản phẩm, trong từng bảng giá, TẠI TỪNG CHI NHÁNH. */
 export const priceBookItems = pgTable(
   'price_book_items',
   {
     priceBookId: uuid()
       .notNull()
       .references(() => priceBooks.id, { onDelete: 'cascade' }),
+    branchId: uuid()
+      .notNull()
+      .references(() => branches.id),
     productId: uuid()
       .notNull()
       .references(() => products.id, { onDelete: 'cascade' }),
@@ -121,7 +113,7 @@ export const priceBookItems = pgTable(
     updatedAt: tstz().notNull().defaultNow(),
   },
   (t) => [
-    primaryKey({ columns: [t.priceBookId, t.productId] }),
-    index('price_book_items_product_idx').on(t.productId),
+    primaryKey({ columns: [t.priceBookId, t.branchId, t.productId] }),
+    index('price_book_items_branch_product_idx').on(t.branchId, t.productId),
   ],
 );

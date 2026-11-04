@@ -41,6 +41,8 @@ const GROUPS: Record<string, string[]> = {
     'company_profile',
     'idempotency_keys',
     'import_jobs',
+    'user_branches',
+    'role_permissions',
   ],
   'Hàng hóa & giá': [
     'categories',
@@ -49,8 +51,18 @@ const GROUPS: Record<string, string[]> = {
     'price_books',
     'price_book_items',
   ],
-  'Tồn kho': ['stocks', 'stock_movements'],
-  'Đối tác': ['customers', 'customer_invoice_profiles', 'suppliers'],
+  'Tồn kho & chuyển kho': [
+    'stocks',
+    'stock_movements',
+    'stock_transfers',
+    'stock_transfer_items',
+  ],
+  'Đối tác': [
+    'customers',
+    'customer_branch_terms',
+    'customer_invoice_profiles',
+    'suppliers',
+  ],
   'Đơn hàng': [
     'orders',
     'order_items',
@@ -77,7 +89,17 @@ const GROUPS: Record<string, string[]> = {
 
 const TABLE_NOTES: Record<string, string> = {
   branches:
-    'Chi nhánh/kho. Hiện chỉ có 1 nhưng mọi chứng từ đều gắn chi nhánh.',
+    'Chi nhánh/kho (Hà Nội, Sài Gòn). Giá bán, tồn kho, giá vốn, công nợ, quỹ và mọi chứng từ đều tách theo chi nhánh.',
+  user_branches:
+    'Chi nhánh người dùng được làm việc (Quản lý thấy tất cả, không cần dòng ở đây).',
+  role_permissions:
+    'Quyền của từng vai trò do Quản lý cấu hình (vai trò manager luôn đủ quyền, không lưu ở đây).',
+  customer_branch_terms:
+    'Hạn mức và kỳ hạn công nợ của khách, riêng từng chi nhánh.',
+  stock_transfers:
+    'Phiếu chuyển kho giữa 2 chi nhánh, 2 bước (đang đi đường → đã nhận). Không phải hóa đơn bán. Giá nhập bên nhận = giá vốn bên gửi + phí vận chuyển phân bổ.',
+  stock_transfer_items:
+    'Dòng hàng chuyển kho: giá vốn bên gửi, phần phí phân bổ và giá nhập kho của bên nhận.',
   users: 'Người dùng đăng nhập. Vai trò cố định (enum user_role).',
   refresh_tokens: 'Refresh token (lưu băm, không lưu token thô).',
   audit_logs: 'Nhật ký thao tác — chỉ thêm, không sửa.',
@@ -87,13 +109,15 @@ const TABLE_NOTES: Record<string, string> = {
     'Chống tạo trùng khi gửi lại yêu cầu (header Idempotency-Key).',
   import_jobs: 'Công việc import Excel chạy nền.',
   categories: 'Nhóm hàng dạng cây (parent_id).',
-  products: 'Hàng hóa. Mỗi quy cách là một SKU riêng; tồn kho ở bảng stocks.',
+  products:
+    'Hàng hóa — chỉ thông tin DÙNG CHUNG giữa các chi nhánh. Giá bán ở price_book_items, tồn kho/giá vốn/vị trí ở stocks (theo chi nhánh).',
   product_images: 'Ảnh sản phẩm.',
   price_books:
     'Bảng giá theo hạng khách (Chung, Lớn, Vừa, VIP và 3 bản VAT). Thiếu giá thì lùi về bảng mặc định.',
-  price_book_items: 'Giá của từng sản phẩm trong từng bảng giá.',
+  price_book_items:
+    'Giá bán của từng sản phẩm trong từng bảng giá, TẠI TỪNG CHI NHÁNH.',
   stocks:
-    'Tồn hiện tại theo chi nhánh. Chỉ cập nhật cùng transaction với stock_movements.',
+    'Kho theo (chi nhánh, sản phẩm): tồn, giá vốn bình quân, giá nhập cuối, tồn tối thiểu/tối đa, vị trí kho. Chỉ cập nhật cùng transaction với stock_movements.',
   stock_movements: 'Sổ cái kho — chỉ thêm. Phục vụ thẻ kho.',
   customers:
     'Khách hàng. Công nợ không lưu ở đây: số dư = tổng debt_ledger (có thể âm). sales_owner_id = nhân viên phụ trách.',
@@ -127,13 +151,31 @@ const TABLE_NOTES: Record<string, string> = {
 
 /** Mô tả cột quan trọng; khóa dạng `bang.cot`. */
 const COLUMN_NOTES: Record<string, string> = {
-  'products.base_price': 'Giá bán trong Bảng giá chung',
-  'products.cost_price': 'Giá vốn bình quân gia quyền',
   'products.unit': 'Đơn vị tính (quy cách thường nằm trong tên hàng)',
   'customers.sales_owner_id':
     'Nhân viên phụ trách (ở KiotViet là "Nhóm khách hàng")',
   'customers.default_price_book_id': 'Bảng giá tự áp khi đặt hàng',
-  'customers.credit_limit': 'Hạn mức công nợ (cảnh báo mềm)',
+  'customers.linked_branch_id':
+    'Khách hàng hệ thống đại diện một chi nhánh (chuyển kho nội bộ)',
+  'suppliers.linked_branch_id':
+    'Nhà cung cấp hệ thống đại diện một chi nhánh (chuyển kho nội bộ)',
+  'customer_branch_terms.credit_limit':
+    'Hạn mức công nợ tại chi nhánh này (cảnh báo mềm)',
+  'stocks.cost_price': 'Giá vốn bình quân gia quyền CỦA chi nhánh này',
+  'stocks.last_purchase_price': 'Giá nhập cuối của chi nhánh này',
+  'stocks.location': 'Vị trí kho tại chi nhánh này',
+  'price_book_items.price':
+    'Giá bán tại chi nhánh (branch_id) trong bảng giá (price_book_id)',
+  'debt_ledger.branch_id': 'Công nợ tách biệt theo chi nhánh',
+  'stock_transfers.goods_value':
+    'Tổng tiền hàng theo giá vốn bên gửi tại thời điểm gửi',
+  'stock_transfers.shipping_fee':
+    'Phí vận chuyển; cộng vào giá nhập kho của bên nhận',
+  'stock_transfers.shipping_paid_by':
+    'Bên ứng tiền trả xe; sender → công nợ đối ứng gồm cả phí',
+  'stock_transfers.debt_amount': 'Công nợ đối ứng đã ghi khi nhận hàng',
+  'stock_transfer_items.unit_cost_received':
+    'Giá nhập kho bên nhận = giá vốn gửi + phí phân bổ / số lượng',
   'orders.deposit_amount': 'Tiền đặt cọc đã thu',
   'invoices.paid_total':
     'Đã thu khi tạo + đã cấn trừ về sau (cache của sổ cái)',
@@ -204,6 +246,18 @@ const cfgOf = new Map(
   tables.map((t) => [getTableConfig(t).name, getTableConfig(t)]),
 );
 const tableName = (t: AnyPgTable): string => getTableConfig(t).name;
+
+// Bảng chưa được xếp nhóm ở trên vẫn xuất hiện trong tài liệu, ở nhóm "Khác" (kèm cảnh báo).
+{
+  const grouped = new Set(Object.values(GROUPS).flat());
+  const orphans = [...cfgOf.keys()].filter((n) => !grouped.has(n));
+  if (orphans.length > 0) {
+    GROUPS['Khác'] = orphans;
+    console.warn(
+      `Cảnh báo: bảng chưa xếp nhóm trong export-docs.ts: ${orphans.join(', ')}`,
+    );
+  }
+}
 
 // ---------------------------------------------------------------- DBML
 
