@@ -72,6 +72,17 @@ erDiagram
 - **Khóa chính UUID** (`gen_random_uuid()`); PostgreSQL 17 chưa có uuidv7 gốc, đổi sang `uuidv7()` khi lên PostgreSQL 18.
 - **Nhiều chi nhánh (Hà Nội, Sài Gòn):** xem mục "Nhiều chi nhánh" bên dưới.
 
+## Sổ cái chỉ-thêm (CSDL ép bằng trigger)
+
+Migration `0012` gắn trigger để CSDL tự từ chối, không phụ thuộc mã ứng dụng:
+
+| Bảng                             | Được                                                                                                                    | Bị từ chối (`SQLSTATE LG001`)                                                                                         |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `stock_movements`, `debt_ledger` | `INSERT`                                                                                                                | `UPDATE`, `DELETE`, `TRUNCATE`                                                                                        |
+| `cash_transactions`              | `INSERT`; `UPDATE` chỉ để **hủy phiếu** (`completed` → `cancelled` kèm `cancelled_at`, `cancel_reason`) hoặc sửa `note` | `DELETE`, `TRUNCATE`; đổi số tiền / quỹ / danh mục / đối tượng / thời điểm; sửa phiếu đã hủy; "hồi sinh" phiếu đã hủy |
+
+Sai số liệu thì **thêm bút toán đảo**, không sửa dòng cũ. Giới hạn: chủ bảng hoặc siêu quản trị vẫn có thể `ALTER TABLE … DISABLE TRIGGER`; lớp này chặn mã viết sai và câu SQL sửa tay vô ý, không chặn người cố tình. Dev muốn làm sạch CSDL thì xóa cả volume Docker (`pnpm db:down` rồi xóa volume), đừng `TRUNCATE`.
+
 ## Tìm kiếm không dấu (tiếng Việt)
 
 - Migration `0002_tim_khong_dau.sql` bật extension `unaccent` + `pg_trgm` và tạo hai hàm **IMMUTABLE**: `f_unaccent(text)` và `f_search_text(text)` (bỏ dấu + chữ thường: `"Đèn Lồng"` → `"den long"`).

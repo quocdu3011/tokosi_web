@@ -269,4 +269,102 @@ describe('InventoryService (CSDL thật trong bộ nhớ)', () => {
       .where(eq(stockMovements.productId, p));
     expect(moves).toHaveLength(1);
   });
+
+  describe('applyMovements (nhiều dòng của một chứng từ)', () => {
+    it('trả kết quả từng dòng đúng thứ tự đầu vào và ghi sổ cái theo thứ tự đó, dù khóa theo thứ tự khác', async () => {
+      const a = await newProduct();
+      const b = await newProduct();
+      for (const p of [a, b]) {
+        await inv.applyMovement(db, {
+          branchId: sg,
+          productId: p,
+          qtyDelta: '10',
+          unitCost: '1000',
+          refType: 'adjustment',
+        });
+      }
+      // đầu vào theo thứ tự (b, a): kết quả phải ứng với (b, a), không bị đảo theo thứ tự khóa
+      const results = await inv.applyMovements(db, [
+        { branchId: sg, productId: b, qtyDelta: '-3', refType: 'invoice' },
+        { branchId: sg, productId: a, qtyDelta: '-4', refType: 'invoice' },
+      ]);
+      expect(results.map((r) => r.onHand)).toEqual(['7.000', '6.000']);
+      expect((await stockOf(sg, a))?.onHand).toBe('6.000');
+      expect((await stockOf(sg, b))?.onHand).toBe('7.000');
+    });
+
+    it('cùng mặt hàng xuất hiện nhiều dòng: áp dụng tuần tự, không khóa trùng, kết quả đúng', async () => {
+      const p = await newProduct();
+      await inv.applyMovement(db, {
+        branchId: sg,
+        productId: p,
+        qtyDelta: '10',
+        unitCost: '500',
+        refType: 'adjustment',
+      });
+      const results = await inv.applyMovements(db, [
+        { branchId: sg, productId: p, qtyDelta: '-4', refType: 'invoice' },
+        { branchId: sg, productId: p, qtyDelta: '-5', refType: 'invoice' },
+      ]);
+      expect(results.map((r) => r.onHand)).toEqual(['6.000', '1.000']);
+    });
+
+    it('một dòng thiếu tồn → cả chứng từ thất bại, các dòng trước đó không để lại dấu vết', async () => {
+      const a = await newProduct();
+      const b = await newProduct();
+      for (const [p, qty] of [
+        [a, '10'],
+        [b, '1'],
+      ] as const) {
+        await inv.applyMovement(db, {
+          branchId: sg,
+          productId: p,
+          qtyDelta: qty,
+          unitCost: '100',
+          refType: 'adjustment',
+        });
+      }
+      await expect(
+        db.transaction((tx) =>
+          inv.applyMovements(tx, [
+            { branchId: sg, productId: a, qtyDelta: '-2', refType: 'invoice' },
+            { branchId: sg, productId: b, qtyDelta: '-5', refType: 'invoice' },
+          ]),
+        ),
+      ).rejects.toMatchObject({ response: { code: 'STOCK_NOT_ENOUGH' } });
+      expect((await stockOf(sg, a))?.onHand).toBe('10.000');
+      expect((await stockOf(sg, b))?.onHand).toBe('1.000');
+      const moves = await db
+        .select()
+        .from(stockMovements)
+        .where(eq(stockMovements.refType, 'invoice'));
+      expect(moves.filter((m) => m.productId === a)).toHaveLength(0);
+    });
+
+    it('chi nhánh khác nhau trong cùng một lần gọi vẫn đúng (mỗi chi nhánh có tồn riêng)', async () => {
+      const p = await newProduct();
+      const results = await inv.applyMovements(db, [
+        {
+          branchId: hn,
+          productId: p,
+          qtyDelta: '5',
+          unitCost: '200',
+          refType: 'adjustment',
+        },
+        {
+          branchId: sg,
+          productId: p,
+          qtyDelta: '7',
+          unitCost: '300',
+          refType: 'adjustment',
+        },
+      ]);
+      expect(results.map((r) => r.costPrice)).toEqual([
+        (await stockOf(hn, p))?.costPrice,
+        (await stockOf(sg, p))?.costPrice,
+      ]);
+      expect((await stockOf(hn, p))?.onHand).toBe('5.000');
+      expect((await stockOf(sg, p))?.onHand).toBe('7.000');
+    });
+  });
 });

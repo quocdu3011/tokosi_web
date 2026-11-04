@@ -57,14 +57,14 @@ Mọi PR phải qua: `lint`, `typecheck`, `test`, `build` (CI chạy đúng bộ
 
 - Dùng chung: hàng hóa, khách hàng, nhà cung cấp, hạng giá. **Riêng từng chi nhánh:** giá bán (`price_book_items.branch_id`), tồn kho + **giá vốn** + vị trí (`stocks`), công nợ (`debt_ledger.branch_id`), hạn mức (`customer_branch_terms`), quỹ, mọi chứng từ. **Không bao giờ dùng giá/tồn/công nợ của chi nhánh này cho chi nhánh kia**; thiếu giá thì lùi về Bảng giá chung của CÙNG chi nhánh.
 - Mọi truy vấn dữ liệu theo chi nhánh phải qua `BranchAccessService` (`resolveWorkingBranch` từ header `X-Branch-Id`, `assertAccess`). Nhân viên chỉ thấy chi nhánh được gán; Quản lý thấy cả hai.
-- Thay đổi tồn kho **chỉ** qua `InventoryService.applyMovement` (khóa dòng, không âm, cập nhật giá vốn bình quân của chi nhánh, ghi sổ cái) trong transaction của chứng từ. Cấp mã chứng từ qua `nextDocumentCode`. Tính tiền/giá vốn bằng `common/costing.ts` (Decimal), không dùng `number`.
+- Thay đổi tồn kho **chỉ** qua `InventoryService` (khóa dòng, không âm, cập nhật giá vốn bình quân của chi nhánh, ghi sổ cái) trong transaction của chứng từ. Chứng từ có **từ 2 dòng hàng trở lên PHẢI dùng `applyMovements`** (khóa trước theo thứ tự cố định chi nhánh → sản phẩm); gọi `applyMovement` trong vòng lặp sẽ gây bế tắc (deadlock → lỗi 500) khi hai chứng từ có cùng mặt hàng theo thứ tự ngược nhau chạy đồng thời. Quy tắc chung: khóa nhiều dòng thì luôn theo một thứ tự cố định. Cấp mã chứng từ qua `nextDocumentCode`. Tính tiền/giá vốn bằng `common/costing.ts` (Decimal), không dùng `number`.
 - Chuyển kho giữa 2 chi nhánh: `StockTransfersService` (2 bước gửi → nhận; giá nhập bên nhận = giá vốn gửi + phí phân bổ; công nợ đối ứng qua khách/NCC nội bộ có `linked_branch_id`). Đó **không phải hóa đơn bán**: mọi báo cáo doanh số/công nợ/danh sách khách, NCC phải **loại đối tác nội bộ** (`linked_branch_id IS NOT NULL`).
 - Trả hàng bán về chi nhánh của hóa đơn gốc; thu nợ chỉ cấn trừ hóa đơn cùng chi nhánh.
 
 ## Quy tắc BẮT BUỘC (nghiệp vụ tiền / kho / công nợ)
 
 1. **Không dùng số thực nhị phân (float) cho tiền.** Tiền chứng từ: số nguyên đồng. Đơn giá/giá vốn: `NUMERIC(18,4)`. Tính toán dùng Decimal ở backend.
-2. **Không sửa trực tiếp số tồn / số dư công nợ / số dư quỹ.** Mọi thay đổi đi qua sổ cái chỉ-thêm (`stock_movements`, `debt_ledger`, `cash_transactions`) trong **cùng một transaction** với chứng từ gốc.
+2. **Không sửa trực tiếp số tồn / số dư công nợ / số dư quỹ.** Mọi thay đổi đi qua sổ cái chỉ-thêm (`stock_movements`, `debt_ledger`, `cash_transactions`) trong **cùng một transaction** với chứng từ gốc. CSDL **ép** điều này bằng trigger (migration 0012): `UPDATE`/`DELETE`/`TRUNCATE` trên `stock_movements`, `debt_ledger` và `DELETE`/đổi trường tiền của `cash_transactions` đều bị từ chối — sửa sai bằng **bút toán đảo**, đừng tìm cách gỡ trigger.
 3. **Tạo hóa đơn phải idempotent** (`Idempotency-Key`/`client_request_id`) và nguyên tử: trừ kho + ghi nợ + ghi quỹ cùng lúc hoặc không gì cả.
 4. **Không xóa cứng chứng từ.** Hủy = đổi trạng thái + ghi nhật ký.
 5. **Công nợ được phép số dư âm** (khách trả dư).

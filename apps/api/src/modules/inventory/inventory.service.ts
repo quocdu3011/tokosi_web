@@ -49,6 +49,54 @@ export interface StockMovementResult {
 export class InventoryService {
   constructor(@Inject(DB) readonly db: Database) {}
 
+  /**
+   * Áp dụng NHIỀU dòng hàng của một chứng từ (hóa đơn, nhập hàng, chuyển kho…) trong cùng transaction.
+   *
+   * LUÔN dùng hàm này (không gọi `applyMovement` trong vòng lặp) khi chứng từ có từ 2 dòng trở lên: nó khóa
+   * trước mọi dòng tồn theo thứ tự cố định (chi nhánh, sản phẩm) rồi mới áp dụng từng dòng theo thứ tự đầu vào.
+   * Nếu khóa theo thứ tự người dùng nhập, hai chứng từ có cùng hai mặt hàng nhưng thứ tự ngược nhau (A,B và B,A)
+   * chạy đồng thời sẽ chờ nhau mãi (deadlock) → PostgreSQL hủy một bên, người dùng thấy lỗi 500.
+   *
+   * @returns kết quả của từng dòng, đúng thứ tự đầu vào.
+   */
+  async applyMovements(
+    tx: Tx,
+    inputs: StockMovementInput[],
+  ): Promise<StockMovementResult[]> {
+    const keys = [
+      ...new Set(inputs.map((m) => `${m.branchId}|${m.productId}`)),
+    ].sort();
+    for (const key of keys) {
+      const [branchId, productId] = key.split('|') as [string, string];
+      await this.lockStock(tx, branchId, productId);
+    }
+    const results: StockMovementResult[] = [];
+    for (const m of inputs) results.push(await this.applyMovement(tx, m));
+    return results;
+  }
+
+  /** Tạo dòng tồn nếu chưa có rồi khóa nó (FOR UPDATE) cho tới hết transaction. */
+  private async lockStock(tx: Tx, branchId: string, productId: string) {
+    await tx
+      .insert(stocks)
+      .values({ branchId, productId })
+      .onConflictDoNothing();
+    const [row] = await tx
+      .select()
+      .from(stocks)
+      .where(
+        and(eq(stocks.branchId, branchId), eq(stocks.productId, productId)),
+      )
+      .for('update');
+    if (!row)
+      throw new AppError(500, 'INTERNAL_ERROR', 'Không tạo được dòng tồn kho');
+    return row;
+  }
+
+  /**
+   * Áp dụng MỘT dòng. Chỉ gọi trực tiếp khi chứng từ chỉ có đúng một dòng; nhiều dòng thì dùng
+   * `applyMovements` để tránh bế tắc.
+   */
   async applyMovement(
     tx: Tx,
     m: StockMovementInput,
@@ -62,19 +110,7 @@ export class InventoryService {
       );
     }
 
-    await tx
-      .insert(stocks)
-      .values({ branchId: m.branchId, productId: m.productId })
-      .onConflictDoNothing();
-    const [row] = await tx
-      .select()
-      .from(stocks)
-      .where(
-        and(eq(stocks.branchId, m.branchId), eq(stocks.productId, m.productId)),
-      )
-      .for('update');
-    if (!row)
-      throw new AppError(500, 'INTERNAL_ERROR', 'Không tạo được dòng tồn kho');
+    const row = await this.lockStock(tx, m.branchId, m.productId);
 
     const newOnHand = dec(row.onHand).plus(delta);
     if (newOnHand.isNegative()) {

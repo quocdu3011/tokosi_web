@@ -90,25 +90,32 @@ export class StockTransfersService {
         unitCostSent: string;
         value: string;
       }> = [];
-      for (const item of input.items) {
-        const qty = dec(item.qty).toFixed(3);
-        const moved = await this.inventory.applyMovement(tx, {
+      const outQtys = input.items.map((item) => dec(item.qty).toFixed(3));
+      const moved = await this.inventory.applyMovements(
+        tx,
+        input.items.map((item, i) => ({
           branchId: input.fromBranchId,
           productId: item.productId,
-          qtyDelta: dec(qty).negated().toFixed(3),
-          refType: 'transfer_out',
+          qtyDelta: dec(outQtys[i] as string)
+            .negated()
+            .toFixed(3),
+          refType: 'transfer_out' as const,
           refId: id,
           refCode: code,
           occurredAt: sentAt,
           userId: actorId,
-        });
+        })),
+      );
+      input.items.forEach((item, i) => {
+        const qty = outQtys[i] as string;
+        const cost = (moved[i] as { movementCost: string }).movementCost;
         lines.push({
           productId: item.productId,
           qty,
-          unitCostSent: moved.movementCost,
-          value: lineTotal(qty, moved.movementCost),
+          unitCostSent: cost,
+          value: lineTotal(qty, cost),
         });
-      }
+      });
 
       const goodsValue = lines.reduce((sum, l) => sum.plus(l.value), dec(0));
       const shares = allocateProportionally(
@@ -155,27 +162,32 @@ export class StockTransfersService {
         .from(stockTransferItems)
         .where(eq(stockTransferItems.transferId, id));
 
-      for (const item of items) {
-        // Giá nhập kho của bên nhận = giá vốn bên gửi + phí vận chuyển phân bổ trên mỗi đơn vị
-        const unitCostReceived = roundUnitPrice(
+      // Giá nhập kho của bên nhận = giá vốn bên gửi + phí vận chuyển phân bổ trên mỗi đơn vị
+      const receivedCosts = items.map((item) =>
+        roundUnitPrice(
           dec(item.unitCostSent).plus(
             dec(item.shippingShare).div(dec(item.qty)),
           ),
-        );
-        await this.inventory.applyMovement(tx, {
+        ),
+      );
+      await this.inventory.applyMovements(
+        tx,
+        items.map((item, i) => ({
           branchId: transfer.toBranchId,
           productId: item.productId,
           qtyDelta: dec(item.qty).toFixed(3),
-          unitCost: unitCostReceived,
-          refType: 'transfer_in',
+          unitCost: receivedCosts[i] as string,
+          refType: 'transfer_in' as const,
           refId: id,
           refCode: transfer.code,
           occurredAt: receivedAt,
           userId: actorId,
-        });
+        })),
+      );
+      for (const [i, item] of items.entries()) {
         await tx
           .update(stockTransferItems)
-          .set({ unitCostReceived })
+          .set({ unitCostReceived: receivedCosts[i] as string })
           .where(eq(stockTransferItems.id, item.id));
       }
 
@@ -255,18 +267,19 @@ export class StockTransfersService {
         .select()
         .from(stockTransferItems)
         .where(eq(stockTransferItems.transferId, id));
-      for (const item of items) {
-        await this.inventory.applyMovement(tx, {
+      await this.inventory.applyMovements(
+        tx,
+        items.map((item) => ({
           branchId: transfer.fromBranchId,
           productId: item.productId,
           qtyDelta: dec(item.qty).toFixed(3),
           unitCost: item.unitCostSent,
-          refType: 'transfer_cancel',
+          refType: 'transfer_cancel' as const,
           refId: id,
           refCode: transfer.code,
           userId: actorId,
-        });
-      }
+        })),
+      );
       await tx
         .update(stockTransfers)
         .set({
