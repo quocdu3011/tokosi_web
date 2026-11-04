@@ -28,6 +28,47 @@ export function requestIdMiddleware(
   next();
 }
 
+const NEWLINE = String.fromCharCode(10);
+const PG_FIELDS = ['constraint', 'table', 'column', 'schema'] as const;
+
+/**
+ * Mô tả lỗi để ghi log MÀ KHÔNG chứa dữ liệu cá nhân. Lỗi truy vấn của Drizzle/PostgreSQL có thông báo kèm
+ * nguyên câu SQL và các tham số (họ tên, SĐT, băm mật khẩu…), và `detail` của PostgreSQL có thể chứa giá trị
+ * của khóa trùng ("Key (username)=(…)"). Với loại lỗi đó chỉ ghi: tên lỗi, mã PostgreSQL, tên ràng buộc/bảng/cột
+ * và các dòng stack. Lỗi khác ghi đầy đủ stack như bình thường.
+ */
+export function describeErrorForLog(exception: unknown): string {
+  if (!(exception instanceof Error)) return String(exception);
+  const chain: unknown[] = [exception];
+  for (let i = 0; i < 3; i++) {
+    const next = (chain[chain.length - 1] as { cause?: unknown } | null)?.cause;
+    if (next === undefined || next === null) break;
+    chain.push(next);
+  }
+  const pg = chain.find(
+    (e): e is Record<string, unknown> =>
+      typeof e === 'object' &&
+      e !== null &&
+      typeof (e as { code?: unknown }).code === 'string' &&
+      /^[0-9A-Z]{5}$/.test((e as { code: string }).code),
+  );
+  const looksLikeQuery = /^Failed query:/i.test(exception.message);
+  if (!pg && !looksLikeQuery) return exception.stack ?? exception.message;
+
+  const info = pg
+    ? [`pg=${String(pg.code)}`].concat(
+        PG_FIELDS.filter((f) => typeof pg[f] === 'string').map(
+          (f) => `${f}=${String(pg[f])}`,
+        ),
+      )
+    : [];
+  const frames = (exception.stack ?? '')
+    .split(NEWLINE)
+    .filter((l) => /^\s+at /.test(l))
+    .join(NEWLINE);
+  return `${exception.name} [${info.join(' ')}] (nội dung truy vấn và tham số được lược bỏ khỏi log)${NEWLINE}${frames}`;
+}
+
 const CODE_BY_STATUS: Record<number, string> = {
   400: 'BAD_REQUEST',
   401: 'UNAUTHENTICATED',
@@ -80,7 +121,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (status >= 500) {
       this.logger.error(
         `[${requestId}] ${req.method} ${req.originalUrl ?? req.url} → ${status}`,
-        exception instanceof Error ? exception.stack : String(exception),
+        describeErrorForLog(exception),
       );
     }
     if (!res.headersSent) {

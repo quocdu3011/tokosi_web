@@ -1,15 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ADMIN_ROLE, USER_CODE_PREFIX } from '@kiot/shared';
-import {
-  and,
-  count,
-  eq,
-  inArray,
-  isNull,
-  ne,
-  sql,
-  type SQL,
-} from 'drizzle-orm';
+import { ADMIN_ROLE, USER_CODE_PREFIX, normalizeVnPhone } from '@kiot/shared';
+import { and, count, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import { AppError } from '../../common/app-error.js';
 import type { AuthUser } from '../../common/auth-user.js';
 import { generatePassword, hashPassword } from '../../common/password.js';
@@ -102,6 +93,7 @@ export class UsersService {
         'Tên đăng nhập gồm chữ thường không dấu, số, "." "_" "-", dài 3–32 ký tự',
       );
     }
+    const phone = this.parsePhone(input.phone) ?? null;
     const branchIds = [...new Set(input.branchIds)];
     await this.assertBranchesActive(this.db, branchIds);
     if (input.role !== ADMIN_ROLE && branchIds.length === 0) {
@@ -153,7 +145,7 @@ export class UsersService {
             passwordHash,
             mustChangePassword: true,
             role: input.role,
-            phone: input.phone?.trim() || null,
+            phone,
             defaultBranchId: input.defaultBranchId ?? null,
           })
           .returning();
@@ -180,8 +172,17 @@ export class UsersService {
         return row!;
       })
       .catch((e: unknown) => {
-        if (isUniqueViolation(e)) this.throwDuplicate(username);
-        throw e;
+        const violated = uniqueViolation(e);
+        if (!violated) throw e;
+        // Bộ đếm mã lệch (vd sau khi import người dùng có sẵn mã) khác với trùng tên đăng nhập
+        if (violated.constraint?.includes('code')) {
+          throw new AppError(
+            409,
+            'DUPLICATE_CODE',
+            'Mã nhân viên được cấp đã tồn tại (bộ đếm mã bị lệch). Hãy báo quản trị hệ thống.',
+          );
+        }
+        this.throwDuplicate(username);
       });
     const result: UserWithPasswordDto = this.toDto(created, branchIds);
     if (temporaryPassword) result.temporaryPassword = temporaryPassword;
@@ -195,6 +196,7 @@ export class UsersService {
     ctx: RequestContext,
   ): Promise<UserDto> {
     return this.db.transaction(async (tx) => {
+      const phone = this.parsePhone(input.phone);
       const before = await this.findOrThrow(tx, id);
       const isSelf = before.id === actor.id;
       const nextRole = input.role ?? before.role;
@@ -236,7 +238,7 @@ export class UsersService {
         updatedAt: new Date(),
       };
       if (input.fullName !== undefined) patch.fullName = input.fullName.trim();
-      if (input.phone !== undefined) patch.phone = input.phone?.trim() || null;
+      if (phone !== undefined) patch.phone = phone;
       if (input.role !== undefined) patch.role = input.role;
       if (input.isActive !== undefined) patch.isActive = input.isActive;
       if (input.defaultBranchId !== undefined) {
@@ -435,10 +437,12 @@ export class UsersService {
 
   /**
    * Phải còn ít nhất một Quản lý hoạt động khác, nếu không hệ thống không còn ai phân quyền được.
-   * Khóa dòng (FOR UPDATE) để hai Quản lý cùng lúc khóa nhau không cùng vượt qua kiểm tra.
+   * Khóa dòng (FOR UPDATE) của MỌI Quản lý hoạt động — kể cả người bị sửa — và luôn theo thứ tự `id`:
+   * nhờ vậy hai Quản lý khóa nhau cùng lúc xếp hàng tuần tự thay vì bế tắc (deadlock → lỗi 500), và bên
+   * sau thấy kết quả của bên trước.
    */
   private async assertAnotherManager(tx: Tx, exceptId: string): Promise<void> {
-    const others = await tx
+    const managers = await tx
       .select({ id: users.id })
       .from(users)
       .where(
@@ -446,11 +450,11 @@ export class UsersService {
           eq(users.role, ADMIN_ROLE),
           eq(users.isActive, true),
           isNull(users.deletedAt),
-          ne(users.id, exceptId),
         ),
       )
+      .orderBy(users.id)
       .for('update');
-    if (others.length === 0) {
+    if (!managers.some((m) => m.id !== exceptId)) {
       throw this.invalidState(
         'Không thể khóa hoặc hạ vai trò Quản lý hoạt động cuối cùng',
       );
@@ -505,6 +509,22 @@ export class UsersService {
     });
   }
 
+  /** undefined = không đổi; null hoặc rỗng = xóa; còn lại phải là số điện thoại Việt Nam hợp lệ (đã chuẩn hóa). */
+  private parsePhone(
+    value: string | null | undefined,
+  ): string | null | undefined {
+    if (value === undefined) return undefined;
+    if (value === null || value.trim() === '') return null;
+    const normalized = normalizeVnPhone(value);
+    if (!normalized) {
+      throw this.invalid(
+        'phone',
+        'Số điện thoại không hợp lệ (10–11 chữ số, bắt đầu bằng 0 hoặc +84)',
+      );
+    }
+    return normalized;
+  }
+
   private invalid(field: string, message: string): AppError {
     return new AppError(400, 'VALIDATION_ERROR', message, [{ field, message }]);
   }
@@ -523,14 +543,17 @@ export class UsersService {
   }
 }
 
-/** Lỗi trùng khóa duy nhất của PostgreSQL (mã 23505), kể cả khi driver bọc trong `cause`. */
-function isUniqueViolation(e: unknown): boolean {
-  const code = (x: unknown) =>
-    typeof x === 'object' && x !== null
-      ? (x as { code?: unknown }).code
-      : undefined;
-  return (
-    code(e) === '23505' ||
-    code((e as { cause?: unknown } | null)?.cause) === '23505'
-  );
+/**
+ * Nếu là lỗi trùng khóa duy nhất của PostgreSQL (mã 23505), trả về tên ràng buộc bị vi phạm (có thể không có
+ * tên với một số driver). Driver có thể bọc lỗi gốc trong `cause`.
+ */
+function uniqueViolation(e: unknown): { constraint?: string } | null {
+  for (const x of [e, (e as { cause?: unknown } | null)?.cause]) {
+    if (typeof x !== 'object' || x === null) continue;
+    const { code, constraint } = x as { code?: unknown; constraint?: unknown };
+    if (code === '23505') {
+      return typeof constraint === 'string' ? { constraint } : {};
+    }
+  }
+  return null;
 }

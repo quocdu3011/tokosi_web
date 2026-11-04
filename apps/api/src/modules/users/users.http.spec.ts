@@ -11,6 +11,7 @@ import { DB, type Database } from '../../db/database.module.js';
 import {
   auditLogs,
   branches,
+  codeSequences,
   refreshTokens,
   userBranches,
   users,
@@ -481,6 +482,60 @@ describe('Quản lý người dùng qua HTTP', () => {
       expect(res.body.code).toBe('NOT_FOUND');
     }
     await asAdmin.get('/api/v1/users/khong-phai-uuid').expect(400);
+  });
+
+  it('số điện thoại được chuẩn hóa khi lưu; sai định dạng → 400 (field phone); null/rỗng = xóa', async () => {
+    const id = await idOf('ketoan01');
+    const ok = await asAdmin
+      .patch(`/api/v1/users/${id}`)
+      .send({ phone: '+84 902 345 678' })
+      .expect(200);
+    expect(ok.body.phone).toBe('0902345678');
+    const bad = await asAdmin
+      .patch(`/api/v1/users/${id}`)
+      .send({ phone: '12345' })
+      .expect(400);
+    expect(bad.body.details[0].field).toBe('phone');
+    await asAdmin
+      .post('/api/v1/users')
+      .send({
+        username: 'sdt-sai',
+        fullName: 'Thử',
+        role: 'sales',
+        branchIds: [sg],
+        phone: 'abc',
+      })
+      .expect(400);
+    const cleared = await asAdmin
+      .patch(`/api/v1/users/${id}`)
+      .send({ phone: '' })
+      .expect(200);
+    expect(cleared.body.phone).toBeNull();
+  });
+
+  it('bộ đếm mã nhân viên lệch (mã đã tồn tại) → 409 DUPLICATE_CODE, KHÔNG báo nhầm trùng tên đăng nhập; không tạo dở dang', async () => {
+    await db
+      .update(codeSequences)
+      .set({ nextValue: 1 })
+      .where(eq(codeSequences.prefix, 'NV')); // NV0001 đã thuộc Quản lý do seed tạo
+    const res = await asAdmin
+      .post('/api/v1/users')
+      .send({
+        username: 'lech-ma',
+        fullName: 'Thử lệch mã',
+        role: 'sales',
+        branchIds: [sg],
+      })
+      .expect(409);
+    expect(res.body.code).toBe('DUPLICATE_CODE');
+    expect(JSON.stringify(res.body)).not.toMatch(/lech-ma/);
+    expect(
+      await db.select().from(users).where(eq(users.username, 'lech-ma')),
+    ).toHaveLength(0);
+    await db
+      .update(codeSequences)
+      .set({ nextValue: 500 })
+      .where(eq(codeSequences.prefix, 'NV'));
   });
 
   // ------------------------------------------------------------------ phòng thủ ở tầng service

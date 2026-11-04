@@ -121,7 +121,11 @@ export class CreateUserDto {
   @IsIn(ROLES)
   role!: Role;
 
-  @ApiPropertyOptional({ example: '0901234567' })
+  @ApiPropertyOptional({
+    example: '0901234567',
+    description:
+      'Số điện thoại Việt Nam (10–11 chữ số, bắt đầu 0 hoặc +84); server chuẩn hóa về dạng 0xxxxxxxxx. Sai định dạng → 400, field `phone`',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(20)
@@ -162,7 +166,11 @@ export class UpdateUserDto {
   @MaxLength(120)
   fullName?: string;
 
-  @ApiPropertyOptional({ nullable: true, description: 'null = xóa số' })
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'null hoặc chuỗi rỗng = xóa số; còn lại phải là số điện thoại hợp lệ (được chuẩn hóa)',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(20)

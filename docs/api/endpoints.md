@@ -140,7 +140,8 @@ Ký hiệu: `?` = tùy chọn · `[]` = mảng · tiền/giá/số lượng là 
 { "branchIds": ["0192…"], "defaultBranchId": "0192…" }   // thay thế toàn bộ; 200 → User
 ```
 
-- **Tên đăng nhập:** chữ thường không dấu, số, `.` `_` `-`, 3–32 ký tự; gửi chữ hoa thì server đưa về chữ thường; **không đổi được** sau khi tạo; trùng (không phân biệt hoa thường) → `409 DUPLICATE_USERNAME`.
+- **Số điện thoại:** 10–11 chữ số bắt đầu bằng `0` hoặc `+84` (cho phép khoảng trắng, `.`, `-`, ngoặc); server **chuẩn hóa** về `0xxxxxxxxx` khi lưu (`+84 901 234 567` → `0901234567`); sai định dạng → `400 VALIDATION_ERROR`, `details[0].field = "phone"`; `null` hoặc rỗng = xóa. Cùng quy tắc sẽ dùng cho khách hàng và nhà cung cấp.
+- **Tên đăng nhập:** chữ thường không dấu, số, `.` `_` `-`, 3–32 ký tự; gửi chữ hoa thì server đưa về chữ thường; **không đổi được** sau khi tạo; trùng (không phân biệt hoa thường) → `409 DUPLICATE_USERNAME`. Hiếm: bộ đếm mã nhân viên bị lệch so với dữ liệu → `409 DUPLICATE_CODE` (báo quản trị hệ thống).
 - **Mật khẩu:** cùng chính sách với đổi mật khẩu (10–128 ký tự, không chứa tên đăng nhập). Không gửi thì hệ thống sinh mật khẩu tạm — **hiển thị cho Quản lý một lần rồi chuyển cho người dùng** (không xem lại được). Tài khoản mới và tài khoản vừa đặt lại luôn bị bắt đổi mật khẩu ở lần đăng nhập đầu (`mustChangePassword = true`).
 - **Chi nhánh:** mọi vai trò trừ Quản lý phải có ít nhất 1 chi nhánh (`400 VALIDATION_ERROR`, `details[0].field = "branchIds"`); `defaultBranchId` phải nằm trong danh sách gán. Gán lại danh sách mà chi nhánh mặc định không còn trong đó thì mặc định bị bỏ (`null`).
 - **Khóa tài khoản** (`isActive = false`): thu hồi mọi phiên ngay — access token đang cầm bị từ chối ở yêu cầu kế tiếp (`401`), không làm mới được nữa. **Không có xóa người dùng.**

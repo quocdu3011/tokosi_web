@@ -12,6 +12,7 @@ import { IsArray, IsInt, IsString, Min, ValidateNested } from 'class-validator';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { configureApp } from '../app.setup.js';
+import { describeErrorForLog } from './all-exceptions.filter.js';
 import { AppError } from './app-error.js';
 
 class ItemDto {
@@ -47,6 +48,20 @@ class ProbeController {
   @Get('http-exception')
   httpException() {
     throw new HttpException('xấu', 418);
+  }
+
+  @Get('query-fail')
+  queryFail() {
+    const cause = Object.assign(new Error('duplicate key value'), {
+      code: '23505',
+      constraint: 'users_username_unique',
+      table: 'users',
+      detail: 'Key (username)=(nguyen.van.a) already exists.',
+    });
+    throw new Error(
+      `Failed query: insert into "users" ("full_name","phone","password_hash") values ($1,$2,$3)${String.fromCharCode(10)}params: Nguyễn Văn Ân,0901234567,$argon2id$v=19$SECRET`,
+      { cause },
+    );
   }
 
   @Get('boom')
@@ -163,5 +178,29 @@ describe('Hợp đồng lỗi { code, message, details, requestId }', () => {
       .expect(404);
     expect(bad.body.requestId).not.toContain('<');
     expect(bad.body.requestId.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('log lỗi 500 của truy vấn CSDL KHÔNG chứa SQL, tham số, họ tên, SĐT, băm mật khẩu hay giá trị khóa trùng; vẫn có mã PG, tên ràng buộc và requestId', async () => {
+    const spy = vi
+      .spyOn((await import('@nestjs/common')).Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
+    const res = await http().get('/api/v1/probe/query-fail').expect(500);
+    expect(res.body.code).toBe('INTERNAL_ERROR');
+    const logged = spy.mock.calls
+      .map((c) => c.map(String).join(' '))
+      .join(' | ');
+    spy.mockRestore();
+    expect(logged).toContain(res.body.requestId);
+    expect(logged).toContain('23505');
+    expect(logged).toContain('users_username_unique');
+    expect(logged).not.toMatch(
+      /Nguyễn|0901234567|argon2|SECRET|nguyen\.van\.a|insert into|params:/,
+    );
+  });
+
+  it('describeErrorForLog: lỗi thường vẫn ghi đầy đủ stack', () => {
+    const e = new Error('lỗi logic bình thường');
+    expect(describeErrorForLog(e)).toContain('lỗi logic bình thường');
+    expect(describeErrorForLog('chuỗi')).toBe('chuỗi');
   });
 });
