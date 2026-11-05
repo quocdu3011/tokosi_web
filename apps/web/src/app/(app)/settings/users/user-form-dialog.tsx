@@ -56,7 +56,7 @@ const schema = z
     isNew: z.boolean(),
     username: z.string().trim(),
     fullName: z.string().trim().min(1, 'Nhập họ tên').max(100, 'Họ tên quá dài'),
-    role: z.enum(ROLES),
+    role: z.enum(ROLES, { error: 'Chọn vai trò' }),
     phone: z.string().trim(),
     branchIds: z.array(z.string()),
     defaultBranchId: z.string(),
@@ -127,7 +127,8 @@ export function UserFormDialog({
       isNew,
       username: user?.username ?? '',
       fullName: user?.fullName ?? '',
-      role: (user?.role ?? 'sales') as RoleCode,
+      // Tài khoản đang chờ cấp quyền (`pending`): để trống để Quản lý chủ động chọn vai trò, không đoán hộ.
+      role: (user ? (user.role === 'pending' ? '' : user.role) : 'sales') as RoleCode,
       phone: user?.phone ?? '',
       branchIds: user?.branchIds ?? (branches.length === 1 ? [branches[0]!.id] : []),
       defaultBranchId: user?.defaultBranchId ?? NONE,
@@ -229,7 +230,13 @@ export function UserFormDialog({
             id={fid('role')}
             label="Vai trò"
             error={err('role')}
-            hint={isSelf ? 'Không đổi được vai trò của chính mình.' : undefined}
+            hint={
+              isSelf
+                ? 'Không đổi được vai trò của chính mình.'
+                : user?.role === 'pending'
+                  ? 'Tài khoản đang chờ cấp quyền: chọn vai trò và chi nhánh để cho phép truy cập.'
+                  : undefined
+            }
           >
             <Controller
               control={control}
@@ -237,7 +244,7 @@ export function UserFormDialog({
               render={({ field }) => (
                 <Select value={field.value} onValueChange={field.onChange} disabled={isSelf}>
                   <SelectTrigger id={fid('role')} {...aria('role')}>
-                    <SelectValue />
+                    <SelectValue placeholder="Chọn vai trò" />
                   </SelectTrigger>
                   <SelectContent>
                     {ROLES.map((r) => (

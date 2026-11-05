@@ -588,3 +588,9 @@
   margin: 0;
   font-weight: 700;
 }
+
+/* Trang cài đặt */
+.settings-card {
+  max-width: 720px;
+  padding: var(--space-2xl);
+}

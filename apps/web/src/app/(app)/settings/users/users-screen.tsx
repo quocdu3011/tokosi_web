@@ -1,12 +1,12 @@
 'use client';
 
-import { ROLE_LABELS, ROLES } from '@kiot/shared';
+import { PENDING_ROLE, ROLE_LABELS, ROLES } from '@kiot/shared';
 import { KeyRound, Pencil, Plus, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { PageHeader } from '@/components/common/coming-soon';
-import { RoleBadge } from '@/components/common/role-badge';
+import { PENDING_LABEL, RoleBadge } from '@/components/common/role-badge';
 import { DataTable, type AppColumnDef } from '@/components/data-table/data-table';
 import { Pagination } from '@/components/data-table/pagination';
 import {
@@ -200,6 +200,7 @@ export function UsersScreen() {
                 {ROLE_LABELS[r]}
               </SelectItem>
             ))}
+            <SelectItem value={PENDING_ROLE}>{PENDING_LABEL}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={status} onValueChange={(v) => resetFilters(() => setStatus(v))}>

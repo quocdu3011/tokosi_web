@@ -143,6 +143,12 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: '/settings/users', label: 'Người dùng', permissions: ['user.manage'], ready: true },
       { href: '/settings/roles', label: 'Phân quyền', permissions: ['role.manage'], ready: true },
+      {
+        href: '/settings/auth',
+        label: 'Đăng nhập Google',
+        permissions: ['user.manage'],
+        ready: true,
+      },
     ],
   },
 ];
