@@ -507,6 +507,7 @@
 }
 .mini-table th.num,
 .mini-table td.num {
+  display: table-cell; /* `.num` toàn cục là display:block, sẽ làm vỡ ô bảng */
   text-align: right;
 }
 .qty-input {

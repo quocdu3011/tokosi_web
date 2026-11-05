@@ -2,6 +2,7 @@
 
 .field {
   display: grid;
+  align-content: start; /* ô cao hơn nội dung (hàng lưới có ô kèm gợi ý) không giãn cách nhãn và ô nhập */
   gap: var(--space-md);
 }
 .form-label {
