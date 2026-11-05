@@ -268,3 +268,101 @@
   max-height: 320px;
   overflow: auto;
 }
+
+/* Nhập Excel: chọn chế độ, chọn file, danh sách dòng lỗi */
+.radio-cards {
+  display: grid;
+  gap: var(--space-md);
+}
+@media (min-width: 640px) {
+  .radio-cards {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.radio-card {
+  position: relative;
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-lg);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+.radio-card:hover:not([data-disabled='true']) {
+  background: var(--panel-3);
+}
+.radio-card[data-checked='true'] {
+  border-color: var(--primary);
+  background: var(--accent-blue-12);
+}
+.radio-card[data-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.radio-card input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  cursor: inherit;
+}
+.radio-card:has(input:focus-visible) {
+  box-shadow: 0 0 0 2px var(--border-focus);
+}
+.radio-card-title {
+  font-weight: 700;
+}
+.radio-card-desc {
+  font-size: 13px;
+  color: var(--muted);
+}
+.import-file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+}
+.import-file-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex: 1 1 140px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.import-file-name svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.import-errors {
+  display: grid;
+  gap: 1px;
+  max-height: 220px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+.import-errors li {
+  display: grid;
+  grid-template-columns: 72px 140px 1fr;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--panel);
+}
+.import-error-field {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}

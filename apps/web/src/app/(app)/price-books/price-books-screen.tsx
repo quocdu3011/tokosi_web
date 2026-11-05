@@ -7,7 +7,13 @@ import { toast } from 'sonner';
 import { PageHeader } from '@/components/common/coming-soon';
 import { DataTable, type AppColumnDef, type SortState } from '@/components/data-table/data-table';
 import { Pagination } from '@/components/data-table/pagination';
-import { ExportMenu, TableSearch, type ExportFormat } from '@/components/data-table/table-toolbar';
+import {
+  ExportMenu,
+  ImportButton,
+  TableSearch,
+  type ExportFormat,
+} from '@/components/data-table/table-toolbar';
+import { ImportDialog } from '@/components/import/import-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -89,6 +95,8 @@ function PriceGridView() {
   const branchId = useBranchStore((s) => s.branchId);
   const canEdit = can(me, 'price.edit');
   const canSeeCost = can(me, 'product.cost.view');
+  const canImport = can(me, 'import.run');
+  const [importOpen, setImportOpen] = useState(false);
   const branchName = me?.branches.find((b) => b.id === branchId)?.name;
 
   const [q, setQ] = useState('');
@@ -287,9 +295,19 @@ function PriceGridView() {
               {data.meta.total.toLocaleString('vi-VN')} kết quả
             </span>
           )}
+          {canImport && (
+            <ImportButton
+              onClick={() => setImportOpen(true)}
+              disabled={hasPending}
+              title={
+                hasPending ? 'Lưu hoặc hủy các ô giá đang sửa trước khi nhập Excel' : undefined
+              }
+            />
+          )}
           <ExportMenu onExport={handleExport} disabled={!data || data.meta.total === 0} />
         </div>
       </div>
+      {importOpen && <ImportDialog type="price-books" onClose={() => setImportOpen(false)} />}
 
       {canEdit && hasPending && (
         <div className="save-bar" role="status">

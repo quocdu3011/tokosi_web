@@ -13,7 +13,7 @@ export type QueryValue = string | number | boolean | null | undefined;
 
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  /** Thân yêu cầu, tự chuyển JSON. */
+  /** Thân yêu cầu, tự chuyển JSON (riêng `FormData` gửi nguyên để tải file lên). */
   body?: unknown;
   /** Tham số truy vấn; giá trị rỗng/null/undefined bị bỏ qua. */
   query?: Record<string, QueryValue>;
@@ -131,7 +131,9 @@ export function createApiClient(deps: ApiClientDeps) {
 
   async function send(path: string, opts: RequestOptions, token: string | null) {
     const headers: Record<string, string> = { Accept: opts.accept ?? 'application/json' };
-    if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
+    // FormData (tải file lên): để trình duyệt tự đặt Content-Type kèm `boundary`.
+    const isForm = typeof FormData !== 'undefined' && opts.body instanceof FormData;
+    if (opts.body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
     if (token) headers.Authorization = `Bearer ${token}`;
     const branchId = opts.branchId === undefined ? deps.getBranchId() : opts.branchId;
     if (branchId) headers['X-Branch-Id'] = branchId;
@@ -141,7 +143,12 @@ export function createApiClient(deps: ApiClientDeps) {
       return await doFetch(buildUrl(deps.baseUrl, path, opts.query), {
         method: opts.method ?? 'GET',
         headers,
-        body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+        body:
+          opts.body === undefined
+            ? undefined
+            : isForm
+              ? (opts.body as FormData)
+              : JSON.stringify(opts.body),
         credentials: 'include',
         signal: opts.signal,
       });

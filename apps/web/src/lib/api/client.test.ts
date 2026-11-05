@@ -144,3 +144,16 @@ describe('createApiClient', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('createApiClient – tải file lên', () => {
+  it('FormData gửi nguyên, không ép Content-Type JSON (trình duyệt tự thêm boundary)', async () => {
+    const { api, fetchMock } = setup(async () => json(202, { id: 'x' }));
+    const body = new FormData();
+    body.append('file', new Blob(['a']), 'a.xlsx');
+    await api.post('/imports/products', body, { query: { dryRun: true } });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('http://api/api/v1/imports/products?dryRun=true');
+    expect(init.body).toBe(body);
+    expect((init.headers as Record<string, string>)['Content-Type']).toBeUndefined();
+  });
+});

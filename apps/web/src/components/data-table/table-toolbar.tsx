@@ -1,6 +1,6 @@
 'use client';
 
-import { Download, FileSpreadsheet, FileText, Search, X } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, Search, Upload, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -55,6 +55,24 @@ export function TableSearch({
         </button>
       )}
     </div>
+  );
+}
+
+/** Nút "Nhập Excel": chỉ hiện cho người có quyền `import.run`; bấm để mở hộp thoại nhập. */
+export function ImportButton({
+  onClick,
+  disabled,
+  title,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  title?: string;
+}) {
+  return (
+    <Button variant="outline" onClick={onClick} disabled={disabled} title={title}>
+      <Upload aria-hidden="true" />
+      Nhập Excel
+    </Button>
   );
 }
 

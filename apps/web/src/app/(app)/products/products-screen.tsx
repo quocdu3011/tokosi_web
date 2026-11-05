@@ -5,7 +5,13 @@ import { useMemo, useState } from 'react';
 import { PageHeader } from '@/components/common/coming-soon';
 import { DataTable, type AppColumnDef, type SortState } from '@/components/data-table/data-table';
 import { Pagination } from '@/components/data-table/pagination';
-import { ExportMenu, TableSearch, type ExportFormat } from '@/components/data-table/table-toolbar';
+import {
+  ExportMenu,
+  ImportButton,
+  TableSearch,
+  type ExportFormat,
+} from '@/components/data-table/table-toolbar';
+import { ImportDialog } from '@/components/import/import-dialog';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -82,6 +88,8 @@ const COLUMN_LABELS: Record<string, string> = {
 export function ProductsScreen() {
   const me = useAuthStore((s) => s.user);
   const canSeeCost = can(me, 'product.cost.view');
+  const canImport = can(me, 'import.run');
+  const [importOpen, setImportOpen] = useState(false);
 
   const [q, setQ] = useState('');
   const [categoryId, setCategoryId] = useState<string>(ALL);
@@ -313,9 +321,11 @@ export function ProductsScreen() {
               {data.meta.total.toLocaleString('vi-VN')} kết quả
             </span>
           )}
+          {canImport && <ImportButton onClick={() => setImportOpen(true)} />}
           <ExportMenu onExport={handleExport} disabled={!data || data.meta.total === 0} />
         </div>
       </div>
+      {importOpen && <ImportDialog type="products" onClose={() => setImportOpen(false)} />}
 
       {isError ? (
         <p className="alert alert-error" role="alert">

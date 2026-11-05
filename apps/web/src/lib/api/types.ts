@@ -60,6 +60,10 @@ export type BulkAdjustResult = Schemas['BulkAdjustResultDto'];
 export type CopyBranchInput = Schemas['CopyBranchDto'];
 export type CopyBranchResult = Schemas['CopyBranchResultDto'];
 
+/** Nhập dữ liệu từ Excel (docs/api/endpoints.md mục 9). */
+export type ImportJob = Schemas['ImportJobDto'];
+export type ImportRowError = Schemas['ImportErrorDto'];
+
 /** Phân trang chuẩn của mọi danh sách (docs/api/README.md mục 4). */
 export interface PageMeta {
   page: number;
