@@ -558,3 +558,32 @@
 .link-button:hover {
   text-decoration: underline;
 }
+
+/* Thẻ chi nhánh và chỉ số trong ngăn kéo hàng hóa */
+.branch-card {
+  display: grid;
+  gap: var(--space-lg);
+  padding: var(--space-xl);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.branch-card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xl);
+  margin: 0;
+}
+.stat-row dt {
+  font-size: 12px;
+  color: var(--muted);
+}
+.stat-row dd {
+  margin: 0;
+  font-weight: 700;
+}
