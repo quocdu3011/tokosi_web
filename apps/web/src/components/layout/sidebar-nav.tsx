@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
 import { useAuthStore } from '@/lib/auth/store';
-import { NAV_SECTIONS } from '@/lib/navigation';
+import { isNavActive, NAV_SECTIONS } from '@/lib/navigation';
 import { canAny } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 
@@ -20,7 +20,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   // Chỉ lưu nhóm người dùng đã bấm; chưa bấm thì theo trang hiện tại.
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
 
-  const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
+  const isActive = (href: string) => isNavActive(pathname, href);
 
   return (
     <nav className="nav" aria-label="Menu chính">

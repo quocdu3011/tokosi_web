@@ -366,3 +366,35 @@
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+
+/* Cây nhóm hàng */
+.tree,
+.tree ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tree ul {
+  margin-left: var(--space-2xl);
+  padding-left: var(--space-lg);
+  border-left: 1px solid var(--border);
+}
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-height: 44px;
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-sm);
+}
+.tree-row:hover {
+  background: var(--surface-hover);
+}
+.tree-name {
+  font-weight: 600;
+}
+.tree-actions {
+  display: inline-flex;
+  gap: var(--space-xs);
+  margin-left: auto;
+}

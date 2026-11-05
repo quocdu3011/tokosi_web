@@ -49,6 +49,12 @@ export const NAV_SECTIONS: NavSection[] = [
         permissions: ['product.view'],
         ready: true,
       },
+      {
+        href: '/products/categories',
+        label: 'Nhóm hàng',
+        permissions: ['product.view'],
+        ready: true,
+      },
     ],
   },
   {
@@ -140,6 +146,19 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
 ];
+
+/**
+ * Mục menu có đang được chọn không: khớp đường dẫn hiện tại và là khớp DÀI NHẤT, để
+ * `/products/categories` không làm sáng cả mục `/products`.
+ */
+export function isNavActive(pathname: string, href: string): boolean {
+  const matches = (h: string) =>
+    h === '/' ? pathname === '/' : pathname === h || pathname.startsWith(`${h}/`);
+  if (!matches(href)) return false;
+  return !NAV_SECTIONS.some((s) =>
+    s.items.some((i) => i.href.length > href.length && matches(i.href)),
+  );
+}
 
 /** Tìm mục menu theo đường dẫn (khớp chính xác). */
 export function findNavItem(href: string): NavItem | undefined {
