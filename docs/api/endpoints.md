@@ -933,7 +933,7 @@ Dùng cho import hàng loạt (chuyển dữ liệu từ KiotViet và nhập tay
 | GET    | `/imports/:id`            | Kết quả và lỗi từng dòng của một lần nhập                                                      | `import.run` |
 | GET    | `/imports/:type/template` | Tải file Excel mẫu                                                                             | `import.run` |
 
-Tham số query của `POST`: `dryRun` (**mặc định `true`**: chỉ kiểm tra, không ghi gì; gửi `dryRun=false` mới ghi thật), `branchId` (chi nhánh cho giá bán / tồn tối thiểu-tối đa / vị trí; bắt buộc nếu file có các cột đó).
+Tham số query của `POST`: `dryRun` (**mặc định `true`**: chỉ kiểm tra, không ghi gì; gửi `dryRun=false` mới ghi thật), `branchId` (chi nhánh cho tồn tối thiểu-tối đa / vị trí / tồn kho của Import thêm; bắt buộc nếu file có các cột đó hoặc khi `mode=add`), `mode` (`overwrite` mặc định = **Import đè**; `add` = **Import thêm**, xem mục "Hai chế độ nhập"). Giá trị `mode` khác → `400 VALIDATION_ERROR`. Phản hồi có thêm field `mode`.
 
 ```json
 // POST /imports/products?dryRun=false&branchId=…   → 202
@@ -953,11 +953,23 @@ Tham số query của `POST`: `dryRun` (**mặc định `true`**: chỉ kiểm t
 }
 ```
 
+**Hai chế độ nhập (`mode`)** — file phải đúng định dạng file mẫu (`GET /imports/products/template`):
+
+| | `overwrite` — Import đè (mặc định) | `add` — Import thêm |
+| --- | --- | --- |
+| Khóa so khớp | `Mã hàng`, không phân biệt hoa thường | như bên trái |
+| Mã đã có | Thông tin trong file **đè** lên bản cũ (ô trống giữ nguyên). Mã không có trong file thì không đổi | **Chỉ CỘNG/TRỪ tồn** theo cột `Tồn kho` của chi nhánh `branchId`; mọi thông tin khác (tên, nhóm, mô tả, trạng thái, ảnh, thành phần, tồn tối thiểu/tối đa, vị trí) **giữ nguyên bản cũ** |
+| Mã mới | Tạo mới | Tạo mới đầy đủ (cần `Tên hàng`) rồi cộng tồn |
+| Cột `Tồn kho`, `Giá vốn` | Bị bỏ qua | Dùng như bên dưới |
+| Chạy lại cùng file | Không đổi gì (idempotent) | **Cộng thêm lần nữa** (không idempotent): luôn chạy `dryRun=true` trước |
+
+Chi tiết `add`: bắt buộc `branchId` và cột `Tồn kho`. `Tồn kho` là số lượng **cộng thêm** (tối đa 3 chữ số thập phân); **số âm = trừ tồn** (không cho tồn xuống dưới 0: dòng đó báo lỗi, `STOCK_NOT_ENOUGH` ở mức dòng); ô trống hoặc `0` = không đổi tồn. `Giá vốn` (không âm, tối đa 4 chữ số thập phân, tùy chọn) là giá nhập của lô cộng thêm → giá vốn bình quân gia quyền của chi nhánh được tính lại; thiếu thì giữ giá vốn hiện tại; khi trừ tồn thì luôn theo giá vốn hiện tại (bỏ qua `Giá vốn` trong file). Combo không có tồn riêng nên dòng combo có `Tồn kho` là lỗi. Tồn đổi qua `InventoryService`, ghi sổ cái loại `adjustment` với chứng từ gốc `IMP-XXXXXXXX` (`refId` = id lần nhập) — hiện ở thẻ kho. Chỉ dòng làm đổi tồn hoặc tạo mới mới được tính vào `updated`/`created`.
+
 **Quy tắc chung**
 
 - **Tất cả hoặc không gì cả:** có **bất kỳ dòng lỗi nào** thì `status = "failed"`, `created = updated = 0` và **không ghi gì** (kể cả các dòng tốt). Sửa file rồi nhập lại. `errors[].row` là số dòng trong file Excel (dòng 1 là tiêu đề; lỗi thiếu cột báo ở dòng 1), tối đa 500 lỗi đầu.
 - `dryRun=true` chạy toàn bộ rồi hoàn tác nên báo cáo chính xác (kể cả lỗi trùng/ràng buộc CSDL) nhưng không lưu.
-- Cập nhật theo **mã hàng, không phân biệt hoa thường**: chạy lại nhiều lần không tạo trùng.
+- Chế độ `overwrite`: cập nhật theo **mã hàng, không phân biệt hoa thường**, chạy lại nhiều lần không tạo trùng. (Chế độ `add` cộng tồn nên không idempotent, xem trên.)
 - Ô trống = **giữ nguyên** giá trị cũ (không xóa).
 - Lỗi hệ thống bất ngờ → `status = "failed"` với một lỗi `row = 0`, không ghi gì.
 - Sai định dạng file (không phải `.xlsx`) → `400 VALIDATION_ERROR`; thiếu file → `400`; file > 10 MB → `413 PAYLOAD_TOO_LARGE`.
@@ -970,7 +982,8 @@ Tham số query của `POST`: `dryRun` (**mặc định `true`**: chỉ kiểm t
 | `Loại hàng`                              | `Hàng hóa` (mặc định) hoặc `Combo` (KiotViet ghi `Combo - Đóng gói` cũng nhận). Trống mà có `Hàng thành phần` → coi là combo. Không đổi được loại của hàng đã có qua Excel |
 | `Hàng thành phần`                        | Của combo, dạng `MSP/SL,MSP/SL`. Thành phần là hàng hóa trong file (dù đứng sau) hoặc đã có trong hệ thống; chạy lại cùng file không đổi gì, đổi số lượng thì cập nhật |
 | `Nhóm hàng(3 Cấp)`                       | Dạng `NHÀ BẾP>>Dao kéo`, tối đa 3 cấp; **tự tạo nhóm còn thiếu**                                                                                    |
-| `Giá bán`, `Tồn kho`, `Giá vốn` và cột khác | **Bị bỏ qua**: hệ thống không có giá bán; số dư đầu kỳ do công cụ chuyển dữ liệu riêng xử lý |
+| `Tồn kho`, `Giá vốn` | **Chỉ dùng ở `mode=add`** (cộng/trừ tồn, giá nhập của lô cộng); ở `overwrite` bị bỏ qua (số dư đầu kỳ do công cụ chuyển dữ liệu riêng xử lý) |
+| `Giá bán` và cột khác | **Bị bỏ qua**: hệ thống không có giá bán |
 | `Tồn nhỏ nhất`, `Tồn lớn nhất`, `Vị trí` | Ghi cho chi nhánh `branchId`                                                                                                                        |
 | `Đang kinh doanh`                        | `1`/`0`                                                                                                                                             |
 | `Mô tả`                                  |                                                                                                                                                     |

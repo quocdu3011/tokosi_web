@@ -69,7 +69,7 @@ export class ImportsController {
   @ApiOperation({
     summary: 'Tải file Excel lên để nhập (type: products)',
     description:
-      'Mặc định chỉ KIỂM TRA (dryRun=true), không ghi gì; gửi dryRun=false để ghi thật. Xử lý ngay trong yêu cầu nên kết quả (status completed hoặc failed) có sẵn trong phản hồi; vẫn xem lại được qua GET /imports/:id. Tất cả hoặc không gì cả: có dòng lỗi thì không ghi gì. Chạy lại cùng file không tạo trùng (cập nhật theo mã hàng).',
+      'Mặc định chỉ KIỂM TRA (dryRun=true), không ghi gì; gửi dryRun=false để ghi thật. Xử lý ngay trong yêu cầu nên kết quả (status completed hoặc failed) có sẵn trong phản hồi; vẫn xem lại được qua GET /imports/:id. Tất cả hoặc không gì cả: có dòng lỗi thì không ghi gì. mode=overwrite (mặc định): cập nhật theo mã hàng, chạy lại cùng file không tạo trùng. mode=add: CỘNG tồn kho theo cột Tồn kho nên chạy lại sẽ cộng thêm lần nữa.',
   })
   @ApiAcceptedResponse({ type: ImportJobDto })
   run(
@@ -82,6 +82,7 @@ export class ImportsController {
     return this.imports.run(user, type, file, {
       dryRun: query.dryRun ?? true,
       branchId: query.branchId,
+      mode: query.mode ?? 'overwrite',
     });
   }
 

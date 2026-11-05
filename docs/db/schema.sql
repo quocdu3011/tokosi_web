@@ -642,3 +642,6 @@ ALTER TABLE "price_book_items" DISABLE ROW LEVEL SECURITY;ALTER TABLE "price_boo
 ALTER TABLE "invoices" DROP CONSTRAINT IF EXISTS "invoices_price_book_id_price_books_id_fk";
 ALTER TABLE "orders" DROP CONSTRAINT IF EXISTS "orders_price_book_id_price_books_id_fk";
 DROP INDEX IF EXISTS "customers_price_book_idx";ALTER TABLE "customers" DROP COLUMN "default_price_book_id";ALTER TABLE "invoices" DROP COLUMN "price_book_id";ALTER TABLE "orders" DROP COLUMN "price_book_id";DELETE FROM "role_permissions" WHERE "permission_code" = 'price.edit';
+
+-- ===== 0020_che_do_nhap_excel.sql =====
+CREATE TYPE "public"."import_mode" AS ENUM('overwrite', 'add');ALTER TABLE "import_jobs" ADD COLUMN "mode" "import_mode" DEFAULT 'overwrite' NOT NULL;

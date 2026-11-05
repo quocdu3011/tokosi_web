@@ -66,6 +66,9 @@ export const stockRefType = pgEnum('stock_ref_type', [
   'transfer_cancel',
 ]);
 
+/** Chế độ nhập: `overwrite` = đè thông tin theo mã; `add` = cộng thêm số lượng, giữ nguyên thông tin cũ. */
+export const importMode = pgEnum('import_mode', ['overwrite', 'add']);
+
 export const importType = pgEnum('import_type', [
   'products',
   'customers',

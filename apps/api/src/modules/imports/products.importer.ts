@@ -11,9 +11,13 @@ import {
 } from '../../db/schema/index.js';
 import { loadComponents } from '../catalog/combo.js';
 import { PRODUCT_CODE_PATTERN } from '../catalog/products.dto.js';
+import { dec } from '../../common/costing.js';
+import { InventoryService } from '../inventory/inventory.service.js';
+import type { ImportMode } from './imports.dto.js';
 import {
   asFlag,
   asNonNegDecimal,
+  asSignedDecimal,
   asText,
   chunk,
   hasColumn,
@@ -35,6 +39,9 @@ const COL = {
   location: ['vi tri'],
   min: ['ton nho nhat'],
   max: ['ton lon nhat'],
+  /** Chỉ dùng ở chế độ "thêm": số lượng CỘNG THÊM vào tồn (số âm = trừ) và giá vốn của lô cộng thêm. */
+  qty: ['ton kho'],
+  cost: ['gia von'],
 } as const;
 /** Cột ảnh: KiotViet đặt tên "Hình ảnh (url1,url2...)". */
 const imageHeader = (headers: string[]) =>
@@ -55,6 +62,10 @@ interface ParsedRow {
   location?: string;
   min?: string;
   max?: string;
+  /** Chế độ "thêm": số lượng cộng (>0) hoặc trừ (<0) vào tồn; bỏ trống/0 = không đổi tồn. */
+  qty?: string;
+  /** Chế độ "thêm": giá vốn của lô cộng thêm (chỉ khi cộng); bỏ trống = giữ giá vốn hiện tại. */
+  cost?: string;
   images: string[];
 }
 
@@ -62,11 +73,22 @@ export interface ProductImportOptions {
   /** Chi nhánh cho tồn tối thiểu/tối đa, vị trí. Bắt buộc nếu file có các cột đó. */
   branchId?: string;
   userId: string;
+  /** `overwrite` (mặc định): đè thông tin theo mã. `add`: cộng tồn, giữ nguyên thông tin của hàng đã có. */
+  mode?: ImportMode;
+  /** Bắt buộc khi `mode = 'add'`: cổng duy nhất được đổi tồn kho. */
+  inventory?: InventoryService;
+  /** Chứng từ gốc ghi vào sổ cái tồn kho cho các dòng cộng/trừ (mã `IMP-…`, id = id lần nhập). */
+  ref?: { id: string; code: string };
 }
 
 /**
  * Nhập hàng hóa từ Excel (cột theo file KiotViet). Cập nhật theo MÃ HÀNG (không phân biệt hoa thường), chạy lại
- * cùng file không tạo trùng. KHÔNG nhập `Tồn kho` và `Giá vốn`: số dư đầu kỳ do công cụ chuyển dữ liệu riêng xử lý.
+ * cùng file không tạo trùng. Chế độ `overwrite` KHÔNG nhập `Tồn kho` và `Giá vốn`: số dư đầu kỳ do công cụ chuyển
+ * dữ liệu riêng xử lý.
+ *
+ * Chế độ `add` (Import thêm): hàng đã có chỉ được CỘNG/TRỪ tồn theo cột `Tồn kho` của chi nhánh `branchId` (thông tin
+ * khác giữ nguyên bản cũ); mã mới được tạo đầy đủ. Tồn đổi qua `InventoryService` (khóa dòng, không âm, giá vốn bình
+ * quân gia quyền theo cột `Giá vốn` nếu có, sổ cái loại `adjustment`). Chạy lại cùng file sẽ cộng thêm lần nữa.
  *
  * Kiểm tra toàn bộ file trước; có bất kỳ dòng lỗi nào thì KHÔNG ghi gì. Phải chạy trong transaction của người gọi.
  */
@@ -77,12 +99,36 @@ export async function importProducts(
 ): Promise<ImportOutcome> {
   const errors: ImportRowError[] = [];
   const headers = sheet.headers;
-  for (const [field, aliases] of [
-    ['Mã hàng', COL.code],
-    ['Tên hàng', COL.name],
-  ] as const) {
+  const isAdd = opts.mode === 'add';
+  // Ở chế độ "thêm", Tên hàng chỉ bắt buộc với mã mới (kiểm tra theo từng dòng bên dưới).
+  const requiredColumns = isAdd
+    ? ([['Mã hàng', COL.code]] as const)
+    : ([
+        ['Mã hàng', COL.code],
+        ['Tên hàng', COL.name],
+      ] as const);
+  for (const [field, aliases] of requiredColumns) {
     if (!hasColumn(headers, aliases)) {
       errors.push({ row: 1, field, message: `Thiếu cột bắt buộc "${field}"` });
+    }
+  }
+  if (isAdd) {
+    if (!hasColumn(headers, COL.qty)) {
+      errors.push({
+        row: 1,
+        field: 'Tồn kho',
+        message: 'Import thêm cần cột "Tồn kho" (số lượng cộng thêm)',
+      });
+    }
+    if (!opts.branchId) {
+      errors.push({
+        row: 1,
+        field: 'branchId',
+        message: 'Import thêm cần chọn chi nhánh (branchId) để cộng tồn',
+      });
+    }
+    if (!opts.inventory || !opts.ref) {
+      throw new Error('Import thêm thiếu InventoryService hoặc chứng từ gốc');
     }
   }
   const hasStockCols =
@@ -115,8 +161,9 @@ export async function importProducts(
         'Mã hàng',
         'Mã hàng chỉ gồm chữ, số, "-", "_", "." và dài 1-30 ký tự',
       );
-    if (!name) err('Tên hàng', 'Thiếu tên hàng');
-    else if (name.length > 255) err('Tên hàng', 'Tên hàng dài quá 255 ký tự');
+    if (!name) {
+      if (!isAdd) err('Tên hàng', 'Thiếu tên hàng');
+    } else if (name.length > 255) err('Tên hàng', 'Tên hàng dài quá 255 ký tự');
     if (code) {
       const key = code.toLowerCase();
       const first = seen.get(key);
@@ -181,6 +228,26 @@ export async function importProducts(
         'Combo không có tồn tối thiểu/tối đa/vị trí riêng; hãy để trống cho hàng thành phần',
       );
 
+    // Chế độ "thêm": Tồn kho có dấu (âm = trừ), Giá vốn không âm 4 chữ số thập phân. Ô trống/0 = không đổi tồn.
+    let qty: string | undefined;
+    let cost: string | undefined;
+    if (isAdd) {
+      const q = asSignedDecimal(pick(values, COL.qty), 3);
+      if (q === undefined)
+        err(
+          'Tồn kho',
+          'Số lượng không hợp lệ (số, tối đa 3 chữ số thập phân; số âm = trừ tồn)',
+        );
+      else if (q !== null && Number(q) !== 0) qty = q;
+      const c = asNonNegDecimal(pick(values, COL.cost), 4);
+      if (c === undefined)
+        err(
+          'Giá vốn',
+          'Giá vốn không hợp lệ (số không âm, tối đa 4 chữ số thập phân)',
+        );
+      else if (c !== null) cost = c;
+    }
+
     const images: string[] = [];
     const imagesRaw = imgHeader ? asText(values[imgHeader]) : null;
     if (imagesRaw) {
@@ -196,11 +263,11 @@ export async function importProducts(
         err('Hình ảnh', `Tối đa ${MAX_IMAGES} ảnh mỗi hàng`);
     }
 
-    if (code && name) {
+    if (code && (name || isAdd)) {
       parsed.push({
         row,
         code,
-        name,
+        name: name ?? '',
         type,
         components,
         categoryPath,
@@ -209,34 +276,15 @@ export async function importProducts(
         location: location ?? undefined,
         min: min ?? undefined,
         max: max ?? undefined,
+        qty,
+        cost,
         images,
       });
     }
   }
   if (errors.length > 0) return { created: 0, updated: 0, errors };
 
-  // ---------- 2) nhóm hàng: tạo các nhóm còn thiếu
-  const categoryIds = new Map<string, string>(); // khóa = đường dẫn đã chuẩn hóa
-  for (const r of parsed) {
-    if (!r.categoryPath) continue;
-    let parentId: string | null = null;
-    let key = '';
-    for (const part of r.categoryPath) {
-      key += `>>${normalizeHeader(part)}`;
-      let id = categoryIds.get(key);
-      if (!id) {
-        id = await findOrCreateCategory(tx, parentId, part);
-        categoryIds.set(key, id);
-      }
-      parentId = id;
-    }
-  }
-  const categoryOf = (path: string[] | undefined): string | undefined => {
-    if (!path) return undefined;
-    return categoryIds.get(path.map((p) => `>>${normalizeHeader(p)}`).join(''));
-  };
-
-  // ---------- 3) hàng hiện có theo mã (không phân biệt hoa thường)
+  // ---------- 2) hàng hiện có theo mã (không phân biệt hoa thường)
   const existing = new Map<string, typeof products.$inferSelect>();
   for (const part of chunk(
     parsed.map((r) => r.code.toLowerCase()),
@@ -260,9 +308,45 @@ export async function importProducts(
       });
     }
   }
+  // Chế độ "thêm": hàng đã có giữ nguyên mọi thông tin (chỉ cộng/trừ tồn); chỉ mã MỚI được tạo đầy đủ.
+  const work = isAdd
+    ? parsed.filter((r) => !existing.has(r.code.toLowerCase()))
+    : parsed;
+  if (isAdd) {
+    for (const r of work) {
+      if (!r.name)
+        errors.push({
+          row: r.row,
+          field: 'Tên hàng',
+          message: 'Hàng mới (chưa có trong hệ thống) cần có tên hàng',
+        });
+    }
+  }
+
+  // ---------- 3) nhóm hàng: tạo các nhóm còn thiếu
+  const categoryIds = new Map<string, string>(); // khóa = đường dẫn đã chuẩn hóa
+  for (const r of work) {
+    if (!r.categoryPath) continue;
+    let parentId: string | null = null;
+    let key = '';
+    for (const part of r.categoryPath) {
+      key += `>>${normalizeHeader(part)}`;
+      let id = categoryIds.get(key);
+      if (!id) {
+        id = await findOrCreateCategory(tx, parentId, part);
+        categoryIds.set(key, id);
+      }
+      parentId = id;
+    }
+  }
+  const categoryOf = (path: string[] | undefined): string | undefined => {
+    if (!path) return undefined;
+    return categoryIds.get(path.map((p) => `>>${normalizeHeader(p)}`).join(''));
+  };
+
   // Loại hàng của hàng đã có không đổi qua Excel (đổi trên giao diện, có kiểm tra giao dịch)
   const typeOfRow = new Map<string, ProductType>(); // loại hàng sau khi nhập, theo mã (chữ thường)
-  for (const r of parsed) {
+  for (const r of work) {
     const cur = existing.get(r.code.toLowerCase());
     if (cur && r.type !== undefined && r.type !== cur.productType) {
       errors.push({
@@ -276,7 +360,7 @@ export async function importProducts(
   }
   // Hàng thành phần phải là hàng hóa đã có (trong file hoặc CSDL), không phải combo
   const outsideCodes = new Set<string>();
-  for (const r of parsed)
+  for (const r of work)
     for (const c of r.components ?? [])
       if (!typeOfRow.has(c.code.toLowerCase()))
         outsideCodes.add(c.code.toLowerCase());
@@ -293,7 +377,7 @@ export async function importProducts(
       );
     for (const x of rows) outsideType.set(x.code.toLowerCase(), x.productType);
   }
-  for (const r of parsed) {
+  for (const r of work) {
     for (const c of r.components ?? []) {
       const key = c.code.toLowerCase();
       const t = typeOfRow.get(key) ?? outsideType.get(key);
@@ -307,6 +391,48 @@ export async function importProducts(
         errors.push({ row: r.row, field: 'Hàng thành phần', message: problem });
     }
   }
+
+  // ---------- 3b) chế độ "thêm": kiểm tra số lượng cộng/trừ tồn TRƯỚC khi ghi
+  const stockRows = isAdd ? parsed.filter((r) => r.qty !== undefined) : [];
+  if (stockRows.length > 0) {
+    const onHandOf = new Map<string, string>(); // productId → tồn hiện tại tại chi nhánh
+    const ids = stockRows.flatMap(
+      (r) => existing.get(r.code.toLowerCase())?.id ?? [],
+    );
+    for (const part of chunk(ids, 1000)) {
+      const found = await tx
+        .select({ productId: stocks.productId, onHand: stocks.onHand })
+        .from(stocks)
+        .where(
+          and(
+            eq(stocks.branchId, opts.branchId!),
+            inArray(stocks.productId, part),
+          ),
+        );
+      for (const f of found) onHandOf.set(f.productId, f.onHand);
+    }
+    for (const r of stockRows) {
+      const cur = existing.get(r.code.toLowerCase());
+      if ((cur?.productType ?? r.type ?? 'goods') === 'combo') {
+        errors.push({
+          row: r.row,
+          field: 'Tồn kho',
+          message:
+            'Combo không có tồn kho riêng; hãy nhập tồn cho các hàng thành phần',
+        });
+        continue;
+      }
+      const delta = dec(r.qty!);
+      const have = dec(cur ? (onHandOf.get(cur.id) ?? '0') : '0');
+      if (have.plus(delta).isNegative()) {
+        errors.push({
+          row: r.row,
+          field: 'Tồn kho',
+          message: `Không đủ tồn để trừ ${delta.negated().toFixed(3)} (hiện có ${have.toFixed(3)})`,
+        });
+      }
+    }
+  }
   if (errors.length > 0) return { created: 0, updated: 0, errors };
 
   // ---------- 4) tạo hàng mới, sửa hàng cũ (chỉ ghi khi có thay đổi)
@@ -314,7 +440,7 @@ export async function importProducts(
   const changed = new Set<string>(); // mã (chữ thường) của hàng có thay đổi
   const idByCode = new Map<string, string>(); // mọi hàng trong file (cũ và mới) → id
   for (const [code, p] of existing) idByCode.set(code, p.id);
-  const toInsert = parsed.filter((r) => !existing.has(r.code.toLowerCase()));
+  const toInsert = work.filter((r) => !existing.has(r.code.toLowerCase()));
   for (const part of chunk(toInsert, BATCH)) {
     const inserted = await tx
       .insert(products)
@@ -335,7 +461,7 @@ export async function importProducts(
   }
   const idOf = (code: string) => idByCode.get(code.toLowerCase())!;
 
-  for (const r of parsed) {
+  for (const r of work) {
     const cur = existing.get(r.code.toLowerCase());
     if (!cur) continue; // hàng vừa tạo ở trên
     const patch: Partial<typeof products.$inferInsert> = {};
@@ -356,7 +482,7 @@ export async function importProducts(
   }
 
   // ---------- 4b) hàng thành phần của combo (thay khi khác bản hiện có)
-  const comboRows = parsed.filter((r) => r.components);
+  const comboRows = work.filter((r) => r.components);
   if (comboRows.length > 0) {
     const current = await loadComponents(
       tx,
@@ -415,7 +541,7 @@ export async function importProducts(
 
   // ---------- 5) tồn tối thiểu / tối đa / vị trí (ô trống = không đổi)
   if (opts.branchId && hasStockCols) {
-    const rows = parsed
+    const rows = work
       .filter(
         (r) =>
           r.min !== undefined ||
@@ -474,7 +600,7 @@ export async function importProducts(
   }
 
   // ---------- 6) ảnh: thêm URL ngoài chưa có (storage_key = null), không xóa ảnh hiện có
-  const withImages = parsed.filter((r) => r.images.length > 0);
+  const withImages = work.filter((r) => r.images.length > 0);
   if (withImages.length > 0) {
     const ids = withImages.map((r) => idOf(r.code));
     const have = new Map<string, Array<{ url: string; sortOrder: number }>>();
@@ -504,6 +630,25 @@ export async function importProducts(
     }
     for (const part of chunk(rows, BATCH))
       await tx.insert(productImages).values(part);
+  }
+
+  // ---------- 7) chế độ "thêm": cộng/trừ tồn qua cổng duy nhất InventoryService (nhiều dòng → applyMovements)
+  if (stockRows.length > 0) {
+    await opts.inventory!.applyMovements(
+      tx,
+      stockRows.map((r) => ({
+        branchId: opts.branchId!,
+        productId: idOf(r.code),
+        qtyDelta: r.qty!,
+        // Giá vốn của file chỉ áp dụng cho lô CỘNG; trừ tồn luôn theo giá vốn bình quân hiện tại.
+        unitCost: r.qty!.startsWith('-') ? undefined : r.cost,
+        refType: 'adjustment' as const,
+        refId: opts.ref!.id,
+        refCode: opts.ref!.code,
+        userId: opts.userId,
+      })),
+    );
+    for (const r of stockRows) changed.add(r.code.toLowerCase());
   }
 
   const createdCodes = new Set(toInsert.map((r) => r.code.toLowerCase()));

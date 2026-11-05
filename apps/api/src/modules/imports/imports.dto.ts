@@ -1,11 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsUUID } from 'class-validator';
+import { IsIn, IsOptional, IsUUID } from 'class-validator';
 import { QueryBoolean } from '../../common/query.js';
 
 export const IMPORT_TYPES = ['products', 'customers', 'suppliers'] as const;
 /** Loại đã hỗ trợ; khách hàng và nhà cung cấp sẽ làm cùng phân hệ của chúng. */
 export const SUPPORTED_IMPORT_TYPES = ['products'] as const;
 export type SupportedImportType = (typeof SUPPORTED_IMPORT_TYPES)[number];
+
+/** `overwrite` (mặc định): đè thông tin theo mã. `add`: cộng thêm số lượng, giữ nguyên thông tin cũ. */
+export const IMPORT_MODES = ['overwrite', 'add'] as const;
+export type ImportMode = (typeof IMPORT_MODES)[number];
 
 export const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
 export const MAX_STORED_ERRORS = 500;
@@ -21,6 +25,12 @@ export class ImportErrorDto {
 export class ImportJobDto {
   @ApiProperty() id!: string;
   @ApiProperty({ enum: IMPORT_TYPES }) type!: string;
+  @ApiProperty({
+    enum: IMPORT_MODES,
+    description:
+      '`overwrite` = đè theo mã; `add` = cộng thêm tồn kho (cột Tồn kho), giữ nguyên thông tin cũ',
+  })
+  mode!: string;
   @ApiProperty({
     enum: ['queued', 'running', 'completed', 'failed'],
     description:
@@ -53,6 +63,16 @@ export class ImportJobDto {
 
 export class ImportQueryDto {
   @ApiPropertyOptional({
+    enum: IMPORT_MODES,
+    default: 'overwrite',
+    description:
+      '`overwrite` (mặc định) = Import đè: cùng mã thì ghi thông tin trong file lên bản cũ, ô trống giữ nguyên. `add` = Import thêm: cùng mã thì CỘNG cột Tồn kho vào tồn của chi nhánh (số âm = trừ, không xuống dưới 0), thông tin khác giữ nguyên bản cũ; mã mới được tạo đầy đủ. Bắt buộc có branchId. Chạy lại sẽ cộng thêm lần nữa',
+  })
+  @IsOptional()
+  @IsIn(IMPORT_MODES)
+  mode?: ImportMode;
+
+  @ApiPropertyOptional({
     default: true,
     description:
       'true (mặc định) = chỉ kiểm tra, không ghi gì. Phải gửi dryRun=false mới ghi thật',
@@ -62,7 +82,7 @@ export class ImportQueryDto {
 
   @ApiPropertyOptional({
     description:
-      'Chi nhánh cho tồn tối thiểu/tối đa, vị trí kho. Bắt buộc nếu file có các cột đó',
+      'Chi nhánh cho tồn tối thiểu/tối đa, vị trí kho và tồn kho (Import thêm). Bắt buộc nếu file có các cột đó hoặc mode=add',
   })
   @IsOptional()
   @IsUUID()

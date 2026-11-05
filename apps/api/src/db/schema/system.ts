@@ -13,6 +13,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import {
   importStatus,
+  importMode,
   importType,
   permissionScope,
   userRole,
@@ -163,6 +164,7 @@ export const idempotencyKeys = pgTable(
 export const importJobs = pgTable('import_jobs', {
   id: pk(),
   type: importType().notNull(),
+  mode: importMode().notNull().default('overwrite'),
   status: importStatus().notNull().default('queued'),
   dryRun: boolean().notNull().default(true),
   fileName: text(),

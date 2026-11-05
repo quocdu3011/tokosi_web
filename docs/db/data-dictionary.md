@@ -2,7 +2,7 @@
 
 > **Sinh tự động** từ `apps/api/src/db/schema` bằng `pnpm db:docs` — không sửa tay. Tổng quan và cách xem sơ đồ: [`README.md`](README.md).
 
-**40 bảng · 18 kiểu liệt kê (enum)**
+**40 bảng · 19 kiểu liệt kê (enum)**
 
 ## Mục lục
 
@@ -22,6 +22,7 @@
 | `cash_direction` | `in`, `out` |
 | `customer_type` | `individual`, `company` |
 | `doc_status` | `completed`, `cancelled` |
+| `import_mode` | `overwrite`, `add` |
 | `import_status` | `queued`, `running`, `completed`, `failed` |
 | `import_type` | `products`, `customers`, `suppliers`, `price-books` |
 | `ledger_entry_type` | `opening`, `invoice`, `payment`, `return`, `adjustment`, `transfer` |
@@ -190,6 +191,7 @@ Công việc import Excel chạy nền.
 | --- | --- | :-: | --- | --- |
 | `id` | uuid |  | `gen_random_uuid()` | **PK** |
 | `type` | import_type |  |  |  |
+| `mode` | import_mode |  | `'overwrite'` |  |
 | `status` | import_status |  | `'queued'` |  |
 | `dry_run` | boolean |  | `true` |  |
 | `file_name` | text | ✔ |  |  |

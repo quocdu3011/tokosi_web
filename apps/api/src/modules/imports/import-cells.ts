@@ -61,6 +61,19 @@ export function asNonNegDecimal(
   return re.test(s) ? s : undefined;
 }
 
+/** Số thập phân CÓ DẤU (số âm = trừ) dạng chuỗi, tối đa `maxScale` chữ số thập phân; lỗi → undefined. null = ô trống. */
+export function asSignedDecimal(
+  v: CellValue | undefined,
+  maxScale: number,
+): string | null | undefined {
+  if (v === null || v === undefined) return null;
+  const s =
+    typeof v === 'number' ? String(v) : String(v).trim().replace(',', '.');
+  if (s === '') return null;
+  const re = new RegExp(String.raw`^-?\d{1,11}(\.\d{1,${maxScale}})?$`);
+  return re.test(s) ? s : undefined;
+}
+
 /** 1/0, true/false, "có"/"không" → boolean; ô trống → null; giá trị lạ → undefined. */
 export function asFlag(v: CellValue | undefined): boolean | null | undefined {
   if (v === null || v === undefined) return null;

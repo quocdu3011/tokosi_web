@@ -29,6 +29,11 @@ enum doc_status {
   "cancelled"
 }
 
+enum import_mode {
+  "overwrite"
+  "add"
+}
+
 enum import_status {
   "queued"
   "running"
@@ -413,6 +418,7 @@ Table idempotency_keys {
 Table import_jobs {
   id uuid [pk, default: `gen_random_uuid()`]
   type import_type [not null]
+  mode import_mode [not null, default: 'overwrite']
   status import_status [not null, default: 'queued']
   dry_run boolean [not null, default: true]
   file_name text

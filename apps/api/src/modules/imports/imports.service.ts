@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { AppError } from '../../common/app-error.js';
@@ -8,12 +9,14 @@ import { DB, type Database } from '../../db/database.module.js';
 import { importJobs } from '../../db/schema/index.js';
 import { AuditService } from '../audit/audit.service.js';
 import { BranchAccessService } from '../branches/branch-access.service.js';
+import { InventoryService } from '../inventory/inventory.service.js';
 import type { ImportOutcome, ImportRowError } from './import-cells.js';
 import {
   MAX_IMPORT_BYTES,
   MAX_STORED_ERRORS,
   SUPPORTED_IMPORT_TYPES,
   type ImportJobDto,
+  type ImportMode,
   type SupportedImportType,
 } from './imports.dto.js';
 import { importProducts } from './products.importer.js';
@@ -35,6 +38,7 @@ export class ImportsService {
     @Inject(DB) private readonly db: Database,
     private readonly auditLog: AuditService,
     private readonly branchAccess: BranchAccessService,
+    private readonly inventory: InventoryService,
   ) {}
 
   /**
@@ -46,7 +50,7 @@ export class ImportsService {
     user: AuthUser,
     type: string,
     file: { originalname: string; size: number; buffer: Buffer } | undefined,
-    opts: { dryRun: boolean; branchId?: string },
+    opts: { dryRun: boolean; branchId?: string; mode: ImportMode },
   ): Promise<ImportJobDto> {
     const kind = this.parseType(type);
     if (!file || file.size === 0) {
@@ -71,6 +75,10 @@ export class ImportsService {
       );
     }
 
+    // Id lần nhập sinh trước để làm chứng từ gốc (`refId`, mã IMP-…) của các dòng cộng/trừ tồn ở chế độ "thêm".
+    const jobId = randomUUID();
+    const ref = { id: jobId, code: `IMP-${jobId.slice(0, 8).toUpperCase()}` };
+
     let outcome: ImportOutcome;
     let systemError: string | null = null;
     try {
@@ -78,6 +86,9 @@ export class ImportsService {
         const result = await importProducts(tx, sheet, {
           branchId: opts.branchId,
           userId: user.id,
+          mode: opts.mode,
+          inventory: this.inventory,
+          ref,
         });
         if (opts.dryRun || result.errors.length > 0) throw new Rollback(result);
         await this.auditLog.record(tx, {
@@ -86,6 +97,8 @@ export class ImportsService {
           branchId: opts.branchId ?? null,
           after: {
             type: kind,
+            mode: opts.mode,
+            ...(opts.mode === 'add' ? { ref: ref.code } : {}),
             fileName: file.originalname,
             rows: sheet.rows.length,
             created: result.created,
@@ -114,7 +127,9 @@ export class ImportsService {
     const [job] = await this.db
       .insert(importJobs)
       .values({
+        id: jobId,
         type: kind,
+        mode: opts.mode,
         status: failed ? 'failed' : 'completed',
         dryRun: opts.dryRun,
         fileName: file.originalname.slice(0, 255),
@@ -150,6 +165,8 @@ export class ImportsService {
         { header: 'Nhóm hàng(3 Cấp)', width: 30 },
         { header: 'Loại hàng', width: 12 },
         { header: 'Hàng thành phần', width: 30 },
+        { header: 'Tồn kho', width: 12 },
+        { header: 'Giá vốn', width: 14 },
         { header: 'Tồn nhỏ nhất', width: 14 },
         { header: 'Tồn lớn nhất', width: 14 },
         { header: 'Vị trí', width: 12 },
@@ -164,6 +181,8 @@ export class ImportsService {
           'NHÀ BẾP>>Dao kéo',
           'Hàng hóa',
           null,
+          50,
+          21800.5,
           10,
           2000,
           'Kệ A1',
@@ -177,6 +196,8 @@ export class ImportsService {
           'NHÀ BẾP>>Dao kéo',
           'Combo',
           'VD001/2',
+          null,
+          null,
           null,
           null,
           null,
@@ -207,6 +228,7 @@ function toDto(j: JobRow): ImportJobDto {
   return {
     id: j.id,
     type: j.type,
+    mode: j.mode,
     status: j.status,
     dryRun: j.dryRun,
     fileName: j.fileName,
