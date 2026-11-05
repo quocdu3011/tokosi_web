@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { formatComponents, parseComponents } from './products.js';
+import {
+  LIQUIDATION_STATUSES,
+  LIQUIDATION_STATUS_LABELS,
+  formatComponents,
+  parseComponents,
+} from './products.js';
 
 describe('parseComponents', () => {
   it('đọc MSP/SL,MSP/SL và bỏ khoảng trắng thừa', () => {
@@ -33,5 +38,14 @@ describe('parseComponents', () => {
   it('format là nghịch đảo của parse', () => {
     const r = parseComponents('A/2,B-1/10');
     expect(r.ok && formatComponents(r.items)).toBe('A/2,B-1/10');
+  });
+});
+
+describe('trạng thái thanh lý', () => {
+  it('có đủ 5 trạng thái, mỗi trạng thái một nhãn tiếng Việt khác nhau', () => {
+    expect(LIQUIDATION_STATUSES).toHaveLength(5);
+    const labels = LIQUIDATION_STATUSES.map((s) => LIQUIDATION_STATUS_LABELS[s]);
+    expect(labels).toEqual(['Thường', 'Thanh Lý', 'Tắt Mã', 'Tồn Cao', 'Tồn Ưu Tiên']);
+    expect(new Set(labels).size).toBe(5);
   });
 });

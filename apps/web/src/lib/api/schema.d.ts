@@ -474,26 +474,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/products/{id}/branches/{branchId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    /**
-     * Đặt tồn tối thiểu/tối đa và vị trí kho của một chi nhánh
-     * @description Không thay đổi số tồn hay giá vốn (chỉ nhập/xuất/chuyển kho mới đổi được).
-     */
-    put: operations['ProductsController_setBranchSettings'];
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/products/{id}/stock-card': {
     parameters: {
       query?: never;
@@ -984,6 +964,11 @@ export interface components {
        */
       productType: 'goods' | 'combo';
       /**
+       * @description Trạng thái thanh lý: `normal` Thường (mặc định), `clearance` Thanh Lý, `disabled` Tắt Mã, `high_stock` Tồn Cao, `priority_stock` Tồn Ưu Tiên
+       * @enum {string}
+       */
+      liquidationStatus: 'normal' | 'clearance' | 'disabled' | 'high_stock' | 'priority_stock';
+      /**
        * @description Hàng thành phần của combo, dạng `MSP/SL,MSP/SL`; chuỗi rỗng với hàng hóa
        * @example DAO01/2,KEO03/1
        */
@@ -1007,9 +992,6 @@ export interface components {
       available: string;
       /** @description Đang đặt nhà cung cấp. Chưa có phân hệ Đặt hàng nhập nên luôn "0" */
       onOrder: string;
-      minStock: string | null;
-      maxStock: string | null;
-      location: string | null;
       description: string | null;
       images: components['schemas']['ProductImageDto'][];
       isActive: boolean;
@@ -1058,6 +1040,11 @@ export interface components {
        */
       productType: 'goods' | 'combo';
       /**
+       * @default normal
+       * @enum {string}
+       */
+      liquidationStatus: 'normal' | 'clearance' | 'disabled' | 'high_stock' | 'priority_stock';
+      /**
        * @description Bắt buộc (ít nhất 1 thành phần) khi productType = combo, dạng `MSP/SL,MSP/SL`: mã hàng hóa (không phải combo), số lượng nguyên dương, mã không lặp. Không được gửi với hàng hóa
        * @example DAO01/2,KEO03/1
        */
@@ -1074,6 +1061,8 @@ export interface components {
        * @enum {string}
        */
       productType?: 'goods' | 'combo';
+      /** @enum {string} */
+      liquidationStatus?: 'normal' | 'clearance' | 'disabled' | 'high_stock' | 'priority_stock';
       /**
        * @description Thay toàn bộ hàng thành phần của combo (`MSP/SL,MSP/SL`). Đổi sang combo thì bắt buộc gửi kèm
        * @example DAO01/2,KEO03/1
@@ -1096,20 +1085,6 @@ export interface components {
       costPrice?: string;
       /** @description Vắng mặt nếu thiếu product.cost.view */
       lastPurchasePrice?: string | null;
-      minStock: string | null;
-      maxStock: string | null;
-      location: string | null;
-    };
-    SetProductBranchSettingsDto: {
-      /**
-       * @description Tồn tối thiểu (>= 0); null = bỏ. Phải <= tồn tối đa
-       * @example 10
-       */
-      minStock?: string | null;
-      /** @example 2000 */
-      maxStock?: string | null;
-      /** @description Vị trí kho; null hoặc rỗng = bỏ */
-      location?: string | null;
     };
     StockCardMovementDto: {
       /** Format: date-time */
@@ -1956,6 +1931,8 @@ export interface operations {
         isActive?: boolean;
         /** @description Lọc theo loại hàng */
         productType?: 'goods' | 'combo';
+        /** @description Lọc theo trạng thái thanh lý */
+        liquidationStatus?: 'normal' | 'clearance' | 'disabled' | 'high_stock' | 'priority_stock';
         /** @description true = chỉ hàng còn tồn tại chi nhánh làm việc */
         inStock?: boolean;
         /** @description xlsx = tải file Excel theo đúng bộ lọc hiện tại (bỏ qua page/limit, tối đa 10.000 dòng) */
@@ -2124,32 +2101,6 @@ export interface operations {
       };
     };
   };
-  ProductsController_setBranchSettings: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-        branchId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['SetProductBranchSettingsDto'];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ProductBranchDto'];
-        };
-      };
-    };
-  };
   ProductsController_stockCard: {
     parameters: {
       query?: {
@@ -2308,7 +2259,7 @@ export interface operations {
       query?: {
         /** @description true (mặc định) = chỉ kiểm tra, không ghi gì. Phải gửi dryRun=false mới ghi thật */
         dryRun?: boolean;
-        /** @description Chi nhánh cho tồn tối thiểu/tối đa, vị trí kho. Bắt buộc nếu file có các cột đó */
+        /** @description Chi nhánh làm việc (hiện không có cột nào của hàng hóa phụ thuộc chi nhánh nên có thể bỏ trống) */
         branchId?: string;
       };
       header?: never;

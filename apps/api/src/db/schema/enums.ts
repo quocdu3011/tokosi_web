@@ -1,5 +1,5 @@
 import { pgEnum } from 'drizzle-orm/pg-core';
-import { PRODUCT_TYPES } from '@kiot/shared';
+import { LIQUIDATION_STATUSES, PRODUCT_TYPES } from '@kiot/shared';
 
 /**
  * Vai trò theo cơ cấu thực tế của công ty:
@@ -94,3 +94,9 @@ export const shippingPayer = pgEnum('shipping_payer', ['sender', 'receiver']);
 
 /** Loại hàng: goods = Hàng hóa (mặc định), combo = gói nhiều hàng hóa thành phần (không có tồn/giá vốn riêng). */
 export const productType = pgEnum('product_type', PRODUCT_TYPES);
+
+/** Trạng thái thanh lý: normal = Thường, clearance = Thanh Lý, disabled = Tắt Mã, high_stock = Tồn Cao, priority_stock = Tồn Ưu Tiên. */
+export const liquidationStatus = pgEnum(
+  'liquidation_status',
+  LIQUIDATION_STATUSES,
+);

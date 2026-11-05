@@ -14,8 +14,7 @@ export interface ComponentEntry {
 export const MAX_COMPONENT_QTY = 100_000;
 
 export type ParseComponentsResult =
-  | { ok: true; items: ComponentEntry[] }
-  | { ok: false; error: string };
+  { ok: true; items: ComponentEntry[] } | { ok: false; error: string };
 
 /**
  * Đọc chuỗi "Hàng thành phần" dạng `MSP/SL,MSP/SL` (vd `DAO01/2,KEO03/1`).
@@ -65,3 +64,23 @@ export function parseComponents(text: string): ParseComponentsResult {
 export function formatComponents(items: readonly ComponentEntry[]): string {
   return items.map((i) => `${i.code}/${i.qty}`).join(',');
 }
+
+/** Trạng thái thanh lý của hàng hóa (mặc định: Thường). */
+export const LIQUIDATION_STATUSES = [
+  'normal',
+  'clearance',
+  'disabled',
+  'high_stock',
+  'priority_stock',
+] as const;
+export type LiquidationStatus = (typeof LIQUIDATION_STATUSES)[number];
+export const DEFAULT_LIQUIDATION_STATUS: LiquidationStatus = 'normal';
+
+/** Nhãn tiếng Việt hiển thị / dùng trong Excel. */
+export const LIQUIDATION_STATUS_LABELS: Record<LiquidationStatus, string> = {
+  normal: 'Thường',
+  clearance: 'Thanh Lý',
+  disabled: 'Tắt Mã',
+  high_stock: 'Tồn Cao',
+  priority_stock: 'Tồn Ưu Tiên',
+};

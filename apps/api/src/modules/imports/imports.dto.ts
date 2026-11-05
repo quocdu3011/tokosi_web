@@ -62,7 +62,7 @@ export class ImportQueryDto {
 
   @ApiPropertyOptional({
     description:
-      'Chi nhánh cho tồn tối thiểu/tối đa, vị trí kho. Bắt buộc nếu file có các cột đó',
+      'Chi nhánh làm việc (hiện không có cột nào của hàng hóa phụ thuộc chi nhánh nên có thể bỏ trống)',
   })
   @IsOptional()
   @IsUUID()

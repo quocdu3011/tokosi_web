@@ -95,7 +95,7 @@ Hai chi nhánh dùng chung một hệ thống. **Dùng chung:** hàng hóa, khá
 
 | Dữ liệu                                                                         | Nằm ở                                                                                     | Khóa chi nhánh                      |
 | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------- |
-| Tồn kho, **giá vốn bình quân**, giá nhập cuối, tồn tối thiểu/tối đa, vị trí kho | `stocks` (khóa chính: chi nhánh, sản phẩm)                                                | `branch_id`                         |
+| Tồn kho, **giá vốn bình quân**, giá nhập cuối | `stocks` (khóa chính: chi nhánh, sản phẩm)                                                | `branch_id`                         |
 | Công nợ khách / nhà cung cấp                                                    | `debt_ledger` — số dư = tổng theo (đối tác, chi nhánh); **tách biệt, không cấn trừ chéo** | `branch_id`                         |
 | Hạn mức, kỳ hạn công nợ                                                         | `customer_branch_terms`                                                                   | `branch_id`                         |
 | Đơn hàng, hóa đơn, trả hàng, phiếu nhập, sổ quỹ                                 | các bảng chứng từ, `cash_accounts`, `cash_transactions`                                   | `branch_id` (không đổi sau khi tạo) |

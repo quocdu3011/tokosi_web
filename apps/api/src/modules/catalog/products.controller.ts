@@ -5,7 +5,6 @@ import {
   Param,
   Patch,
   Post,
-  Put,
   Query,
   Req,
   StreamableFile,
@@ -39,7 +38,6 @@ import {
   ProductDto,
   ProductListDto,
   ProductLookupDto,
-  SetProductBranchSettingsDto,
   StockCardDto,
   StockCardQueryDto,
   UpdateProductDto,
@@ -163,23 +161,6 @@ export class ProductsController {
     @Param('id', ParseIdPipe) id: string,
   ) {
     return this.products.branchesOf(user, id);
-  }
-
-  @Put(':id/branches/:branchId')
-  @RequirePermission('product.edit')
-  @ApiOperation({
-    summary: 'Đặt tồn tối thiểu/tối đa và vị trí kho của một chi nhánh',
-    description:
-      'Không thay đổi số tồn hay giá vốn (chỉ nhập/xuất/chuyển kho mới đổi được).',
-  })
-  @ApiOkResponse({ type: ProductBranchDto })
-  setBranchSettings(
-    @CurrentUser() user: AuthUser,
-    @Param('id', ParseIdPipe) id: string,
-    @Param('branchId', ParseIdPipe) branchId: string,
-    @Body() body: SetProductBranchSettingsDto,
-  ) {
-    return this.products.setBranchSettings(user, id, branchId, body);
   }
 
   @Get(':id/stock-card')

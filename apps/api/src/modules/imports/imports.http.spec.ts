@@ -22,8 +22,9 @@ const KV_HEADERS = [
   'Giá bán',
   'Giá vốn',
   'Tồn kho',
-  'Tồn nhỏ nhất',
+  'Tồn nhỏ nhất', // cột KiotViet còn nhưng hệ thống bỏ qua
   'Tồn lớn nhất',
+  'Trạng thái thanh lý',
   'Hình ảnh (url1,url2...)',
   'Hàng thành phần',
   'Đang kinh doanh',
@@ -168,6 +169,7 @@ describe('Nhập/xuất Excel qua HTTP', () => {
           'https://cdn.example.test/a.jpg,https://cdn.example.test/b.jpg',
         'Đang kinh doanh': 1,
         'Vị trí': 'Kệ A1',
+        'Trạng thái thanh lý': 'Thanh Lý',
       }),
       kvRow({
         'Nhóm hàng(3 Cấp)': 'NHÀ BẾP>>Nồi chảo',
@@ -212,15 +214,11 @@ describe('Nhập/xuất Excel qua HTTP', () => {
     expect(cats.find((c) => c.name === 'Dao kéo')!.parentId).toBe(bep.id);
     expect(dao.categoryId).toBe(cats.find((c) => c.name === 'Dao kéo')!.id);
 
-    // min/max/vị trí ghi vào stocks của Sài Gòn; tồn kho và giá vốn KHÔNG bị đụng
-    const st = (await t.db.select().from(stocks)).find(
-      (s) => s.productId === dao.id,
-    )!;
-    expect(st).toMatchObject({ branchId: t.sg, location: 'Kệ A1' });
-    expect(Number(st.minStock)).toBe(10);
-    expect(Number(st.maxStock)).toBe(2000);
-    expect(Number(st.onHand)).toBe(0);
-    expect(Number(st.costPrice)).toBe(0);
+    // tồn kho và giá vốn KHÔNG bị đụng; các cột tồn nhỏ nhất/lớn nhất/vị trí của KiotViet bị bỏ qua
+    expect(
+      (await t.db.select().from(stocks)).filter((x) => x.productId === dao.id),
+    ).toHaveLength(0);
+    expect(dao.liquidationStatus).toBe('clearance');
 
     // ảnh là URL ngoài, không có storage_key
     const imgs = await t.db
@@ -251,6 +249,7 @@ describe('Nhập/xuất Excel qua HTTP', () => {
           'https://cdn.example.test/a.jpg,https://cdn.example.test/b.jpg',
         'Đang kinh doanh': 1,
         'Vị trí': 'Kệ A1',
+        'Trạng thái thanh lý': 'Thanh Lý',
       }),
     ]);
     const res = await post('products', file, `?dryRun=false&branchId=${t.sg}`);
@@ -291,12 +290,8 @@ describe('Nhập/xuất Excel qua HTTP', () => {
     expect(await countProducts()).toBe(before); // không sinh "dao01" thứ hai
     const dao = (await productByCode('DAO01'))!;
     expect(dao.name).toBe('Dao thái rau (mới)');
-    // ô trống không xóa dữ liệu cũ
-    const st = (await t.db.select().from(stocks)).find(
-      (s) => s.productId === dao.id,
-    )!;
-    expect(st.location).toBe('Kệ A1');
-    expect(Number(st.minStock)).toBe(10);
+    // ô trống không xóa dữ liệu cũ (trạng thái thanh lý giữ nguyên)
+    expect(dao.liquidationStatus).toBe('clearance');
   });
 
   it('có dòng lỗi → KHÔNG ghi gì (kể cả các dòng tốt), liệt kê lỗi từng dòng với số dòng trong file', async () => {
@@ -318,9 +313,8 @@ describe('Nhập/xuất Excel qua HTTP', () => {
       }), // dòng 7
       kvRow({
         'Mã hàng': 'OK05',
-        'Tên hàng': 'Min > max',
-        'Tồn nhỏ nhất': 50,
-        'Tồn lớn nhất': 5,
+        'Tên hàng': 'Trạng thái sai',
+        'Trạng thái thanh lý': 'Không rõ',
       }), // dòng 8
       kvRow({
         'Mã hàng': 'OK06',
@@ -368,7 +362,7 @@ describe('Nhập/xuất Excel qua HTTP', () => {
     expect(await productByCode('MOI01')).toBeUndefined();
   });
 
-  it('thiếu cột bắt buộc / có cột tồn tối thiểu nhưng không chọn chi nhánh → báo lỗi ở dòng 1, không ghi gì', async () => {
+  it('thiếu cột bắt buộc → báo lỗi ở dòng 1, không ghi gì; không cần chọn chi nhánh', async () => {
     const noName = await post(
       'products',
       await xlsx(['Mã hàng'], [['Z1']]),
@@ -377,15 +371,7 @@ describe('Nhập/xuất Excel qua HTTP', () => {
     expect(noName.body.status).toBe('failed');
     expect(noName.body.errors[0]).toMatchObject({ row: 1 });
 
-    const needBranch = await post(
-      'products',
-      await xlsx(['Mã hàng', 'Tên hàng', 'Vị trí'], [['Z2', 'x', 'Kệ A']]),
-      '?dryRun=false',
-    );
-    expect(needBranch.body.status).toBe('failed');
-    expect(needBranch.body.errors[0].field).toBe('branchId');
-
-    // không có cột phụ thuộc chi nhánh thì không cần chi nhánh
+    // hàng hóa không có cột nào phụ thuộc chi nhánh nên không cần chi nhánh
     const ok = await post(
       'products',
       await xlsx(['Mã hàng', 'Tên hàng'], [['Z3', 'x']]),
@@ -550,7 +536,7 @@ describe('Nhập/xuất Excel qua HTTP', () => {
         'Tên hàng': 'x',
         'Loại hàng': 'Combo',
         'Hàng thành phần': 'GN1/1',
-        'Tồn nhỏ nhất': 5, // combo không có tồn tối thiểu
+        'Trạng thái thanh lý': 'Sai', // trạng thái không hợp lệ
       }),
     ]);
     const res = await post('products', file, `?dryRun=false&branchId=${t.sg}`);

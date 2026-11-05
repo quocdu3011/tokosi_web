@@ -15,6 +15,7 @@ import {
 } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import {
+  LIQUIDATION_STATUS_LABELS,
   formatComponents,
   parseComponents,
   type ProductType,
@@ -33,7 +34,6 @@ import { DB, type Database, type DbOrTx } from '../../db/database.module.js';
 import { categoryWithDescendants } from '../../db/category-tree.js';
 import { searchWhere } from '../../db/search.js';
 import {
-  branches,
   categories,
   goodsReceiptItems,
   invoiceItems,
@@ -67,7 +67,6 @@ import {
   type ProductDto,
   type ProductImageDto,
   type ProductLookupDto,
-  type SetProductBranchSettingsDto,
   type StockCardDto,
   type StockCardQueryDto,
   type UpdateProductDto,
@@ -85,9 +84,6 @@ interface JoinedRow {
   onHand: string | null;
   costPrice: string | null;
   lastPurchasePrice: string | null;
-  minStock: string | null;
-  maxStock: string | null;
-  location: string | null;
   reserved: string | null;
 }
 
@@ -125,6 +121,9 @@ export class ProductsService {
       searchWhere(productSearchExpr(products), q.q),
       q.isActive === undefined ? undefined : eq(products.isActive, q.isActive),
       q.productType ? eq(products.productType, q.productType) : undefined,
+      q.liquidationStatus
+        ? eq(products.liquidationStatus, q.liquidationStatus)
+        : undefined,
       categoryIds ? inArray(products.categoryId, categoryIds) : undefined,
       q.inStock === undefined
         ? undefined
@@ -190,6 +189,7 @@ export class ProductsService {
       { header: 'Nhóm hàng(3 Cấp)', width: 30 },
       { header: 'Loại hàng', width: 12 },
       { header: 'Hàng thành phần', width: 30 },
+      { header: 'Trạng thái thanh lý', width: 18 },
       ...(withCost
         ? [
             { header: 'Giá vốn', width: 14 },
@@ -198,9 +198,6 @@ export class ProductsService {
         : []),
       { header: 'Tồn kho', width: 12 },
       { header: 'KH đặt', width: 12 },
-      { header: 'Tồn nhỏ nhất', width: 14 },
-      { header: 'Tồn lớn nhất', width: 14 },
-      { header: 'Vị trí', width: 12 },
       { header: 'Mô tả', width: 30 },
       { header: 'Đang kinh doanh', width: 16 },
       { header: 'Hình ảnh (url1,url2...)', width: 40 },
@@ -211,12 +208,10 @@ export class ProductsService {
       p.categoryPath ? p.categoryPath.replaceAll(' > ', '>>') : null,
       p.productType === 'combo' ? 'Combo' : 'Hàng hóa',
       p.components || null,
+      LIQUIDATION_STATUS_LABELS[p.liquidationStatus],
       ...(withCost ? [num(p.costPrice), num(p.lastPurchasePrice)] : []),
       num(p.onHand),
       num(p.reserved),
-      num(p.minStock),
-      num(p.maxStock),
-      p.location,
       p.description,
       p.isActive ? 1 : 0,
       p.images.map((i) => i.url).join(',') || null,
@@ -294,6 +289,7 @@ export class ProductsService {
             name: input.name.trim(),
             categoryId: input.categoryId ?? null,
             productType,
+            liquidationStatus: input.liquidationStatus ?? 'normal',
             description: input.description ?? null,
             createdBy: user.id,
           })
@@ -387,6 +383,8 @@ export class ProductsService {
           updatedAt: new Date(),
         };
         if (typeChanged) patch.productType = nextType;
+        if (input.liquidationStatus !== undefined)
+          patch.liquidationStatus = input.liquidationStatus;
         if (input.code !== undefined) patch.code = input.code;
         if (input.name !== undefined) patch.name = input.name.trim();
         if (input.categoryId !== undefined) patch.categoryId = input.categoryId;
@@ -475,9 +473,6 @@ export class ProductsService {
         onHand: fig ? fig.onHand : onHand.toFixed(3),
         reserved: isCombo ? '0.000' : reserved.toFixed(3),
         available: fig ? fig.available : onHand.minus(reserved).toFixed(3),
-        minStock: isCombo ? null : (s?.minStock ?? null),
-        maxStock: isCombo ? null : (s?.maxStock ?? null),
-        location: isCombo ? null : (s?.location ?? null),
       };
       if (canSeeCost) {
         dto.costPrice = fig ? fig.costPrice : (s?.costPrice ?? '0.0000');
@@ -487,106 +482,6 @@ export class ProductsService {
       }
       return dto;
     });
-  }
-
-  /**
-   * Đặt tồn tối thiểu / tối đa / vị trí kho của một chi nhánh. CHỈ ghi các cột này của `stocks`:
-   * số tồn và giá vốn chỉ `InventoryService` được thay đổi.
-   */
-  async setBranchSettings(
-    user: AuthUser,
-    id: string,
-    branchId: string,
-    input: SetProductBranchSettingsDto,
-  ): Promise<ProductBranchDto> {
-    await this.branchAccess.assertAccess(user, branchId);
-    const product = await this.findOrThrow(this.db, id);
-    if (product.productType === 'combo') {
-      throw new AppError(
-        400,
-        'INVALID_STATE',
-        'Combo không có tồn tối thiểu/tối đa/vị trí riêng; hãy đặt cho hàng thành phần',
-      );
-    }
-    const [branch] = await this.db
-      .select({ id: branches.id })
-      .from(branches)
-      .where(and(eq(branches.id, branchId), eq(branches.isActive, true)));
-    if (!branch) {
-      throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy chi nhánh');
-    }
-    if (
-      input.minStock === undefined &&
-      input.maxStock === undefined &&
-      input.location === undefined
-    ) {
-      throw new AppError(
-        400,
-        'VALIDATION_ERROR',
-        'Không có trường nào để cập nhật',
-        [{ field: 'minStock', message: 'Gửi ít nhất một trường' }],
-      );
-    }
-
-    await this.db.transaction(async (tx) => {
-      const [current] = await tx
-        .select()
-        .from(stocks)
-        .where(and(eq(stocks.branchId, branchId), eq(stocks.productId, id)))
-        .for('update');
-      const nextMin =
-        input.minStock === undefined ? current?.minStock : input.minStock;
-      const nextMax =
-        input.maxStock === undefined ? current?.maxStock : input.maxStock;
-      if (nextMin && nextMax && dec(nextMin).gt(dec(nextMax))) {
-        throw new AppError(
-          400,
-          'VALIDATION_ERROR',
-          'Tồn tối thiểu không được lớn hơn tồn tối đa',
-          [{ field: 'minStock', message: 'Phải nhỏ hơn hoặc bằng tồn tối đa' }],
-        );
-      }
-      const set: Partial<typeof stocks.$inferInsert> = {
-        updatedAt: new Date(),
-      };
-      if (input.minStock !== undefined)
-        set.minStock =
-          input.minStock === null ? null : dec(input.minStock).toFixed(3);
-      if (input.maxStock !== undefined)
-        set.maxStock =
-          input.maxStock === null ? null : dec(input.maxStock).toFixed(3);
-      if (input.location !== undefined)
-        set.location = input.location?.trim() || null;
-
-      await tx
-        .insert(stocks)
-        .values({ branchId, productId: id, ...set })
-        .onConflictDoUpdate({
-          target: [stocks.branchId, stocks.productId],
-          set,
-        });
-      await this.auditLog.record(tx, {
-        action: 'product.branch_settings',
-        entityType: 'product',
-        entityId: id,
-        branchId,
-        before: current
-          ? {
-              minStock: current.minStock,
-              maxStock: current.maxStock,
-              location: current.location,
-            }
-          : null,
-        after: {
-          minStock: set.minStock ?? current?.minStock ?? null,
-          maxStock: set.maxStock ?? current?.maxStock ?? null,
-          location: set.location ?? current?.location ?? null,
-        },
-      });
-    });
-
-    const all = await this.branchesOf(user, id);
-    return all.find((b) => b.branchId === branchId)!;
   }
 
   // ------------------------------------------------------------------ thẻ kho
@@ -694,9 +589,6 @@ export class ProductsService {
         onHand: stocks.onHand,
         costPrice: stocks.costPrice,
         lastPurchasePrice: stocks.lastPurchasePrice,
-        minStock: stocks.minStock,
-        maxStock: stocks.maxStock,
-        location: stocks.location,
         reserved: reserved.qty,
       })
       .from(products)
@@ -752,6 +644,7 @@ export class ProductsService {
           ? (paths.get(r.p.categoryId) ?? null)
           : null,
         productType: r.p.productType,
+        liquidationStatus: r.p.liquidationStatus,
         components: componentsText(items),
         componentItems: items.map((c) => ({
           productId: c.productId,
@@ -764,9 +657,6 @@ export class ProductsService {
         reserved: isCombo ? '0.000' : reserved.toFixed(3),
         available: fig ? fig.available : onHand.minus(reserved).toFixed(3),
         onOrder: '0',
-        minStock: isCombo ? null : r.minStock,
-        maxStock: isCombo ? null : r.maxStock,
-        location: isCombo ? null : r.location,
         description: r.p.description,
         images: images.get(r.p.id) ?? [],
         isActive: r.p.isActive,
@@ -999,6 +889,7 @@ function auditView(p: ProductRow, components: string) {
     name: p.name,
     categoryId: p.categoryId,
     productType: p.productType,
+    liquidationStatus: p.liquidationStatus,
     components,
     description: p.description,
     isActive: p.isActive,

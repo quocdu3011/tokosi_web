@@ -37,9 +37,6 @@ export const stocks = pgTable(
     onHand: quantity().notNull().default('0'),
     costPrice: price().notNull().default('0'),
     lastPurchasePrice: price(),
-    minStock: quantity(),
-    maxStock: quantity(),
-    location: text(),
     updatedAt: tstz().notNull().defaultNow(),
   },
   (t) => [

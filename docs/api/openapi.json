@@ -1126,6 +1126,22 @@
             }
           },
           {
+            "name": "liquidationStatus",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo trạng thái thanh lý",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "normal",
+                "clearance",
+                "disabled",
+                "high_stock",
+                "priority_stock"
+              ]
+            }
+          },
+          {
             "name": "inStock",
             "required": false,
             "in": "query",
@@ -1377,61 +1393,6 @@
           }
         ],
         "summary": "Chi tiết theo từng chi nhánh người dùng được phép",
-        "tags": [
-          "Hàng hóa"
-        ]
-      }
-    },
-    "/api/v1/products/{id}/branches/{branchId}": {
-      "put": {
-        "description": "Không thay đổi số tồn hay giá vốn (chỉ nhập/xuất/chuyển kho mới đổi được).",
-        "operationId": "ProductsController_setBranchSettings",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "branchId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SetProductBranchSettingsDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProductBranchDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Đặt tồn tối thiểu/tối đa và vị trí kho của một chi nhánh",
         "tags": [
           "Hàng hóa"
         ]
@@ -1743,7 +1704,7 @@
             "name": "branchId",
             "required": false,
             "in": "query",
-            "description": "Chi nhánh cho tồn tối thiểu/tối đa, vị trí kho. Bắt buộc nếu file có các cột đó",
+            "description": "Chi nhánh làm việc (hiện không có cột nào của hàng hóa phụ thuộc chi nhánh nên có thể bỏ trống)",
             "schema": {
               "type": "string"
             }
@@ -2817,6 +2778,17 @@
             ],
             "description": "`goods` = Hàng hóa, `combo` = gói nhiều hàng thành phần. Combo không có tồn/giá vốn riêng: onHand, available, costPrice, lastPurchasePrice luôn tính từ thành phần; reserved luôn \"0\"; minStock/maxStock/location luôn null"
           },
+          "liquidationStatus": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "clearance",
+              "disabled",
+              "high_stock",
+              "priority_stock"
+            ],
+            "description": "Trạng thái thanh lý: `normal` Thường (mặc định), `clearance` Thanh Lý, `disabled` Tắt Mã, `high_stock` Tồn Cao, `priority_stock` Tồn Ưu Tiên"
+          },
           "components": {
             "type": "string",
             "example": "DAO01/2,KEO03/1",
@@ -2859,18 +2831,6 @@
             "type": "string",
             "description": "Đang đặt nhà cung cấp. Chưa có phân hệ Đặt hàng nhập nên luôn \"0\""
           },
-          "minStock": {
-            "type": "string",
-            "nullable": true
-          },
-          "maxStock": {
-            "type": "string",
-            "nullable": true
-          },
-          "location": {
-            "type": "string",
-            "nullable": true
-          },
           "description": {
             "type": "string",
             "nullable": true
@@ -2900,6 +2860,7 @@
           "categoryId",
           "categoryPath",
           "productType",
+          "liquidationStatus",
           "components",
           "componentItems",
           "branchId",
@@ -2907,9 +2868,6 @@
           "reserved",
           "available",
           "onOrder",
-          "minStock",
-          "maxStock",
-          "location",
           "description",
           "images",
           "isActive",
@@ -3024,6 +2982,17 @@
             ],
             "default": "goods"
           },
+          "liquidationStatus": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "clearance",
+              "disabled",
+              "high_stock",
+              "priority_stock"
+            ],
+            "default": "normal"
+          },
           "components": {
             "type": "string",
             "example": "DAO01/2,KEO03/1",
@@ -3059,6 +3028,16 @@
               "combo"
             ],
             "description": "Chỉ đổi được khi hàng chưa có giao dịch và (khi đổi sang combo) chưa là thành phần của combo nào"
+          },
+          "liquidationStatus": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "clearance",
+              "disabled",
+              "high_stock",
+              "priority_stock"
+            ]
           },
           "components": {
             "type": "string",
@@ -3106,18 +3085,6 @@
             "type": "string",
             "nullable": true,
             "description": "Vắng mặt nếu thiếu product.cost.view"
-          },
-          "minStock": {
-            "type": "string",
-            "nullable": true
-          },
-          "maxStock": {
-            "type": "string",
-            "nullable": true
-          },
-          "location": {
-            "type": "string",
-            "nullable": true
           }
         },
         "required": [
@@ -3126,32 +3093,8 @@
           "branchName",
           "onHand",
           "reserved",
-          "available",
-          "minStock",
-          "maxStock",
-          "location"
+          "available"
         ]
-      },
-      "SetProductBranchSettingsDto": {
-        "type": "object",
-        "properties": {
-          "minStock": {
-            "type": "string",
-            "nullable": true,
-            "example": "10",
-            "description": "Tồn tối thiểu (>= 0); null = bỏ. Phải <= tồn tối đa"
-          },
-          "maxStock": {
-            "type": "string",
-            "nullable": true,
-            "example": "2000"
-          },
-          "location": {
-            "type": "string",
-            "nullable": true,
-            "description": "Vị trí kho; null hoặc rỗng = bỏ"
-          }
-        }
       },
       "StockCardMovementDto": {
         "type": "object",

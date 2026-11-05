@@ -1,4 +1,10 @@
-import { parseComponents, type ProductType } from '@kiot/shared';
+import {
+  LIQUIDATION_STATUSES,
+  LIQUIDATION_STATUS_LABELS,
+  parseComponents,
+  type LiquidationStatus,
+  type ProductType,
+} from '@kiot/shared';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { normalizeHeader, type ParsedSheet } from '../../common/excel.js';
 import type { Tx } from '../../db/database.module.js';
@@ -7,13 +13,11 @@ import {
   productComponents,
   productImages,
   products,
-  stocks,
 } from '../../db/schema/index.js';
 import { loadComponents } from '../catalog/combo.js';
 import { PRODUCT_CODE_PATTERN } from '../catalog/products.dto.js';
 import {
   asFlag,
-  asNonNegDecimal,
   asText,
   chunk,
   hasColumn,
@@ -32,13 +36,19 @@ const COL = {
   category: ['nhom hang(3 cap)', 'nhom hang'],
   active: ['dang kinh doanh'],
   description: ['mo ta'],
-  location: ['vi tri'],
-  min: ['ton nho nhat'],
-  max: ['ton lon nhat'],
+  liquidation: ['trang thai thanh ly'],
 } as const;
 /** Cột ảnh: KiotViet đặt tên "Hình ảnh (url1,url2...)". */
 const imageHeader = (headers: string[]) =>
   headers.find((h) => h.startsWith('hinh anh'));
+
+/** Nhãn (đã chuẩn hóa không dấu) hoặc mã → trạng thái thanh lý. */
+const LIQUIDATION_BY_TEXT = new Map<string, LiquidationStatus>(
+  LIQUIDATION_STATUSES.flatMap((st) => [
+    [normalizeHeader(LIQUIDATION_STATUS_LABELS[st]), st] as const,
+    [st, st] as const,
+  ]),
+);
 
 const MAX_IMAGES = 10;
 const BATCH = 500;
@@ -52,9 +62,7 @@ interface ParsedRow {
   categoryPath?: string[];
   active?: boolean;
   description?: string;
-  location?: string;
-  min?: string;
-  max?: string;
+  liquidation?: LiquidationStatus;
   images: string[];
 }
 
@@ -84,18 +92,6 @@ export async function importProducts(
     if (!hasColumn(headers, aliases)) {
       errors.push({ row: 1, field, message: `Thiếu cột bắt buộc "${field}"` });
     }
-  }
-  const hasStockCols =
-    hasColumn(headers, COL.location) ||
-    hasColumn(headers, COL.min) ||
-    hasColumn(headers, COL.max);
-  if (hasStockCols && !opts.branchId) {
-    errors.push({
-      row: 1,
-      field: 'branchId',
-      message:
-        'File có cột tồn tối thiểu / tồn tối đa / vị trí nên cần chọn chi nhánh (branchId)',
-    });
   }
   if (errors.length > 0) return { created: 0, updated: 0, errors };
 
@@ -168,18 +164,16 @@ export async function importProducts(
     const active = asFlag(pick(values, COL.active));
     if (active === undefined) err('Đang kinh doanh', 'Chỉ nhận 1/0');
 
-    const min = asNonNegDecimal(pick(values, COL.min), 3);
-    if (min === undefined) err('Tồn nhỏ nhất', 'Số lượng không hợp lệ');
-    const max = asNonNegDecimal(pick(values, COL.max), 3);
-    if (max === undefined) err('Tồn lớn nhất', 'Số lượng không hợp lệ');
-    if (min && max && Number(min) > Number(max))
-      err('Tồn nhỏ nhất', 'Tồn nhỏ nhất không được lớn hơn tồn lớn nhất');
-    const location = asText(pick(values, COL.location));
-    if (type === 'combo' && (min || max || location))
-      err(
-        'Loại hàng',
-        'Combo không có tồn tối thiểu/tối đa/vị trí riêng; hãy để trống cho hàng thành phần',
-      );
+    let liquidation: LiquidationStatus | undefined;
+    const liqRaw = asText(pick(values, COL.liquidation));
+    if (liqRaw) {
+      liquidation = LIQUIDATION_BY_TEXT.get(normalizeHeader(liqRaw));
+      if (!liquidation)
+        err(
+          'Trạng thái thanh lý',
+          'Chỉ nhận: Thường, Thanh Lý, Tắt Mã, Tồn Cao, Tồn Ưu Tiên',
+        );
+    }
 
     const images: string[] = [];
     const imagesRaw = imgHeader ? asText(values[imgHeader]) : null;
@@ -206,9 +200,7 @@ export async function importProducts(
         categoryPath,
         active: active ?? undefined,
         description: asText(pick(values, COL.description)) ?? undefined,
-        location: location ?? undefined,
-        min: min ?? undefined,
-        max: max ?? undefined,
+        liquidation,
         images,
       });
     }
@@ -326,6 +318,7 @@ export async function importProducts(
           categoryId: categoryOf(r.categoryPath) ?? null,
           description: r.description ?? null,
           isActive: r.active ?? true,
+          liquidationStatus: r.liquidation ?? ('normal' as const),
           createdBy: opts.userId,
         })),
       )
@@ -346,6 +339,8 @@ export async function importProducts(
       patch.description = r.description;
     if (r.active !== undefined && cur.isActive !== r.active)
       patch.isActive = r.active;
+    if (r.liquidation !== undefined && cur.liquidationStatus !== r.liquidation)
+      patch.liquidationStatus = r.liquidation;
     if (Object.keys(patch).length > 0) {
       await tx
         .update(products)
@@ -413,67 +408,7 @@ export async function importProducts(
     }
   }
 
-  // ---------- 5) tồn tối thiểu / tối đa / vị trí (ô trống = không đổi)
-  if (opts.branchId && hasStockCols) {
-    const rows = parsed
-      .filter(
-        (r) =>
-          r.min !== undefined ||
-          r.max !== undefined ||
-          r.location !== undefined,
-      )
-      .map((r) => ({ r, productId: idOf(r.code) }))
-      .sort((a, b) => a.productId.localeCompare(b.productId));
-    const old = new Map<string, typeof stocks.$inferSelect>();
-    for (const part of chunk(rows, 1000)) {
-      const found = await tx
-        .select()
-        .from(stocks)
-        .where(
-          and(
-            eq(stocks.branchId, opts.branchId),
-            inArray(
-              stocks.productId,
-              part.map((x) => x.productId),
-            ),
-          ),
-        );
-      for (const f of found) old.set(f.productId, f);
-    }
-    const diff = rows.filter(({ r, productId }) => {
-      const o = old.get(productId);
-      return (
-        (r.min !== undefined && Number(o?.minStock ?? NaN) !== Number(r.min)) ||
-        (r.max !== undefined && Number(o?.maxStock ?? NaN) !== Number(r.max)) ||
-        (r.location !== undefined && (o?.location ?? null) !== r.location)
-      );
-    });
-    for (const part of chunk(diff, BATCH)) {
-      await tx
-        .insert(stocks)
-        .values(
-          part.map(({ r, productId }) => ({
-            branchId: opts.branchId!,
-            productId,
-            minStock: r.min ?? null,
-            maxStock: r.max ?? null,
-            location: r.location ?? null,
-          })),
-        )
-        .onConflictDoUpdate({
-          target: [stocks.branchId, stocks.productId],
-          set: {
-            minStock: sql`coalesce(excluded.min_stock, ${stocks.minStock})`,
-            maxStock: sql`coalesce(excluded.max_stock, ${stocks.maxStock})`,
-            location: sql`coalesce(excluded.location, ${stocks.location})`,
-            updatedAt: new Date(),
-          },
-        });
-    }
-    for (const { r } of diff) changed.add(r.code.toLowerCase());
-  }
-
-  // ---------- 6) ảnh: thêm URL ngoài chưa có (storage_key = null), không xóa ảnh hiện có
+  // ---------- 5) ảnh: thêm URL ngoài chưa có (storage_key = null), không xóa ảnh hiện có
   const withImages = parsed.filter((r) => r.images.length > 0);
   if (withImages.length > 0) {
     const ids = withImages.map((r) => idOf(r.code));
