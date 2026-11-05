@@ -1,0 +1,237 @@
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
+import { AppError } from '../../common/app-error.js';
+import type { AuthUser } from '../../common/auth-user.js';
+import { describeErrorForLog } from '../../common/all-exceptions.filter.js';
+import { readSheet, writeSheet, type ParsedSheet } from '../../common/excel.js';
+import { DB, type Database } from '../../db/database.module.js';
+import { importJobs } from '../../db/schema/index.js';
+import { AuditService } from '../audit/audit.service.js';
+import { BranchAccessService } from '../branches/branch-access.service.js';
+import type { ImportOutcome, ImportRowError } from './import-cells.js';
+import {
+  MAX_IMPORT_BYTES,
+  MAX_STORED_ERRORS,
+  SUPPORTED_IMPORT_TYPES,
+  type ImportJobDto,
+  type SupportedImportType,
+} from './imports.dto.js';
+import { importPriceBooks } from './price-books.importer.js';
+import { importProducts } from './products.importer.js';
+
+/** Ném để hủy transaction (chạy thử hoặc có lỗi) nhưng vẫn mang kết quả ra ngoài. */
+class Rollback extends Error {
+  constructor(readonly outcome: ImportOutcome) {
+    super('rollback');
+  }
+}
+
+type JobRow = typeof importJobs.$inferSelect;
+
+@Injectable()
+export class ImportsService {
+  private readonly logger = new Logger(ImportsService.name);
+
+  constructor(
+    @Inject(DB) private readonly db: Database,
+    private readonly auditLog: AuditService,
+    private readonly branchAccess: BranchAccessService,
+  ) {}
+
+  /**
+   * Nhập file Excel. Xử lý ĐỒNG BỘ (vài nghìn dòng, không cần hàng đợi) trong MỘT transaction, được ăn cả ngã về
+   * không: có bất kỳ dòng lỗi nào thì không ghi gì. `dryRun` chạy toàn bộ rồi hoàn tác nên báo cáo chính xác, kể cả
+   * lỗi ràng buộc CSDL.
+   */
+  async run(
+    user: AuthUser,
+    type: string,
+    file: { originalname: string; size: number; buffer: Buffer } | undefined,
+    opts: { dryRun: boolean; branchId?: string },
+  ): Promise<ImportJobDto> {
+    const kind = this.parseType(type);
+    if (!file || file.size === 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Chưa chọn file Excel', [
+        { field: 'file', message: 'Chọn một file .xlsx' },
+      ]);
+    }
+    if (opts.branchId)
+      await this.branchAccess.assertAccess(user, opts.branchId);
+
+    let sheet: ParsedSheet;
+    try {
+      sheet = await readSheet(file.buffer);
+    } catch (e) {
+      const reason =
+        e instanceof Error && /quá \d+ dòng/.test(e.message) ? e.message : null;
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        reason ?? 'Không đọc được file. Hãy dùng file Excel (.xlsx) theo mẫu.',
+        [{ field: 'file', message: reason ?? 'File không phải .xlsx hợp lệ' }],
+      );
+    }
+
+    let outcome: ImportOutcome;
+    let systemError: string | null = null;
+    try {
+      outcome = await this.db.transaction(async (tx) => {
+        const result =
+          kind === 'products'
+            ? await importProducts(tx, sheet, {
+                branchId: opts.branchId,
+                userId: user.id,
+              })
+            : await importPriceBooks(tx, sheet, {
+                branchId: opts.branchId,
+                userId: user.id,
+              });
+        if (opts.dryRun || result.errors.length > 0) throw new Rollback(result);
+        await this.auditLog.record(tx, {
+          action: 'import.run',
+          entityType: 'import',
+          branchId: opts.branchId ?? null,
+          after: {
+            type: kind,
+            fileName: file.originalname,
+            rows: sheet.rows.length,
+            created: result.created,
+            updated: result.updated,
+          },
+        });
+        return result;
+      });
+    } catch (e) {
+      if (e instanceof Rollback) {
+        outcome = e.outcome;
+      } else {
+        // Lỗi ràng buộc/CSDL ngoài dự kiến: không ghi gì (transaction đã hoàn tác), không lộ chi tiết nội bộ
+        this.logger.error(`Nhập ${kind} thất bại: ${describeErrorForLog(e)}`);
+        systemError =
+          'Lỗi hệ thống khi ghi dữ liệu nên không có gì được lưu. Hãy thử lại hoặc báo quản trị kèm mã yêu cầu.';
+        outcome = { created: 0, updated: 0, errors: [] };
+      }
+    }
+
+    const errors: ImportRowError[] = systemError
+      ? [{ row: 0, field: '', message: systemError }]
+      : outcome.errors;
+    const failedRows = new Set(errors.map((x) => x.row)).size;
+    const failed = errors.length > 0;
+    const [job] = await this.db
+      .insert(importJobs)
+      .values({
+        type: kind,
+        status: failed ? 'failed' : 'completed',
+        dryRun: opts.dryRun,
+        fileName: file.originalname.slice(0, 255),
+        total: sheet.rows.length,
+        created: failed ? 0 : outcome.created,
+        updated: failed ? 0 : outcome.updated,
+        failed: failedRows,
+        errors: errors.slice(0, MAX_STORED_ERRORS),
+        createdBy: user.id,
+        finishedAt: new Date(),
+      })
+      .returning();
+    return toDto(job!);
+  }
+
+  async get(id: string): Promise<ImportJobDto> {
+    const [job] = await this.db
+      .select()
+      .from(importJobs)
+      .where(eq(importJobs.id, id));
+    if (!job) throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy lần nhập');
+    return toDto(job);
+  }
+
+  /** File Excel mẫu: tiêu đề giống file KiotViet kèm một dòng ví dụ (dữ liệu giả). */
+  async template(type: string): Promise<Buffer> {
+    const kind = this.parseType(type);
+    if (kind === 'products') {
+      return writeSheet(
+        'Hàng hóa',
+        [
+          { header: 'Mã hàng', width: 16 },
+          { header: 'Tên hàng', width: 36 },
+          { header: 'Nhóm hàng(3 Cấp)', width: 30 },
+          { header: 'Đơn vị tính', width: 12 },
+          { header: 'Giá bán', width: 14 },
+          { header: 'Tồn nhỏ nhất', width: 14 },
+          { header: 'Tồn lớn nhất', width: 14 },
+          { header: 'Vị trí', width: 12 },
+          { header: 'Trọng lượng', width: 14 },
+          { header: 'Mô tả', width: 30 },
+          { header: 'Đang kinh doanh', width: 16 },
+          { header: 'Được bán trực tiếp', width: 18 },
+          { header: 'Hình ảnh (url1,url2...)', width: 40 },
+        ],
+        [
+          [
+            'VD001',
+            'Hàng ví dụ',
+            'NHÀ BẾP>>Dao kéo',
+            'Cái',
+            33500,
+            10,
+            2000,
+            'Kệ A1',
+            850,
+            'Mô tả ngắn',
+            1,
+            1,
+            'https://example.com/anh1.jpg',
+          ],
+        ],
+      );
+    }
+    return writeSheet(
+      'Bảng giá',
+      [
+        { header: 'Mã hàng', width: 16 },
+        { header: 'Bảng giá chung', width: 16 },
+        { header: 'Lớn', width: 12 },
+        { header: 'Vừa', width: 12 },
+        { header: 'VIP', width: 12 },
+        { header: 'Lớn VAT', width: 12 },
+        { header: 'Vừa VAT', width: 12 },
+        { header: 'VIP VAT', width: 12 },
+      ],
+      [['VD001', 33500, 33000, 33200, 32800, 36300, 36500, 36100]],
+    );
+  }
+
+  private parseType(type: string): SupportedImportType {
+    if ((SUPPORTED_IMPORT_TYPES as readonly string[]).includes(type)) {
+      return type as SupportedImportType;
+    }
+    if (type === 'customers' || type === 'suppliers') {
+      throw new AppError(
+        400,
+        'IMPORT_TYPE_NOT_SUPPORTED',
+        'Chưa hỗ trợ nhập khách hàng / nhà cung cấp từ Excel; sẽ có cùng phân hệ tương ứng',
+      );
+    }
+    throw new AppError(404, 'NOT_FOUND', `Không có loại nhập "${type}"`);
+  }
+}
+
+function toDto(j: JobRow): ImportJobDto {
+  return {
+    id: j.id,
+    type: j.type,
+    status: j.status,
+    dryRun: j.dryRun,
+    fileName: j.fileName,
+    total: j.total,
+    created: j.created,
+    updated: j.updated,
+    failed: j.failed,
+    errors: (j.errors as ImportRowError[] | null) ?? [],
+    createdAt: j.createdAt.toISOString(),
+    finishedAt: j.finishedAt?.toISOString() ?? null,
+  };
+}
+
+export const IMPORT_FILE_LIMIT = MAX_IMPORT_BYTES;

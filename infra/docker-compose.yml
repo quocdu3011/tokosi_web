@@ -21,5 +21,24 @@ services:
       timeout: 3s
       retries: 10
 
+  # Kho file ảnh hàng hóa (chuẩn S3). API: http://localhost:9000 — console quản trị: http://localhost:9001
+  # Dùng image của Chainguard vì MinIO đã gỡ image dựng sẵn khỏi Docker Hub/quay.io (11/2026).
+  # Image này không có shell nên không có container tạo bucket: chạy `pnpm --filter @kiot/api storage:init`.
+  # Mã backend chỉ dùng giao thức S3 nên đổi sang máy chủ S3 khác chỉ cần đổi cấu hình (S3_*).
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+    container_name: kiot-minio
+    restart: unless-stopped
+    command: ['server', '/data', '--console-address', ':9001']
+    environment:
+      MINIO_ROOT_USER: kiot_minio
+      MINIO_ROOT_PASSWORD: kiot_minio_dev_password
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - kiot_minio:/data
+
 volumes:
   kiot_pgdata:
+  kiot_minio:

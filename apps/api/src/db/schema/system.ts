@@ -97,9 +97,14 @@ export const auditLogs = pgTable(
     before: jsonb(),
     after: jsonb(),
     ip: text(),
+    /** Mã yêu cầu HTTP (cùng giá trị với header X-Request-Id và `requestId` trong lỗi) để lần ngược log. */
+    requestId: text(),
+    /** Chi nhánh đang làm việc của yêu cầu (nếu có). */
+    branchId: uuid().references(() => branches.id),
     createdAt: tstz().notNull().defaultNow(),
   },
   (t) => [
+    index('audit_logs_request_idx').on(t.requestId),
     index('audit_logs_entity_idx').on(t.entityType, t.entityId),
     index('audit_logs_created_idx').on(t.createdAt),
   ],

@@ -765,6 +765,1205 @@
           "Người dùng"
         ]
       }
+    },
+    "/api/v1/categories": {
+      "get": {
+        "description": "productCount của nhóm cha đã gồm hàng của mọi nhóm con. Tối đa 3 cấp.",
+        "operationId": "CategoriesController_tree",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CategoryNodeDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cây nhóm hàng (không phân trang)",
+        "tags": [
+          "Nhóm hàng"
+        ]
+      },
+      "post": {
+        "operationId": "CategoriesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryNodeDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "DUPLICATE_NAME"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tạo nhóm hàng",
+        "tags": [
+          "Nhóm hàng"
+        ]
+      }
+    },
+    "/api/v1/categories/{id}": {
+      "patch": {
+        "description": "Không được chuyển nhóm vào chính nó hoặc nhóm con của nó (INVALID_STATE); tổng không quá 3 cấp.",
+        "operationId": "CategoriesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryNodeDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy nhóm hàng"
+          },
+          "409": {
+            "description": "DUPLICATE_NAME"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Đổi tên / chuyển nhóm cha",
+        "tags": [
+          "Nhóm hàng"
+        ]
+      },
+      "delete": {
+        "description": "Chỉ khi không còn nhóm con và không còn hàng hóa.",
+        "operationId": "CategoriesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "404": {
+            "description": "Không tìm thấy nhóm hàng"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xóa nhóm hàng (xóa mềm)",
+        "tags": [
+          "Nhóm hàng"
+        ]
+      }
+    },
+    "/api/v1/products": {
+      "get": {
+        "description": "Các trường giá/tồn/vị trí tính cho chi nhánh làm việc (header X-Branch-Id). costPrice và lastPurchasePrice chỉ có khi người gọi có quyền product.cost.view.",
+        "operationId": "ProductsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Tên cột cần sắp xếp; thêm `-` phía trước để giảm dần. Chỉ nhận các cột endpoint cho phép",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Tìm không dấu theo mã và tên (mọi từ đều phải có mặt)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo nhóm hàng, GỒM cả hàng của các nhóm con",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "inStock",
+            "required": false,
+            "in": "query",
+            "description": "true = chỉ hàng còn tồn tại chi nhánh làm việc",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "description": "xlsx = tải file Excel theo đúng bộ lọc hiện tại (bỏ qua page/limit, tối đa 10.000 dòng)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "xlsx"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductListDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách hàng hóa (lọc, tìm không dấu, phân trang)",
+        "tags": [
+          "Hàng hóa"
+        ]
+      },
+      "post": {
+        "description": "Chỉ chứa thông tin dùng chung hai chi nhánh. Giá bán đặt qua lưới giá; tồn tối thiểu/tối đa và vị trí đặt qua PUT /products/:id/branches/:branchId; ảnh tải qua POST /products/:id/images (gọi sau khi có id).",
+        "operationId": "ProductsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "DUPLICATE_CODE"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tạo hàng hóa",
+        "tags": [
+          "Hàng hóa"
+        ]
+      }
+    },
+    "/api/v1/products/lookup": {
+      "get": {
+        "operationId": "ProductsController_lookup",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Tìm không dấu theo mã và tên; bỏ trống = 20 hàng đầu theo mã",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProductLookupDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tìm nhanh cho ô chọn hàng (tối đa 20 dòng, không phân trang)",
+        "tags": [
+          "Hàng hóa"
+        ]
+      }
+    },
+    "/api/v1/products/{id}": {
+      "get": {
+        "operationId": "ProductsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy hàng hóa"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Chi tiết một hàng hóa (theo chi nhánh làm việc)",
+        "tags": [
+          "Hàng hóa"
+        ]
+      },
+      "patch": {
+        "description": "Người chỉ có quyền \"Sửa mô tả, ảnh hàng hóa\" chỉ được gửi description. Mã hàng chỉ đổi được khi hàng chưa có giao dịch (INVALID_STATE).",
+        "operationId": "ProductsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy hàng hóa"
+          },
+          "409": {
+            "description": "DUPLICATE_CODE"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sửa hàng hóa (gồm ngưng bán isActive=false)",
+        "tags": [
+          "Hàng hóa"
+        ]
+      }
+    },
+    "/api/v1/products/{id}/branches": {
+      "get": {
+        "description": "Tồn, giá vốn (theo quyền), tồn tối thiểu/tối đa, vị trí kho và giá của cả 7 bảng giá.",
+        "operationId": "ProductsController_branches",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProductBranchDto"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy hàng hóa"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Chi tiết theo từng chi nhánh người dùng được phép",
+        "tags": [
+          "Hàng hóa"
+        ]
+      }
+    },
+    "/api/v1/products/{id}/branches/{branchId}": {
+      "put": {
+        "description": "Không thay đổi số tồn hay giá vốn (chỉ nhập/xuất/chuyển kho mới đổi được).",
+        "operationId": "ProductsController_setBranchSettings",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetProductBranchSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductBranchDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Đặt tồn tối thiểu/tối đa và vị trí kho của một chi nhánh",
+        "tags": [
+          "Hàng hóa"
+        ]
+      }
+    },
+    "/api/v1/products/{id}/stock-card": {
+      "get": {
+        "description": "from/to theo ngày giờ Việt Nam (cả hai đầu đều tính). openingQty là tồn trước from; balance cộng dồn theo từng dòng.",
+        "operationId": "ProductsController_stockCard",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Từ ngày (giờ Việt Nam, tính cả ngày này); bỏ trống = từ đầu. Dạng YYYY-MM-DD",
+            "schema": {
+              "example": "2026-11-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Đến ngày (giờ Việt Nam, tính cả ngày này); bỏ trống = đến hiện tại",
+            "schema": {
+              "example": "2026-11-30",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockCardDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Thẻ kho: lịch sử nhập-xuất của hàng tại chi nhánh làm việc",
+        "tags": [
+          "Hàng hóa"
+        ]
+      }
+    },
+    "/api/v1/products/{id}/images": {
+      "get": {
+        "operationId": "ProductImagesController_list",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProductImageDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách ảnh của hàng (theo thứ tự hiển thị)",
+        "tags": [
+          "Hàng hóa"
+        ]
+      },
+      "post": {
+        "description": "Ảnh lưu trên kho file riêng và mỗi ảnh có URL riêng. Tất cả hoặc không gì cả: một ảnh lỗi thì không lưu ảnh nào. Định dạng kiểm tra theo nội dung file, không theo đuôi. Mỗi hàng tối đa 10 ảnh. Trả về TOÀN BỘ ảnh của hàng sau khi thêm.",
+        "operationId": "ProductImagesController_add",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "files"
+                ],
+                "properties": {
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    },
+                    "description": "Tối đa 10 ảnh mỗi lần, mỗi ảnh tối đa 5 MB, định dạng JPEG, PNG hoặc WebP"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProductImageDto"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy hàng hóa"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tải NHIỀU ảnh lên cùng lúc (multipart/form-data, field \"files\")",
+        "tags": [
+          "Hàng hóa"
+        ]
+      }
+    },
+    "/api/v1/products/{id}/images/order": {
+      "put": {
+        "operationId": "ProductImagesController_reorder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderImagesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProductImageDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sắp lại thứ tự ảnh (ảnh đầu là ảnh đại diện)",
+        "tags": [
+          "Hàng hóa"
+        ]
+      }
+    },
+    "/api/v1/products/{id}/images/{imageId}": {
+      "delete": {
+        "description": "Xóa cả file trên kho file (nếu ảnh do hệ thống lưu). Ảnh nhập từ Excel chỉ bị gỡ khỏi hàng.",
+        "operationId": "ProductImagesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "imageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "404": {
+            "description": "Không tìm thấy ảnh"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xóa một ảnh",
+        "tags": [
+          "Hàng hóa"
+        ]
+      }
+    },
+    "/api/v1/price-books": {
+      "get": {
+        "operationId": "PricingController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PriceBookDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách 7 bảng giá",
+        "tags": [
+          "Thiết lập giá"
+        ]
+      }
+    },
+    "/api/v1/price-books/grid": {
+      "get": {
+        "description": "Chi nhánh lấy từ tham số branchId hoặc header X-Branch-Id. Ô chưa có giá là null (khi bán sẽ lùi về Bảng giá chung của CÙNG chi nhánh).",
+        "operationId": "PricingController_grid",
+        "parameters": [
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "description": "Chi nhánh của lưới giá; bỏ trống = chi nhánh làm việc (X-Branch-Id). Phải là chi nhánh người dùng được phép",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Tìm không dấu theo mã và tên",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "Gồm cả hàng của các nhóm con",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "description": "xlsx = tải Excel theo bộ lọc (bỏ qua page/limit)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "xlsx"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GridDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lưới giá: mỗi dòng một sản phẩm, mỗi cột một bảng giá, theo MỘT chi nhánh",
+        "tags": [
+          "Thiết lập giá"
+        ]
+      },
+      "put": {
+        "description": "Giá là số nguyên đồng; price = null xóa giá ô đó. Tối đa 500 ô; tất cả hoặc không gì cả.",
+        "operationId": "PricingController_saveGrid",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveGridDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveGridResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lưu nhiều ô giá cùng lúc (chỉ gửi các ô thay đổi)",
+        "tags": [
+          "Thiết lập giá"
+        ]
+      }
+    },
+    "/api/v1/price-books/bulk-adjust": {
+      "post": {
+        "description": "dryRun bắt buộc: true = chỉ xem trước. Chỉ áp dụng cho ô ĐÃ có giá; giá mới âm thì bỏ qua; luôn làm tròn ra số nguyên đồng.",
+        "operationId": "PricingController_bulkAdjust",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkAdjustDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkAdjustResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tăng/giảm giá hàng loạt (có chế độ xem trước)",
+        "tags": [
+          "Thiết lập giá"
+        ]
+      }
+    },
+    "/api/v1/price-books/copy-branch": {
+      "post": {
+        "description": "Dùng để khởi tạo giá chi nhánh mới. overwrite=false (mặc định) chỉ chép ô đích chưa có giá.",
+        "operationId": "PricingController_copyBranch",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CopyBranchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CopyBranchResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sao chép giá từ chi nhánh này sang chi nhánh kia",
+        "tags": [
+          "Thiết lập giá"
+        ]
+      }
+    },
+    "/api/v1/price-books/{id}": {
+      "patch": {
+        "description": "Không tắt được Bảng giá chung.",
+        "operationId": "PricingController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePriceBookDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceBookDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy bảng giá"
+          },
+          "409": {
+            "description": "DUPLICATE_NAME"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Đổi tên / bật tắt bảng giá",
+        "tags": [
+          "Thiết lập giá"
+        ]
+      }
+    },
+    "/api/v1/imports/{type}/template": {
+      "get": {
+        "operationId": "ImportsController_template",
+        "parameters": [
+          {
+            "name": "type",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tải file Excel mẫu",
+        "tags": [
+          "Nhập dữ liệu từ Excel"
+        ]
+      }
+    },
+    "/api/v1/imports/{type}": {
+      "post": {
+        "description": "Mặc định chỉ KIỂM TRA (dryRun=true), không ghi gì; gửi dryRun=false để ghi thật. Xử lý ngay trong yêu cầu nên kết quả (status completed hoặc failed) có sẵn trong phản hồi; vẫn xem lại được qua GET /imports/:id. Tất cả hoặc không gì cả: có dòng lỗi thì không ghi gì. Chạy lại cùng file không tạo trùng (cập nhật theo mã hàng).",
+        "operationId": "ImportsController_run",
+        "parameters": [
+          {
+            "name": "type",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dryRun",
+            "required": false,
+            "in": "query",
+            "description": "true (mặc định) = chỉ kiểm tra, không ghi gì. Phải gửi dryRun=false mới ghi thật",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "description": "Chi nhánh cho giá bán, tồn tối thiểu/tối đa, vị trí kho. Bắt buộc nếu file có các cột đó",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tải file Excel lên để nhập (type: products | price-books)",
+        "tags": [
+          "Nhập dữ liệu từ Excel"
+        ]
+      }
+    },
+    "/api/v1/imports/{id}": {
+      "get": {
+        "operationId": "ImportsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Kết quả và lỗi từng dòng của một lần nhập",
+        "tags": [
+          "Nhập dữ liệu từ Excel"
+        ]
+      }
     }
   },
   "info": {
@@ -1530,6 +2729,1012 @@
         },
         "required": [
           "branchIds"
+        ]
+      },
+      "CategoryNodeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "NHÀ BẾP"
+          },
+          "parentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "productCount": {
+            "type": "number",
+            "description": "Số hàng hóa chưa xóa thuộc nhóm này VÀ mọi nhóm con (nhóm cha cộng dồn từ nhóm con)"
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryNodeDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "parentId",
+          "productCount",
+          "children"
+        ]
+      },
+      "CreateCategoryDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Dao kéo",
+            "description": "Tên nhóm, 1-100 ký tự; không trùng trong cùng nhóm cha (không phân biệt hoa thường và dấu)"
+          },
+          "parentId": {
+            "type": "string",
+            "description": "Nhóm cha; bỏ trống = nhóm gốc. Tối đa 3 cấp"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateCategoryDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nhóm cha mới; null = chuyển ra nhóm gốc"
+          }
+        }
+      },
+      "ProductImageDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "example": "https://files.example.vn/products/…/a.jpg"
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "sortOrder"
+        ]
+      },
+      "ProductDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "QKBSP"
+          },
+          "name": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoryPath": {
+            "type": "string",
+            "nullable": true,
+            "example": "ĐIỆN GIA DỤNG > Quạt điện"
+          },
+          "unit": {
+            "type": "string",
+            "example": "Cái"
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Chi nhánh mà các trường giá/tồn/vị trí bên dưới tính cho (= chi nhánh làm việc, header X-Branch-Id)"
+          },
+          "basePrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "Giá Bảng giá chung TẠI chi nhánh này (số nguyên đồng); null nếu chưa có giá",
+            "example": "33500"
+          },
+          "costPrice": {
+            "type": "string",
+            "description": "Giá vốn bình quân của chi nhánh này. VẮNG MẶT nếu thiếu quyền product.cost.view",
+            "example": "21800.5000"
+          },
+          "lastPurchasePrice": {
+            "type": "string",
+            "description": "Giá nhập cuối của chi nhánh này; như costPrice",
+            "nullable": true
+          },
+          "onHand": {
+            "type": "string",
+            "example": "515.000"
+          },
+          "reserved": {
+            "type": "string",
+            "description": "Đang giữ cho các đơn đặt hàng chưa chốt (phiếu tạm)"
+          },
+          "available": {
+            "type": "string",
+            "description": "onHand − reserved"
+          },
+          "onOrder": {
+            "type": "string",
+            "description": "Đang đặt nhà cung cấp. Chưa có phân hệ Đặt hàng nhập nên luôn \"0\""
+          },
+          "minStock": {
+            "type": "string",
+            "nullable": true
+          },
+          "maxStock": {
+            "type": "string",
+            "nullable": true
+          },
+          "location": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "weightG": {
+            "type": "string",
+            "nullable": true
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductImageDto"
+            }
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "isSellable": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "categoryId",
+          "categoryPath",
+          "unit",
+          "branchId",
+          "basePrice",
+          "onHand",
+          "reserved",
+          "available",
+          "onOrder",
+          "minStock",
+          "maxStock",
+          "location",
+          "description",
+          "weightG",
+          "images",
+          "isActive",
+          "isSellable",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ProductListMetaDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "totalPages": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages"
+        ]
+      },
+      "ProductListDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ProductListMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "ProductLookupDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "basePrice": {
+            "type": "string",
+            "nullable": true
+          },
+          "available": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "unit",
+          "basePrice",
+          "available",
+          "imageUrl"
+        ]
+      },
+      "CreateProductDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "QKBSP",
+            "description": "Chữ, số, \"-\", \"_\", \".\"; 1-30 ký tự; không dấu cách; không trùng (kể cả khác hoa thường); không đổi được sau khi đã có giao dịch"
+          },
+          "name": {
+            "type": "string",
+            "example": "Quạt kẹp bàn Super MST-A1"
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "Nhóm hàng (GET /categories)"
+          },
+          "unit": {
+            "type": "string",
+            "example": "Cái",
+            "default": "Cái"
+          },
+          "description": {
+            "type": "string"
+          },
+          "weightG": {
+            "type": "string",
+            "description": "Trọng lượng gram",
+            "example": "850"
+          },
+          "isSellable": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ]
+      },
+      "UpdateProductDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Chỉ đổi được khi hàng chưa có giao dịch nào"
+          },
+          "name": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string",
+            "nullable": true
+          },
+          "unit": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "description": "Người chỉ có quyền \"Sửa mô tả, ảnh hàng hóa\" (product.content.edit) chỉ được sửa trường này"
+          },
+          "weightG": {
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "false = ngưng kinh doanh"
+          },
+          "isSellable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ProductBranchPriceDto": {
+        "type": "object",
+        "properties": {
+          "priceBookId": {
+            "type": "string"
+          },
+          "priceBookCode": {
+            "type": "string",
+            "example": "LON"
+          },
+          "price": {
+            "type": "string",
+            "nullable": true,
+            "example": "33000"
+          }
+        },
+        "required": [
+          "priceBookId",
+          "priceBookCode",
+          "price"
+        ]
+      },
+      "ProductBranchDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string"
+          },
+          "branchCode": {
+            "type": "string",
+            "example": "HN"
+          },
+          "branchName": {
+            "type": "string"
+          },
+          "onHand": {
+            "type": "string"
+          },
+          "reserved": {
+            "type": "string"
+          },
+          "available": {
+            "type": "string"
+          },
+          "costPrice": {
+            "type": "string",
+            "description": "Vắng mặt nếu thiếu product.cost.view"
+          },
+          "lastPurchasePrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "Vắng mặt nếu thiếu product.cost.view"
+          },
+          "minStock": {
+            "type": "string",
+            "nullable": true
+          },
+          "maxStock": {
+            "type": "string",
+            "nullable": true
+          },
+          "location": {
+            "type": "string",
+            "nullable": true
+          },
+          "prices": {
+            "description": "Giá của cả 7 bảng giá TẠI chi nhánh này (null = chưa có giá)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductBranchPriceDto"
+            }
+          }
+        },
+        "required": [
+          "branchId",
+          "branchCode",
+          "branchName",
+          "onHand",
+          "reserved",
+          "available",
+          "minStock",
+          "maxStock",
+          "location",
+          "prices"
+        ]
+      },
+      "SetProductBranchSettingsDto": {
+        "type": "object",
+        "properties": {
+          "minStock": {
+            "type": "string",
+            "nullable": true,
+            "example": "10",
+            "description": "Tồn tối thiểu (>= 0); null = bỏ. Phải <= tồn tối đa"
+          },
+          "maxStock": {
+            "type": "string",
+            "nullable": true,
+            "example": "2000"
+          },
+          "location": {
+            "type": "string",
+            "nullable": true,
+            "description": "Vị trí kho; null hoặc rỗng = bỏ"
+          }
+        }
+      },
+      "StockCardMovementDto": {
+        "type": "object",
+        "properties": {
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "refType": {
+            "type": "string",
+            "example": "goods_receipt"
+          },
+          "refId": {
+            "type": "string",
+            "nullable": true
+          },
+          "refCode": {
+            "type": "string",
+            "nullable": true,
+            "example": "PN000948"
+          },
+          "qtyDelta": {
+            "type": "string",
+            "example": "600.000"
+          },
+          "balance": {
+            "type": "string",
+            "example": "1000.000"
+          },
+          "unitCost": {
+            "type": "object",
+            "description": "Vắng mặt nếu thiếu product.cost.view"
+          }
+        },
+        "required": [
+          "occurredAt",
+          "refType",
+          "refId",
+          "refCode",
+          "qtyDelta",
+          "balance"
+        ]
+      },
+      "StockCardDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string"
+          },
+          "openingQty": {
+            "type": "string",
+            "example": "400.000"
+          },
+          "movements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockCardMovementDto"
+            }
+          },
+          "closingQty": {
+            "type": "string",
+            "example": "485.000"
+          }
+        },
+        "required": [
+          "branchId",
+          "openingQty",
+          "movements",
+          "closingQty"
+        ]
+      },
+      "ReorderImagesDto": {
+        "type": "object",
+        "properties": {
+          "imageIds": {
+            "description": "Id của TẤT CẢ ảnh hiện có của hàng theo thứ tự mới; ảnh đầu là ảnh đại diện",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "imageIds"
+        ]
+      },
+      "PriceBookDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "CHUNG"
+          },
+          "name": {
+            "type": "string",
+            "example": "Bảng giá chung"
+          },
+          "withVat": {
+            "type": "boolean"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Bảng giá chung: dùng khi bảng khác thiếu giá"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "withVat",
+          "isDefault",
+          "isActive"
+        ]
+      },
+      "GridBookDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name"
+        ]
+      },
+      "GridRowDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "costPrice": {
+            "type": "string",
+            "description": "Giá vốn của chi nhánh. VẮNG MẶT nếu thiếu product.cost.view"
+          },
+          "prices": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "nullable": true
+            },
+            "description": "Khóa = priceBookId, giá trị = giá bán (số nguyên đồng) hoặc null nếu chưa có giá"
+          }
+        },
+        "required": [
+          "productId",
+          "code",
+          "name",
+          "prices"
+        ]
+      },
+      "GridMetaDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "totalPages": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages"
+        ]
+      },
+      "GridDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string"
+          },
+          "books": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GridBookDto"
+            }
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GridRowDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/GridMetaDto"
+          }
+        },
+        "required": [
+          "branchId",
+          "books",
+          "data",
+          "meta"
+        ]
+      },
+      "GridChangeDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string"
+          },
+          "priceBookId": {
+            "type": "string"
+          },
+          "price": {
+            "type": "string",
+            "nullable": true,
+            "example": "33000",
+            "description": "Giá mới (số nguyên đồng); null = xóa giá, lùi về bảng chung"
+          }
+        },
+        "required": [
+          "productId",
+          "priceBookId",
+          "price"
+        ]
+      },
+      "SaveGridDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "description": "Chi nhánh được sửa giá"
+          },
+          "changes": {
+            "description": "Tối đa 500 ô mỗi lần",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GridChangeDto"
+            }
+          }
+        },
+        "required": [
+          "branchId",
+          "changes"
+        ]
+      },
+      "SaveGridResultDto": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "number",
+            "description": "Số ô thực sự thay đổi (bỏ qua ô giữ nguyên giá)"
+          }
+        },
+        "required": [
+          "updated"
+        ]
+      },
+      "BulkAdjustDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string"
+          },
+          "priceBookId": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "Chỉ điều chỉnh hàng của nhóm này (gồm nhóm con)"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "percent",
+              "amount"
+            ],
+            "description": "percent = theo %, amount = cộng/trừ số tiền cố định mỗi ô"
+          },
+          "value": {
+            "type": "string",
+            "example": "5",
+            "description": "Số có dấu: dương = tăng, âm = giảm. Ví dụ 5 với percent = tăng 5%"
+          },
+          "roundTo": {
+            "type": "string",
+            "example": "100",
+            "default": "1",
+            "description": "Làm tròn đến bội số này (số nguyên >= 1, nửa lên). Giá bán luôn là số nguyên đồng"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "true = chỉ xem trước, KHÔNG lưu; false = lưu thật. Bắt buộc gửi rõ để không lưu nhầm"
+          }
+        },
+        "required": [
+          "branchId",
+          "priceBookId",
+          "mode",
+          "value",
+          "dryRun"
+        ]
+      },
+      "BulkAdjustPreviewDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "oldPrice": {
+            "type": "string",
+            "example": "33000"
+          },
+          "newPrice": {
+            "type": "string",
+            "example": "34700"
+          }
+        },
+        "required": [
+          "productId",
+          "code",
+          "oldPrice",
+          "newPrice"
+        ]
+      },
+      "BulkAdjustResultDto": {
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean"
+          },
+          "affected": {
+            "type": "number",
+            "description": "Số ô đổi giá"
+          },
+          "skipped": {
+            "type": "number",
+            "description": "Số ô bỏ qua vì giá mới âm"
+          },
+          "unchanged": {
+            "type": "number",
+            "description": "Số ô giá không đổi sau khi làm tròn"
+          },
+          "preview": {
+            "description": "Tối đa 200 dòng đầu",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BulkAdjustPreviewDto"
+            }
+          }
+        },
+        "required": [
+          "dryRun",
+          "affected",
+          "skipped",
+          "unchanged",
+          "preview"
+        ]
+      },
+      "CopyBranchDto": {
+        "type": "object",
+        "properties": {
+          "fromBranchId": {
+            "type": "string"
+          },
+          "toBranchId": {
+            "type": "string"
+          },
+          "priceBookId": {
+            "type": "string",
+            "description": "Chỉ chép bảng giá này; bỏ trống = mọi bảng giá"
+          },
+          "overwrite": {
+            "type": "boolean",
+            "default": false,
+            "description": "false = chỉ chép ô chi nhánh đích CHƯA có giá; true = ghi đè ô đã có"
+          }
+        },
+        "required": [
+          "fromBranchId",
+          "toBranchId"
+        ]
+      },
+      "CopyBranchResultDto": {
+        "type": "object",
+        "properties": {
+          "copied": {
+            "type": "number",
+            "description": "Số ô được chép / cập nhật"
+          },
+          "skipped": {
+            "type": "number",
+            "description": "Số ô bỏ qua (đã có giá hoặc giá giống nhau)"
+          }
+        },
+        "required": [
+          "copied",
+          "skipped"
+        ]
+      },
+      "UpdatePriceBookDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "false = tắt bảng giá. Không tắt được Bảng giá chung"
+          }
+        }
+      },
+      "ImportErrorDto": {
+        "type": "object",
+        "properties": {
+          "row": {
+            "type": "number",
+            "description": "Số dòng trong file Excel (dòng 1 là tiêu đề)"
+          },
+          "field": {
+            "type": "string",
+            "example": "Mã hàng"
+          },
+          "message": {
+            "type": "string",
+            "example": "Mã hàng trùng với dòng 12 trong file"
+          }
+        },
+        "required": [
+          "row",
+          "field",
+          "message"
+        ]
+      },
+      "ImportJobDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "products",
+              "price-books",
+              "customers",
+              "suppliers"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "description": "Hiện nhập xử lý ngay trong yêu cầu nên chỉ gặp completed hoặc failed. failed = có dòng lỗi hoặc lỗi hệ thống, KHÔNG ghi gì"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "true = chỉ kiểm tra, không ghi dữ liệu"
+          },
+          "fileName": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "number",
+            "description": "Số dòng dữ liệu trong file"
+          },
+          "created": {
+            "type": "number",
+            "description": "Sẽ tạo / đã tạo (hàng hóa mới; với price-books là số ô giá mới). Bằng 0 khi có lỗi"
+          },
+          "updated": {
+            "type": "number",
+            "description": "Sẽ sửa / đã sửa, chỉ tính bản ghi có thay đổi thật nên chạy lại cùng file cho kết quả 0"
+          },
+          "failed": {
+            "type": "number",
+            "description": "Số dòng có lỗi"
+          },
+          "errors": {
+            "description": "Lỗi từng dòng (tối đa 500 lỗi đầu)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportErrorDto"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "status",
+          "dryRun",
+          "fileName",
+          "total",
+          "created",
+          "updated",
+          "failed",
+          "errors",
+          "createdAt",
+          "finishedAt"
         ]
       }
     }

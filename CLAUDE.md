@@ -24,16 +24,18 @@ docs/           Tài liệu thiết kế, ERD, ADR
 
 ## Lệnh thường dùng (chạy ở thư mục gốc)
 
-| Lệnh                                                        | Việc                                                                 |
-| ----------------------------------------------------------- | -------------------------------------------------------------------- |
-| `pnpm install`                                              | Cài phụ thuộc                                                        |
-| `pnpm dev`                                                  | Chạy web + api ở chế độ phát triển                                   |
-| `pnpm build` / `pnpm lint` / `pnpm typecheck` / `pnpm test` | Qua Turborepo (có cache)                                             |
-| `pnpm db:up` / `pnpm db:down`                               | Bật/tắt PostgreSQL cục bộ (cần Docker)                               |
-| `pnpm --filter @kiot/api test`                              | Chạy test của một gói                                                |
-| `pnpm --filter @kiot/api test:e2e`                          | Test e2e của API (không cần CSDL thật)                               |
-| `pnpm --filter @kiot/api db:seed`                           | Dữ liệu khởi tạo đầy đủ (xem `docs/db/README.md`); chạy lại an toàn  |
-| `pnpm --filter @kiot/api openapi:export`                    | Xuất `docs/api/openapi.json` (chạy khi đổi endpoint/DTO, commit kèm) |
+| Lệnh                                                        | Việc                                                                                             |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `pnpm install`                                              | Cài phụ thuộc                                                                                    |
+| `pnpm dev`                                                  | Chạy web + api ở chế độ phát triển                                                               |
+| `pnpm build` / `pnpm lint` / `pnpm typecheck` / `pnpm test` | Qua Turborepo (có cache)                                                                         |
+| `pnpm db:up` / `pnpm db:down`                               | Bật/tắt PostgreSQL + MinIO (kho file ảnh) cục bộ (cần Docker)                                    |
+| `pnpm --filter @kiot/api test`                              | Chạy test của một gói                                                                            |
+| `pnpm --filter @kiot/api test:e2e`                          | Test e2e của API (không cần CSDL thật)                                                           |
+| `pnpm --filter @kiot/api db:seed`                           | Dữ liệu khởi tạo đầy đủ (xem `docs/db/README.md`); chạy lại an toàn                              |
+| `pnpm --filter @kiot/api db:seed:demo`                      | Dữ liệu MẪU để dev (60 hàng, tồn, giá 7 bảng giá × 2 chi nhánh); chỉ dev, từ chối ở production   |
+| `pnpm --filter @kiot/api storage:init`                      | Tạo bucket ảnh + cho phép đọc công khai trên MinIO dev (chạy sau `pnpm db:up`); chạy lại an toàn |
+| `pnpm --filter @kiot/api openapi:export`                    | Xuất `docs/api/openapi.json` (chạy khi đổi endpoint/DTO, commit kèm)                             |
 
 Mọi PR phải qua: `lint`, `typecheck`, `test`, `build` (CI chạy đúng bộ này).
 
@@ -60,6 +62,16 @@ Mọi PR phải qua: `lint`, `typecheck`, `test`, `build` (CI chạy đúng bộ
 - Thay đổi tồn kho **chỉ** qua `InventoryService` (khóa dòng, không âm, cập nhật giá vốn bình quân của chi nhánh, ghi sổ cái) trong transaction của chứng từ. Chứng từ có **từ 2 dòng hàng trở lên PHẢI dùng `applyMovements`** (khóa trước theo thứ tự cố định chi nhánh → sản phẩm); gọi `applyMovement` trong vòng lặp sẽ gây bế tắc (deadlock → lỗi 500) khi hai chứng từ có cùng mặt hàng theo thứ tự ngược nhau chạy đồng thời. Quy tắc chung: khóa nhiều dòng thì luôn theo một thứ tự cố định. Cấp mã chứng từ qua `nextDocumentCode`. Tính tiền/giá vốn bằng `common/costing.ts` (Decimal), không dùng `number`.
 - Chuyển kho giữa 2 chi nhánh: `StockTransfersService` (2 bước gửi → nhận; giá nhập bên nhận = giá vốn gửi + phí phân bổ; công nợ đối ứng qua khách/NCC nội bộ có `linked_branch_id`). Đó **không phải hóa đơn bán**: mọi báo cáo doanh số/công nợ/danh sách khách, NCC phải **loại đối tác nội bộ** (`linked_branch_id IS NOT NULL`).
 - Trả hàng bán về chi nhánh của hóa đơn gốc; thu nợ chỉ cấn trừ hóa đơn cùng chi nhánh.
+
+## Quy ước kỹ thuật dùng chung
+
+- **Nhật ký thao tác:** luôn qua `AuditService.record(tx, {...})` (`modules/audit/`), trong CÙNG transaction với thay đổi. `requestId`, người dùng, chi nhánh, IP tự lấy từ ngữ cảnh yêu cầu (`common/request-context.ts`). Không tự `insert` vào `audit_logs`; không ghi mật khẩu/token/băm vào nhật ký.
+- **Ghi nhiều dòng cùng lúc (giá, tồn, nhập Excel…):** xử lý theo **thứ tự khóa cố định** (vd bảng giá → sản phẩm) rồi mới ghi, để hai người ghi cùng lúc không bế tắc (deadlock → lỗi 500). PGlite (test) chỉ có một kết nối nên KHÔNG tái hiện bế tắc: phần nào khóa nhiều dòng phải thử trên PostgreSQL thật nhiều kết nối.
+- **Tham số đường dẫn là UUID:** luôn `@Param('id', ParseIdPipe)` (`common/parse-id.pipe.ts`), không dùng `ParseUUIDPipe` của Nest (trả `BAD_REQUEST`, sai hợp đồng lỗi).
+- **Danh sách:** dùng `PageQueryDto`/`pageParams`/`pageMeta`/`parseSort` (`common/pagination.ts`); tham số boolean dùng `QueryBoolean`; mọi danh sách có `?format=xlsx` dùng `common/excel.ts`.
+- **File (ảnh):** chỉ qua `FileStorage` (`modules/files/`, chuẩn S3). Kiểm tra loại file theo **nội dung** (`detectImage`), không theo đuôi/Content-Type. Cấu hình `S3_*` + `FILE_PUBLIC_BASE_URL`; production bắt buộc.
+- **Giá bán là số nguyên đồng** (kiểm tra ở API và khi nhập Excel); giá vốn/giá nhập mới có 4 chữ số thập phân.
+- **Test HTTP:** dùng `createHttpTestApp` (`src/test-utils/http-app.ts`) — ứng dụng thật đủ ba guard trên PostgreSQL trong bộ nhớ. Với phần chạm tiền/kho, làm thêm **kiểm tra ngược** (tạm gỡ bản sửa, test phải thất bại).
 
 ## Quy tắc BẮT BUỘC (nghiệp vụ tiền / kho / công nợ)
 

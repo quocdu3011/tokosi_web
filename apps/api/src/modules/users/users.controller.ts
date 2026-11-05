@@ -5,13 +5,13 @@ import {
   Header,
   HttpCode,
   Param,
-  ParseUUIDPipe,
   Patch,
   Post,
   Put,
   Query,
   Req,
 } from '@nestjs/common';
+import { ParseIdPipe } from '../../common/parse-id.pipe.js';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -70,7 +70,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Chi tiết một người dùng' })
   @ApiOkResponse({ type: UserDto })
   @ApiNotFoundResponse({ description: 'Không tìm thấy người dùng' })
-  get(@Param('id', ParseUUIDPipe) id: string) {
+  get(@Param('id', ParseIdPipe) id: string) {
     return this.users.get(id);
   }
 
@@ -101,7 +101,7 @@ export class UsersController {
   @ApiNotFoundResponse({ description: 'Không tìm thấy người dùng' })
   update(
     @CurrentUser() actor: AuthUser,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() body: UpdateUserDto,
     @Req() req: AppRequest,
   ) {
@@ -125,7 +125,7 @@ export class UsersController {
   @ApiNotFoundResponse({ description: 'Không tìm thấy người dùng' })
   resetPassword(
     @CurrentUser() actor: AuthUser,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() body: ResetPasswordDto,
     @Req() req: AppRequest,
   ) {
@@ -142,7 +142,7 @@ export class UsersController {
   @ApiNotFoundResponse({ description: 'Không tìm thấy người dùng' })
   setBranches(
     @CurrentUser() actor: AuthUser,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() body: SetUserBranchesDto,
     @Req() req: AppRequest,
   ) {

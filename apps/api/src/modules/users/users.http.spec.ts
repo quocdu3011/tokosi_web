@@ -180,6 +180,30 @@ describe('Quản lý người dùng qua HTTP', () => {
     expect(again.body.temporaryPassword).toBeUndefined();
   });
 
+  it('nhật ký tự gắn requestId, người thao tác, IP và cả khi yêu cầu có body JSON (ngữ cảnh không mất sau khi đọc body)', async () => {
+    const res = await asAdmin
+      .post('/api/v1/users')
+      .set('X-Request-Id', 'test-request-0001')
+      .send({
+        username: 'nhat-ky-1',
+        fullName: 'Thử nhật ký',
+        role: 'sales',
+        branchIds: [sg],
+      })
+      .expect(201);
+    expect(res.headers['x-request-id']).toBe('test-request-0001');
+    const [log] = await db
+      .select()
+      .from(auditLogs)
+      .where(eq(auditLogs.entityId, res.body.id));
+    expect(log).toMatchObject({
+      action: 'user.create',
+      requestId: 'test-request-0001',
+      userId: await idOf('quanly2'),
+    });
+    expect(log?.ip).toEqual(expect.any(String));
+  });
+
   it('tạo với mật khẩu quản trị tự đặt: không trả mật khẩu; đăng nhập được', async () => {
     const res = await asAdmin
       .post('/api/v1/users')
@@ -481,7 +505,12 @@ describe('Quản lý người dùng qua HTTP', () => {
     ]) {
       expect(res.body.code).toBe('NOT_FOUND');
     }
-    await asAdmin.get('/api/v1/users/khong-phai-uuid').expect(400);
+    const badId = await asAdmin
+      .get('/api/v1/users/khong-phai-uuid')
+      .expect(400);
+    expect(badId.body.code).toBe('VALIDATION_ERROR');
+    expect(badId.body.details[0].field).toBe('id');
+    expect(badId.body.requestId).toEqual(expect.any(String));
   });
 
   it('số điện thoại được chuẩn hóa khi lưu; sai định dạng → 400 (field phone); null/rỗng = xóa', async () => {

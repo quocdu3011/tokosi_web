@@ -7,7 +7,8 @@ import { hashPassword, verifyPassword } from '../../common/password.js';
 import { passwordProblems } from '../../common/password-policy.js';
 import { APP_CONFIG, type AppConfig } from '../../config/app-config.js';
 import { DB, type Database } from '../../db/database.module.js';
-import { auditLogs, refreshTokens, users } from '../../db/schema/index.js';
+import { refreshTokens, users } from '../../db/schema/index.js';
+import { AuditService } from '../audit/audit.service.js';
 import { BranchAccessService } from '../branches/branch-access.service.js';
 import { PermissionsService } from '../authorization/permissions.service.js';
 import { LoginThrottle } from './login-throttle.js';
@@ -64,6 +65,7 @@ export class AuthService {
     private readonly tokens: TokenService,
     private readonly permissions: PermissionsService,
     private readonly branchAccess: BranchAccessService,
+    private readonly auditLog: AuditService,
   ) {
     this.throttle = new LoginThrottle(
       config.loginMaxFailures,
@@ -358,7 +360,7 @@ export class AuthService {
     action: string,
     after: Record<string, unknown>,
   ): Promise<void> {
-    await this.db.insert(auditLogs).values({
+    await this.auditLog.record(this.db, {
       userId,
       action,
       entityType: 'auth',

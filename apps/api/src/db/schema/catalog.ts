@@ -26,7 +26,16 @@ export const categories = pgTable(
     ...timestamps(),
     ...softDelete(),
   },
-  (t) => [index('categories_parent_idx').on(t.parentId)],
+  (t) => [
+    index('categories_parent_idx').on(t.parentId),
+    // Tên không trùng trong cùng nhóm cha (không phân biệt hoa thường và dấu); nhóm gốc dùng UUID rỗng thay NULL
+    uniqueIndex('categories_sibling_name_unique')
+      .on(
+        sql`coalesce(${t.parentId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
+        sql`f_search_text(${t.name})`,
+      )
+      .where(sql`${t.deletedAt} is null`),
+  ],
 );
 
 /**
@@ -54,6 +63,8 @@ export const products = pgTable(
     index('products_category_idx').on(t.categoryId),
     trgmIndex('products_search_trgm', productSearchExpr(t)),
     index('products_active_idx').on(t.isActive),
+    // Mã hàng không trùng kể cả khác hoa thường (cột `code` đã có ràng buộc duy nhất phân biệt hoa thường)
+    uniqueIndex('products_code_lower_unique').on(sql`lower(${t.code})`),
   ],
 );
 

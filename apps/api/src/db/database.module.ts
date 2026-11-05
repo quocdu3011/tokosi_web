@@ -14,6 +14,10 @@ export const PG_POOL = Symbol('PG_POOL');
 export const DB = Symbol('DB');
 
 export type Database = NodePgDatabase<typeof schema>;
+/** Transaction của Drizzle (tham số của callback trong `db.transaction`). */
+export type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
+/** Kết nối thường hoặc transaction: dùng cho hàm chạy được ở cả hai nơi. */
+export type DbOrTx = Database | Tx;
 
 @Global()
 @Module({

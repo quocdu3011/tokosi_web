@@ -6,6 +6,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { AppError } from '../../common/app-error.js';
 import type { AppRequest } from '../../common/auth-user.js';
+import { currentContext } from '../../common/request-context.js';
 import { BranchAccessService } from './branch-access.service.js';
 import { REQUIRE_BRANCH_KEY } from './require-branch.decorator.js';
 
@@ -41,6 +42,8 @@ export class BranchContextGuard implements CanActivate {
       request.user,
       requested,
     );
+    const ctx = currentContext();
+    if (ctx) ctx.branchId = request.branchId;
     return true;
   }
 }

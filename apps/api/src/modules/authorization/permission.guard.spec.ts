@@ -4,7 +4,10 @@ import type { Grant, PermissionCode, Role } from '@kiot/shared';
 import type { AppRequest } from '../../common/auth-user.js';
 import { PermissionGuard } from './permission.guard.js';
 import type { PermissionsService } from './permissions.service.js';
-import { RequirePermission } from './require-permission.decorator.js';
+import {
+  RequireAnyPermission,
+  RequirePermission,
+} from './require-permission.decorator.js';
 
 class Sample {
   @RequirePermission('invoice.create')
@@ -12,6 +15,13 @@ class Sample {
 
   @RequirePermission('invoice.create', 'cash.create')
   both(this: void) {}
+
+  @RequireAnyPermission('product.edit', 'product.content.edit')
+  upload(this: void) {}
+
+  @RequirePermission('product.view')
+  @RequireAnyPermission('product.edit', 'product.content.edit')
+  viewAndAny(this: void) {}
 
   open(this: void) {}
 }
@@ -92,5 +102,59 @@ describe('PermissionGuard', () => {
         contextFor(proto.both, { user: { id: 'u2', role: 'accountant' } }),
       ),
     ).resolves.toBe(true);
+  });
+
+  describe('RequireAnyPermission (ít nhất một trong các quyền)', () => {
+    it('có một trong hai quyền là đủ; ghi phạm vi của quyền có', async () => {
+      const { guard, contextFor } = setup({
+        marketing: [{ code: 'product.content.edit', scope: 'all' }],
+      });
+      const req: Partial<AppRequest> = {
+        user: { id: 'u1', role: 'marketing' },
+      };
+      await expect(
+        guard.canActivate(contextFor(proto.upload, req)),
+      ).resolves.toBe(true);
+      expect(req.grants).toEqual({ 'product.content.edit': 'all' });
+    });
+
+    it('không có quyền nào trong danh sách → 403 FORBIDDEN, details.anyOf liệt kê các quyền', async () => {
+      const { guard, contextFor } = setup({
+        sales: [{ code: 'product.view', scope: 'all' }],
+      });
+      const req = { user: { id: 'u1', role: 'sales' as Role } };
+      await expect(
+        guard.canActivate(contextFor(proto.upload, req)),
+      ).rejects.toMatchObject({
+        status: 403,
+        code: 'FORBIDDEN',
+        response: {
+          details: { anyOf: ['product.edit', 'product.content.edit'] },
+        },
+      });
+    });
+
+    it('dùng cùng RequirePermission: phải đủ quyền bắt buộc VÀ có ít nhất một quyền trong danh sách', async () => {
+      const { guard, contextFor } = setup({
+        sales: [{ code: 'product.edit', scope: 'all' }],
+        marketing: [
+          { code: 'product.view', scope: 'all' },
+          { code: 'product.edit', scope: 'all' },
+        ],
+      });
+      // thiếu product.view dù có product.edit
+      await expect(
+        guard.canActivate(
+          contextFor(proto.viewAndAny, { user: { id: 'u', role: 'sales' } }),
+        ),
+      ).rejects.toMatchObject({ status: 403 });
+      await expect(
+        guard.canActivate(
+          contextFor(proto.viewAndAny, {
+            user: { id: 'u', role: 'marketing' },
+          }),
+        ),
+      ).resolves.toBe(true);
+    });
   });
 });

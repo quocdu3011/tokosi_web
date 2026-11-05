@@ -153,14 +153,17 @@ Ký hiệu: `?` = tùy chọn · `[]` = mảng · tiền/giá/số lượng là 
 
 ## 2. Hàng hóa
 
+> **Trạng thái: đã triển khai** mục 2.1–2.3 (Swagger `/api/docs`, `openapi.json`). Còn lại của phân hệ: `POST /pricing/quote` (mục 2.4, làm cùng Đơn hàng).
+> **Quy ước chung của mục này:** mọi endpoint cần đăng nhập và quyền nêu ở cột "Quyền". Số lượng là chuỗi thập phân tối đa 3 chữ số (`"515.000"`); giá bán là chuỗi số nguyên đồng (`"33500"`); giá vốn là chuỗi 4 chữ số thập phân (`"21800.5000"`).
+
 ### 2.1 Nhóm hàng
 
-| Method | Đường dẫn         | Mô tả                                    | Quyền          | Mốc |
-| ------ | ----------------- | ---------------------------------------- | -------------- | --- |
-| GET    | `/categories`     | Cây nhóm hàng (không phân trang)         | đăng nhập      | W2  |
-| POST   | `/categories`     | Tạo nhóm `{ name, parentId? }`           | `product.edit` | W2  |
-| PATCH  | `/categories/:id` | Đổi tên / chuyển nhóm cha                | `product.edit` | W2  |
-| DELETE | `/categories/:id` | Xóa (chỉ khi không còn hàng và nhóm con) | `product.edit` | W2  |
+| Method | Đường dẫn         | Mô tả                                            | Quyền          |
+| ------ | ----------------- | ------------------------------------------------ | -------------- |
+| GET    | `/categories`     | Cây nhóm hàng (không phân trang)                 | `product.view` |
+| POST   | `/categories`     | Tạo nhóm `{ name, parentId? }`                   | `product.edit` |
+| PATCH  | `/categories/:id` | Đổi tên / chuyển nhóm cha `{ name?, parentId? }` | `product.edit` |
+| DELETE | `/categories/:id` | Xóa mềm → `204`                                  | `product.edit` |
 
 ```json
 // GET /categories
@@ -177,22 +180,29 @@ Ký hiệu: `?` = tùy chọn · `[]` = mảng · tiền/giá/số lượng là 
 ]
 ```
 
+- `productCount` của nhóm cha **đã cộng dồn** hàng của mọi nhóm con (không đếm hàng đã xóa).
+- Tối đa **3 cấp**. Tên **không trùng trong cùng nhóm cha** (không phân biệt hoa thường và dấu) → `409 DUPLICATE_NAME`.
+- `PATCH` với `parentId: null` chuyển nhóm ra gốc. Không được chuyển nhóm vào chính nó hoặc nhóm con của nó (`400 INVALID_STATE`); vượt 3 cấp → `400 VALIDATION_ERROR` (`field = parentId`).
+- `DELETE` chỉ khi không còn nhóm con và không còn hàng hóa → ngược lại `400 INVALID_STATE` (`details.productCount` nếu còn hàng).
+
 ### 2.2 Danh sách hàng hóa
 
-| Method | Đường dẫn                          | Mô tả                                                                        | Quyền          | Mốc |
-| ------ | ---------------------------------- | ---------------------------------------------------------------------------- | -------------- | --- |
-| GET    | `/products`                        | Danh sách, lọc, phân trang                                                   | đăng nhập      | W2  |
-| GET    | `/products/lookup?q=`              | Tìm nhanh cho ô chọn hàng (tối đa 20 dòng, không phân trang)                 | đăng nhập      | W2  |
-| GET    | `/products/:id`                    | Chi tiết                                                                     | đăng nhập      | W2  |
-| POST   | `/products`                        | Tạo                                                                          | `product.edit` | W2  |
-| PATCH  | `/products/:id`                    | Sửa (gồm ngưng bán `isActive=false`)                                         | `product.edit` | W2  |
-| POST   | `/products/:id/images`             | Tải ảnh (`multipart/form-data`, field `file`)                                | `product.edit` | W3  |
-| DELETE | `/products/:id/images/:imageId`    | Xóa ảnh                                                                      | `product.edit` | W3  |
-| GET    | `/products/:id/stock-card?from&to` | **Thẻ kho**: lịch sử nhập–xuất                                               | đăng nhập      | W4  |
-| GET    | `/products/:id/branches`           | Chi tiết theo từng chi nhánh người dùng được phép: giá, tồn, giá vốn, vị trí | đăng nhập      | W4  |
-| PUT    | `/products/:id/branches/:branchId` | Đặt tồn tối thiểu/tối đa và vị trí kho của một chi nhánh                     | `product.edit` | W4  |
+| Method | Đường dẫn                          | Mô tả                                                                      | Quyền                                      |
+| ------ | ---------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------ |
+| GET    | `/products`                        | Danh sách, lọc, phân trang; `?format=xlsx` tải Excel                       | `product.view` (+ `X-Branch-Id`)           |
+| GET    | `/products/lookup?q=`              | Tìm nhanh cho ô chọn hàng (tối đa 20 dòng, chỉ hàng đang bán)              | `product.view` (+ `X-Branch-Id`)           |
+| GET    | `/products/:id`                    | Chi tiết                                                                   | `product.view` (+ `X-Branch-Id`)           |
+| POST   | `/products`                        | Tạo                                                                        | `product.edit` (+ `X-Branch-Id`)           |
+| PATCH  | `/products/:id`                    | Sửa (gồm ngưng bán `isActive=false`)                                       | `product.edit` hoặc `product.content.edit` |
+| GET    | `/products/:id/images`             | Danh sách ảnh theo thứ tự hiển thị                                         | `product.view`                             |
+| POST   | `/products/:id/images`             | **Tải NHIỀU ảnh lên cùng lúc** (`multipart/form-data`, field `files`)      | `product.edit` hoặc `product.content.edit` |
+| PUT    | `/products/:id/images/order`       | Sắp lại thứ tự ảnh `{ imageIds: [...] }` (ảnh đầu là ảnh đại diện)         | `product.edit` hoặc `product.content.edit` |
+| DELETE | `/products/:id/images/:imageId`    | Xóa một ảnh → `204`                                                        | `product.edit` hoặc `product.content.edit` |
+| GET    | `/products/:id/stock-card?from&to` | **Thẻ kho**: lịch sử nhập–xuất tại chi nhánh làm việc                      | `product.view` (+ `X-Branch-Id`)           |
+| GET    | `/products/:id/branches`           | Chi tiết theo từng chi nhánh người dùng được phép: giá 7 bảng, tồn, vị trí | `product.view`                             |
+| PUT    | `/products/:id/branches/:branchId` | Đặt tồn tối thiểu/tối đa và vị trí kho của một chi nhánh                   | `product.edit`                             |
 
-Bộ lọc `GET /products`: `q`, `categoryId` (gồm cả nhóm con), `isActive`, `inStock` (`true` = còn tồn), `sort` (`code`, `name`, `onHand`, `createdAt`).
+Bộ lọc `GET /products`: `q` (tìm không dấu theo mã và tên), `categoryId` (**gồm cả nhóm con**), `isActive`, `inStock` (`true` = còn tồn **tại chi nhánh làm việc**), `sort` (`code`, `name`, `onHand`, `createdAt`; thêm `-` để giảm dần; cột lạ bị bỏ qua), `page`, `limit` (tối đa 100).
 
 ```json
 // Đối tượng Product
@@ -204,19 +214,19 @@ Bộ lọc `GET /products`: `q`, `categoryId` (gồm cả nhóm con), `isActive`
   "categoryPath": "ĐIỆN GIA DỤNG > Quạt điện",
   "unit": "Cái",
   "branchId": "…", // chi nhánh mà các trường giá/tồn/vị trí dưới đây tính cho (= X-Branch-Id)
-  "basePrice": "33500", // giá Bảng giá chung TẠI chi nhánh này
-  "costPrice": "21800.5000", // giá vốn bình quân CỦA chi nhánh này; vắng mặt nếu thiếu quyền product.cost.view
+  "basePrice": "33500", // giá Bảng giá chung TẠI chi nhánh này; null nếu chưa có giá
+  "costPrice": "21800.5000", // giá vốn bình quân CỦA chi nhánh này; VẮNG MẶT nếu thiếu quyền product.cost.view
   "lastPurchasePrice": "21500.0000", // giá nhập cuối của chi nhánh này; như trên
-  "onHand": "515",
-  "reserved": "40",
-  "available": "475",
-  "onOrder": "1000",
+  "onHand": "515.000",
+  "reserved": "40.000", // đang giữ cho các đơn đặt hàng chưa chốt (phiếu tạm) tại chi nhánh này
+  "available": "475.000", // onHand − reserved
+  "onOrder": "0", // đang đặt nhà cung cấp; CHƯA có phân hệ Đặt hàng nhập nên luôn "0"
   "minStock": null,
-  "maxStock": "2000",
+  "maxStock": "2000.000",
   "location": "11",
   "description": null,
   "weightG": null,
-  "images": [{ "id": "…", "url": "https://…/a.jpg", "sortOrder": 0 }],
+  "images": [{ "id": "…", "url": "https://files…/products/<id>/<uuid>.jpg", "sortOrder": 0 }],
   "isActive": true,
   "isSellable": true,
   "createdAt": "2026-11-03T01:30:11.087Z",
@@ -232,20 +242,64 @@ Bộ lọc `GET /products`: `q`, `categoryId` (gồm cả nhóm con), `isActive`
   "categoryId": "…",
   "unit": "Cái",
   "description": null,
-  "weightG": null,
+  "weightG": "850",
   "isSellable": true
 }
 // Body chỉ chứa thông tin DÙNG CHUNG cho cả hai chi nhánh. Giá bán đặt qua lưới giá (mục 2.3);
 // tồn tối thiểu/tối đa và vị trí kho đặt riêng từng chi nhánh qua PUT /products/:id/branches/:branchId.
-// Lỗi: 409 DUPLICATE_CODE
+// Lỗi: 409 DUPLICATE_CODE (field code)
 ```
 
-**Phân biệt dữ liệu dùng chung và theo chi nhánh:** mã, tên, nhóm, đơn vị, ảnh, mô tả dùng chung; **giá bán, tồn kho, giá vốn, giá nhập cuối, tồn tối thiểu/tối đa, vị trí kho riêng từng chi nhánh**. Các trường theo chi nhánh trong response của `GET /products…` luôn tính cho chi nhánh làm việc (`X-Branch-Id`); muốn xem cả hai chi nhánh dùng `GET /products/:id/branches`.
+**Phân biệt dữ liệu dùng chung và theo chi nhánh:** mã, tên, nhóm, đơn vị, ảnh, mô tả dùng chung; **giá bán, tồn kho, giá vốn, giá nhập cuối, tồn tối thiểu/tối đa, vị trí kho riêng từng chi nhánh**. Các trường theo chi nhánh trong response của `GET /products…` luôn tính cho chi nhánh làm việc (`X-Branch-Id`; người có nhiều chi nhánh mà không gửi → `400 BRANCH_REQUIRED`); muốn xem cả hai chi nhánh dùng `GET /products/:id/branches`.
 
-Quy ước: `code` duy nhất, tối đa 30 ký tự, chỉ chữ/số/`-`/`_`/`.`, không dấu cách; **không đổi sau khi đã có giao dịch**. `onHand/reserved/available/onOrder` chỉ đọc.
+**Mã hàng:** chữ, số, `-`, `_`, `.`; 1–30 ký tự; không dấu cách; **không trùng kể cả khác hoa thường** (`409 DUPLICATE_CODE`). Chỉ đổi được khi hàng **chưa có giao dịch nào** (không có dòng tồn kho, đơn, hóa đơn, phiếu nhập/trả, chuyển kho) → ngược lại `400 INVALID_STATE`.
+
+**Người chỉ có `product.content.edit`** (vd Marketing) chỉ sửa được `description` và ảnh. Gửi trường khác → `403 FORBIDDEN` với `details.fields` liệt kê các trường bị từ chối. Frontend nên khóa các ô khác khi người dùng không có `product.edit`.
+
+#### Thêm hàng hóa kèm ảnh trên web (2 bước)
+
+1. `POST /products` → nhận `id`.
+2. `POST /products/:id/images` gửi cả lô ảnh một lần (không nhập đường dẫn ảnh).
+
+Màn hình chỉ cần một nút Lưu và gọi lần lượt hai API này. Nếu bước 2 lỗi thì hàng đã được tạo; người dùng chỉ việc tải lại ảnh (vào sửa hàng).
+
+#### Ảnh
+
+- Mỗi ảnh lưu trên **kho file riêng** (chuẩn S3) và có **URL riêng**; dùng thẳng URL trong thẻ `<img>`. Ảnh nhập từ Excel giữ nguyên URL gốc.
+- `POST /products/:id/images`: `multipart/form-data`, field **`files`** (lặp lại nhiều lần), **tối đa 10 ảnh mỗi lần, mỗi ảnh ≤ 5 MB, JPEG/PNG/WebP**. Định dạng kiểm tra theo **nội dung file** (không theo đuôi hay Content-Type). Mỗi hàng tối đa 10 ảnh. Trả `201` với **toàn bộ ảnh của hàng** sau khi thêm.
+- **Tất cả hoặc không gì cả:** một ảnh lỗi thì không lưu ảnh nào. Lỗi trả `details: [{ field: "files[1]", message }]` (số trong ngoặc là vị trí file trong lô).
+- Lỗi: `413 PAYLOAD_TOO_LARGE` (ảnh > 5 MB), `400 VALIDATION_ERROR`, `502 STORAGE_ERROR` (kho file lỗi, thử lại), `503 STORAGE_NOT_CONFIGURED` (máy chủ chưa cấu hình kho file).
+- `PUT .../images/order`: gửi **đủ tất cả** id ảnh của hàng theo thứ tự mới, thiếu/thừa/trùng → `400`.
 
 ```json
-// GET /products/lookup?q=quat  →  mảng gọn
+// GET /products/:id/branches   (chỉ các chi nhánh người dùng được phép)
+[
+  {
+    "branchId": "…",
+    "branchCode": "HN",
+    "branchName": "Chi nhánh Hà Nội",
+    "onHand": "40.000",
+    "reserved": "0.000",
+    "available": "40.000",
+    "costPrice": "22000.0000",
+    "lastPurchasePrice": null, // vắng mặt nếu thiếu product.cost.view
+    "minStock": null,
+    "maxStock": null,
+    "location": null,
+    "prices": [
+      { "priceBookId": "…", "priceBookCode": "CHUNG", "price": "34500" },
+      { "priceBookId": "…", "priceBookCode": "LON", "price": null }
+    ]
+  }
+]
+
+// PUT /products/:id/branches/:branchId   body: { "minStock": "10", "maxStock": "2000", "location": "Kệ A1" }
+// Gửi null để xóa; chỉ gửi trường cần đổi; phải minStock <= maxStock. KHÔNG đổi được tồn kho hay giá vốn
+// (chỉ nhập/xuất/chuyển kho mới đổi được). Trả đối tượng như một phần tử ở trên.
+```
+
+```json
+// GET /products/lookup?q=quat  →  mảng gọn (chi nhánh làm việc)
 [
   {
     "id": "…",
@@ -253,52 +307,62 @@ Quy ước: `code` duy nhất, tối đa 30 ký tự, chỉ chữ/số/`-`/`_`/`
     "name": "Quạt kẹp bàn Super MST-A1",
     "unit": "Cái",
     "basePrice": "33500",
-    "available": "475",
+    "available": "475.000",
     "imageUrl": "https://…/a.jpg"
   }
 ]
 ```
 
 ```json
-// GET /products/:id/stock-card?from=2026-11-01&to=2026-11-30
+// GET /products/:id/stock-card?from=2026-11-01&to=2026-11-30   (chi nhánh làm việc)
 {
-  "openingQty": "400",
+  "branchId": "…",
+  "openingQty": "400.000",
   "movements": [
     {
       "occurredAt": "…",
       "refType": "goods_receipt",
       "refId": "…",
       "refCode": "PN000948",
-      "qtyDelta": "600",
-      "balance": "1000",
+      "qtyDelta": "600.000",
+      "balance": "1000.000",
       "unitCost": "1179.9700"
     },
     {
       "occurredAt": "…",
       "refType": "invoice",
+      "refId": "…",
       "refCode": "HD016890",
-      "qtyDelta": "-515",
-      "balance": "485"
+      "qtyDelta": "-515.000",
+      "balance": "485.000"
     }
   ],
-  "closingQty": "485"
+  "closingQty": "485.000"
 }
 ```
 
-`refType`: `opening`, `goods_receipt`, `invoice`, `sales_return`, `purchase_return`, `adjustment`.
+- `from`/`to` dạng `YYYY-MM-DD` theo **giờ Việt Nam**, tính cả hai ngày; bỏ trống = không giới hạn. `openingQty` là tồn trước `from`.
+- `unitCost` chỉ có khi người gọi có quyền `product.cost.view`.
+- `refType`: `opening`, `goods_receipt`, `invoice`, `sales_return`, `purchase_return`, `adjustment`, `transfer_out`, `transfer_in`, `transfer_cancel`.
+
+**Xuất Excel:** `GET /products?format=xlsx` (kèm các bộ lọc, bỏ qua `page/limit`, tối đa 10.000 dòng). Tiêu đề cột trùng file KiotViet nên nhập lại được; cột `Giá vốn`, `Giá nhập cuối` chỉ có khi có quyền xem giá vốn.
 
 ### 2.3 Thiết lập giá
 
-Có **7 bảng giá**: Chung (mặc định), Lớn, Vừa, VIP, và 3 bản VAT. Mỗi sản phẩm có thể chưa có giá ở một bảng; khi bán, bảng nào thiếu giá thì **lùi về Bảng giá chung**.
+Có **7 bảng giá**: Chung (mặc định), Lớn, Vừa, VIP, và 3 bản VAT. Mỗi sản phẩm có thể chưa có giá ở một bảng; khi bán, bảng nào thiếu giá thì **lùi về Bảng giá chung của cùng chi nhánh**.
 
-| Method | Đường dẫn                  | Mô tả                                                                         | Quyền        | Mốc |
-| ------ | -------------------------- | ----------------------------------------------------------------------------- | ------------ | --- |
-| GET    | `/price-books`             | Danh sách bảng giá                                                            | đăng nhập    | W2  |
-| PATCH  | `/price-books/:id`         | Đổi tên / bật tắt                                                             | `price.edit` | W3  |
-| GET    | `/price-books/grid`        | **Lưới giá**: mỗi dòng = 1 sản phẩm, mỗi cột = 1 bảng giá                     | đăng nhập    | W3  |
-| PUT    | `/price-books/grid`        | Lưu nhiều ô giá cùng lúc                                                      | `price.edit` | W3  |
-| POST   | `/price-books/bulk-adjust` | Tăng/giảm giá hàng loạt (có chế độ xem trước)                                 | `price.edit` | W3  |
-| POST   | `/price-books/copy-branch` | Sao chép giá từ chi nhánh này sang chi nhánh kia (khởi tạo giá chi nhánh mới) | `price.edit` | W3  |
+| Method | Đường dẫn                  | Mô tả                                                                           | Quyền          |
+| ------ | -------------------------- | ------------------------------------------------------------------------------- | -------------- |
+| GET    | `/price-books`             | Danh sách bảng giá                                                              | `product.view` |
+| PATCH  | `/price-books/:id`         | Đổi tên / bật tắt `{ name?, isActive? }`                                        | `price.edit`   |
+| GET    | `/price-books/grid`        | **Lưới giá**: mỗi dòng = 1 sản phẩm, mỗi cột = 1 bảng giá; `?format=xlsx` Excel | `product.view` |
+| PUT    | `/price-books/grid`        | Lưu nhiều ô giá cùng lúc                                                        | `price.edit`   |
+| POST   | `/price-books/bulk-adjust` | Tăng/giảm giá hàng loạt (có chế độ xem trước)                                   | `price.edit`   |
+| POST   | `/price-books/copy-branch` | Sao chép giá từ chi nhánh này sang chi nhánh kia                                | `price.edit`   |
+
+- Không tắt được Bảng giá chung (`400 INVALID_STATE`); đổi tên trùng → `409 DUPLICATE_NAME`. Bảng giá bị tắt không còn là cột của lưới.
+- **Giá bán là số nguyên đồng, không âm.** Giá lẻ (`"33000.5"`), âm hay không phải số → `400 VALIDATION_ERROR`.
+- Mọi thao tác ghi giá đều theo **MỘT chi nhánh** và người gọi phải được phép làm việc ở chi nhánh đó (`403 BRANCH_FORBIDDEN`). Giá chi nhánh này **không bao giờ** lọt sang chi nhánh kia.
 
 ```json
 // GET /price-books
@@ -310,28 +374,13 @@ Có **7 bảng giá**: Chung (mặc định), Lớn, Vừa, VIP, và 3 bản VAT
     "withVat": false,
     "isDefault": true,
     "isActive": true
-  },
-  {
-    "id": "…",
-    "code": "LON",
-    "name": "Lớn",
-    "withVat": false,
-    "isDefault": false,
-    "isActive": true
-  },
-  {
-    "id": "…",
-    "code": "LON_VAT",
-    "name": "Lớn VAT",
-    "withVat": true,
-    "isDefault": false,
-    "isActive": true
   }
 ]
 ```
 
 ```json
-// GET /price-books/grid?branchId=…&q=&categoryId=&page=1&limit=50   (branchId mặc định = chi nhánh làm việc)
+// GET /price-books/grid?branchId=…&q=&categoryId=&page=1&limit=50
+// branchId bỏ trống = chi nhánh làm việc (X-Branch-Id). limit tối đa 200.
 {
   "branchId": "…",
   "books": [
@@ -343,7 +392,7 @@ Có **7 bảng giá**: Chung (mặc định), Lớn, Vừa, VIP, và 3 bản VAT
       "productId": "…",
       "code": "QKBSP",
       "name": "Quạt kẹp bàn…",
-      "costPrice": "21800.5000",
+      "costPrice": "21800.5000", // vắng mặt nếu thiếu product.cost.view
       "prices": {
         "<priceBookId CHUNG>": "33500",
         "<priceBookId LON>": "33000",
@@ -356,38 +405,50 @@ Có **7 bảng giá**: Chung (mặc định), Lớn, Vừa, VIP, và 3 bản VAT
 ```
 
 ```json
-// PUT /price-books/grid  (chỉ gửi các ô thay đổi; price = null nghĩa là xóa giá, lùi về bảng chung)
+// PUT /price-books/grid  (chỉ gửi các ô thay đổi; tối đa 500 ô; price = null xóa giá ô đó → lùi về bảng chung)
 { "branchId": "…", "changes": [{ "productId": "…", "priceBookId": "…", "price": "33000" }] }
-// 200: { "updated": 1 }
+// 200: { "updated": 1 }   — chỉ tính ô THỰC SỰ đổi. Một ô lỗi (hoặc cặp sản phẩm+bảng giá bị gửi trùng) → 400 và KHÔNG lưu ô nào.
 ```
 
 ```json
 // POST /price-books/bulk-adjust
 {
-  "branchId": "…", // chi nhánh được điều chỉnh giá
+  "branchId": "…",          // chi nhánh được điều chỉnh
   "priceBookId": "…",
-  "categoryId": "…?",
-  "mode": "percent", // "percent" | "amount"
-  "value": "5", // tăng 5%  (số âm = giảm)
-  "roundTo": "100", // làm tròn đến bội số này (tùy chọn)
-  "dryRun": true // true = chỉ trả bản xem trước, chưa lưu
+  "categoryId": "…",        // tùy chọn: chỉ hàng của nhóm này (gồm nhóm con)
+  "mode": "percent",        // "percent" | "amount"
+  "value": "5",             // có dấu: 5 = tăng 5%; "-3.5" = giảm 3,5%; với amount là số tiền cộng/trừ mỗi ô
+  "roundTo": "100",         // tùy chọn, mặc định "1": làm tròn nửa lên đến bội số này (số nguyên >= 1)
+  "dryRun": true            // BẮT BUỘC gửi rõ. true = chỉ xem trước, KHÔNG lưu; false = lưu thật
 }
-// 200: { "affected": 54, "preview": [{ "productId": "…", "code": "…", "oldPrice": "33000", "newPrice": "34700" }] }
+// 200:
+{
+  "dryRun": true, "affected": 54, "skipped": 0, "unchanged": 6,
+  "preview": [{ "productId": "…", "code": "QKBSP", "oldPrice": "33500", "newPrice": "35200" }]   // tối đa 200 dòng đầu
+}
+```
+
+- Chỉ áp dụng cho ô **đã có giá**. `skipped` = số ô bị bỏ vì giá mới âm; `unchanged` = số ô giá không đổi sau khi làm tròn. Giá luôn ra số nguyên đồng.
+- Ví dụ: 33.500 tăng 5% làm tròn 100 → 35.175 → **35.200**.
+
+```json
+// POST /price-books/copy-branch
+{ "fromBranchId": "…", "toBranchId": "…", "priceBookId": "…", "overwrite": false }
+// priceBookId bỏ trống = mọi bảng giá. overwrite=false (mặc định): chỉ chép các ô chi nhánh đích CHƯA có giá.
+// overwrite=true: ghi đè ô khác giá. 200: { "copied": 1840, "skipped": 120 }. Hai chi nhánh phải khác nhau và người gọi phải có quyền ở cả hai.
 ```
 
 **Giá theo chi nhánh:** 7 hạng giá dùng chung cho hai chi nhánh, nhưng **số tiền của từng ô giá là riêng từng chi nhánh**. Màn hình lưới giá cần chọn chi nhánh (tab/ô chọn). Khi bán, giá tra theo chi nhánh của đơn → hạng giá của khách → nếu thiếu thì lùi về Bảng giá chung **của cùng chi nhánh** (không lấy giá chi nhánh kia).
 
-```json
-// POST /price-books/copy-branch
-{ "fromBranchId": "…", "toBranchId": "…", "priceBookId": "…?", "overwrite": false }
-// overwrite=false: chỉ chép các ô chi nhánh đích chưa có giá. 200: { "copied": 1840, "skipped": 120 }
-```
+**Xuất Excel:** `GET /price-books/grid?format=xlsx` — một cột mỗi bảng giá (tiêu đề là tên bảng giá). Nhập lại bằng `POST /imports/price-books` (mục 9).
 
 ### 2.4 Báo giá cho màn hình tạo đơn
 
 | Method | Đường dẫn        | Mô tả                                                              | Quyền     | Mốc |
 | ------ | ---------------- | ------------------------------------------------------------------ | --------- | --- |
 | POST   | `/pricing/quote` | Tính giá niêm yết, tồn và cảnh báo cho các dòng hàng của một khách | đăng nhập | W3  |
+
+> **Chưa triển khai** (cần module Khách hàng; làm cùng Đơn hàng).
 
 Dùng khi người dùng chọn khách / thêm hàng để **hiển thị đúng giá và tồn tức thì**. Đây chỉ là báo giá; khi lưu đơn server tính lại. **Giá, tồn và công nợ tính theo chi nhánh làm việc (`X-Branch-Id`)** — công nợ và hạn mức là của khách tại chi nhánh đó.
 
@@ -950,34 +1011,62 @@ Cấu trúc chung cho dạng JSON: `{ "params": {…}, "columns": [{ "key": "…
 
 ## 9. Nhập dữ liệu từ Excel
 
-Dùng cho import hàng loạt (chuyển dữ liệu từ KiotViet và nhập tay bằng file). Xử lý **bất đồng bộ**: tải file lên → nhận `jobId` → hỏi trạng thái.
+> **Trạng thái:** đã triển khai cho `products` và `price-books`; `customers`, `suppliers` trả `400 IMPORT_TYPE_NOT_SUPPORTED` (sẽ làm cùng phân hệ của chúng). Chỉ người có quyền `import.run` (mặc định chỉ Quản lý).
 
-| Method | Đường dẫn                 | Mô tả                                                                                                           | Quyền        | Mốc |
-| ------ | ------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------ | --- |
-| POST   | `/imports/:type`          | Tải file lên (`multipart/form-data`, field `file`). `type`: `products`, `customers`, `suppliers`, `price-books` | `import.run` | W3  |
-| GET    | `/imports/:id`            | Trạng thái và lỗi từng dòng                                                                                     | `import.run` | W3  |
-| GET    | `/imports/:type/template` | Tải file Excel mẫu                                                                                              | `import.run` | W3  |
+Dùng cho import hàng loạt (chuyển dữ liệu từ KiotViet và nhập tay bằng file). **Xử lý ngay trong yêu cầu** (vài nghìn dòng), kết quả có sẵn trong phản hồi; vẫn xem lại được bằng `GET /imports/:id`.
+
+| Method | Đường dẫn                 | Mô tả                                                                                          | Quyền        |
+| ------ | ------------------------- | ---------------------------------------------------------------------------------------------- | ------------ |
+| POST   | `/imports/:type`          | Tải file lên (`multipart/form-data`, field `file`, ≤ 10 MB). `type`: `products`, `price-books` | `import.run` |
+| GET    | `/imports/:id`            | Kết quả và lỗi từng dòng của một lần nhập                                                      | `import.run` |
+| GET    | `/imports/:type/template` | Tải file Excel mẫu                                                                             | `import.run` |
+
+Tham số query của `POST`: `dryRun` (**mặc định `true`**: chỉ kiểm tra, không ghi gì; gửi `dryRun=false` mới ghi thật), `branchId` (chi nhánh cho giá bán / tồn tối thiểu-tối đa / vị trí; bắt buộc nếu file có các cột đó).
 
 ```json
-// POST /imports/products?dryRun=true   → 202 { "id": "…", "status": "queued" }
-
-// GET /imports/:id
+// POST /imports/products?dryRun=false&branchId=…   → 202
 {
   "id": "…",
   "type": "products",
-  "status": "completed", // queued | running | completed | failed
-  "dryRun": true, // true = chỉ kiểm tra, chưa ghi dữ liệu
-  "total": 2787,
-  "created": 2700,
-  "updated": 80,
-  "failed": 7,
-  "errors": [{ "row": 15, "field": "code", "message": "Mã hàng trùng trong file" }]
+  "status": "completed", // completed | failed   (queued/running chỉ dành cho bản chạy nền sau này)
+  "dryRun": false,
+  "fileName": "SanPham.xlsx",
+  "total": 2787, // số dòng dữ liệu trong file
+  "created": 2700, // sẽ tạo / đã tạo
+  "updated": 87, // chỉ tính bản ghi CÓ THAY ĐỔI THẬT → chạy lại cùng file cho 0
+  "failed": 0, // số dòng có lỗi
+  "errors": [], // [{ "row": 15, "field": "Mã hàng", "message": "Mã hàng trùng với dòng 12 trong file" }]
+  "createdAt": "…",
+  "finishedAt": "…"
 }
 ```
 
+**Quy tắc chung**
+
+- **Tất cả hoặc không gì cả:** có **bất kỳ dòng lỗi nào** thì `status = "failed"`, `created = updated = 0` và **không ghi gì** (kể cả các dòng tốt). Sửa file rồi nhập lại. `errors[].row` là số dòng trong file Excel (dòng 1 là tiêu đề; lỗi thiếu cột báo ở dòng 1), tối đa 500 lỗi đầu.
+- `dryRun=true` chạy toàn bộ rồi hoàn tác nên báo cáo chính xác (kể cả lỗi trùng/ràng buộc CSDL) nhưng không lưu.
+- Cập nhật theo **mã hàng, không phân biệt hoa thường**: chạy lại nhiều lần không tạo trùng.
+- Ô trống = **giữ nguyên** giá trị cũ (không xóa).
+- Lỗi hệ thống bất ngờ → `status = "failed"` với một lỗi `row = 0`, không ghi gì.
+- Sai định dạng file (không phải `.xlsx`) → `400 VALIDATION_ERROR`; thiếu file → `400`; file > 10 MB → `413 PAYLOAD_TOO_LARGE`.
+
+**`products`** — nhận tiêu đề cột của file KiotViet (không phân biệt hoa thường/dấu):
+
+| Cột                                      | Ghi chú                                                                                                                                             |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Mã hàng`, `Tên hàng`                    | **Bắt buộc**. Mã theo quy tắc ở mục 2.2; không trùng trong file                                                                                     |
+| `Đơn vị tính`                            | Mặc định "Cái"                                                                                                                                      |
+| `Nhóm hàng(3 Cấp)`                       | Dạng `NHÀ BẾP>>Dao kéo`, tối đa 3 cấp; **tự tạo nhóm còn thiếu**                                                                                    |
+| `Giá bán`                                | Số nguyên đồng → ghi vào **Bảng giá chung của chi nhánh `branchId`**. Trống hoặc 0 = chưa có giá                                                    |
+| `Tồn nhỏ nhất`, `Tồn lớn nhất`, `Vị trí` | Ghi cho chi nhánh `branchId`                                                                                                                        |
+| `Đang kinh doanh`, `Được bán trực tiếp`  | `1`/`0`                                                                                                                                             |
+| `Trọng lượng`, `Mô tả`                   |                                                                                                                                                     |
+| `Hình ảnh (url1,url2...)`                | Nhiều địa chỉ `http(s)` cách nhau dấu phẩy → **giữ nguyên URL gốc** (không tải về kho file); thêm ảnh chưa có, không xóa ảnh hiện có; tối đa 10 ảnh |
+| `Tồn kho`, `Giá vốn` và cột khác         | **Bị bỏ qua**: số dư đầu kỳ do công cụ chuyển dữ liệu riêng xử lý                                                                                   |
+
+**`price-books`** — cột `Mã hàng` + **mỗi cột một bảng giá** (tiêu đề là _tên_ hoặc _mã_ bảng giá: `Bảng giá chung`, `Lớn`, `LON_VAT`…). **Bắt buộc `branchId`** (giá riêng từng chi nhánh). Giá là số nguyên đồng; ô trống hoặc `0` = giữ nguyên; mã hàng không tồn tại là lỗi. `created` = số ô giá mới, `updated` = số ô đổi giá. Cột khác (tên hàng, tồn kho, giá vốn…) bị bỏ qua. File xuất từ `GET /price-books/grid?format=xlsx` nhập lại được.
+
 - Nên cho người dùng chạy `dryRun=true` trước, xem lỗi rồi mới chạy thật (`dryRun=false`).
-- Import có thể chạy lại nhiều lần (cập nhật theo **mã**, không tạo trùng).
-- Hiển thị tiến độ bằng cách gọi `GET /imports/:id` mỗi 1–2 giây cho đến khi `status` là `completed` hoặc `failed`.
 - Import số dư đầu kỳ (tồn, nợ, quỹ) **không** mở cho giao diện; backend chạy bằng công cụ riêng khi chuyển đổi.
 
 ---

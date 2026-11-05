@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "categories_sibling_name_unique" ON "categories" USING btree (coalesce("parent_id", '00000000-0000-0000-0000-000000000000'::uuid),f_search_text("name")) WHERE "categories"."deleted_at" is null;

@@ -8,7 +8,10 @@ import { getPermissionDef, type PermissionCode } from '@kiot/shared';
 import { AppError } from '../../common/app-error.js';
 import type { AppRequest } from '../../common/auth-user.js';
 import { PermissionsService } from './permissions.service.js';
-import { REQUIRED_PERMISSIONS_KEY } from './require-permission.decorator.js';
+import {
+  ANY_PERMISSIONS_KEY,
+  REQUIRED_PERMISSIONS_KEY,
+} from './require-permission.decorator.js';
 
 /**
  * Kiểm tra `@RequirePermission(...)`. Endpoint không gắn decorator thì cho qua
@@ -25,7 +28,11 @@ export class PermissionGuard implements CanActivate {
     const required = this.reflector.getAllAndOverride<
       PermissionCode[] | undefined
     >(REQUIRED_PERMISSIONS_KEY, [context.getHandler(), context.getClass()]);
-    if (!required || required.length === 0) return true;
+    const anyOf = this.reflector.getAllAndOverride<
+      PermissionCode[] | undefined
+    >(ANY_PERMISSIONS_KEY, [context.getHandler(), context.getClass()]);
+    if ((!required || required.length === 0) && (!anyOf || anyOf.length === 0))
+      return true;
 
     const request = context.switchToHttp().getRequest<AppRequest>();
     const user = request.user;
@@ -34,7 +41,7 @@ export class PermissionGuard implements CanActivate {
     }
 
     const grants: NonNullable<AppRequest['grants']> = {};
-    for (const code of required) {
+    for (const code of required ?? []) {
       const grant = await this.permissions.getGrant(user.role, code);
       if (!grant) {
         const label = getPermissionDef(code)?.label ?? code;
@@ -43,6 +50,21 @@ export class PermissionGuard implements CanActivate {
         });
       }
       grants[code] = grant.scope;
+    }
+    if (anyOf && anyOf.length > 0) {
+      for (const code of anyOf) {
+        const grant = await this.permissions.getGrant(user.role, code);
+        if (grant) grants[code] = grant.scope;
+      }
+      if (!anyOf.some((code) => grants[code] !== undefined)) {
+        const labels = anyOf.map((c) => getPermissionDef(c)?.label ?? c);
+        throw new AppError(
+          403,
+          'FORBIDDEN',
+          `Bạn không có quyền: ${labels.join(' hoặc ')}`,
+          { anyOf },
+        );
+      }
     }
     request.grants = { ...request.grants, ...grants };
     return true;

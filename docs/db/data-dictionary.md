@@ -118,10 +118,13 @@ Nhật ký thao tác — chỉ thêm, không sửa.
 | `before` | jsonb | ✔ |  |  |
 | `after` | jsonb | ✔ |  |  |
 | `ip` | text | ✔ |  |  |
+| `request_id` | text | ✔ |  |  |
+| `branch_id` | uuid | ✔ |  | → `branches.id` |
 | `created_at` | timestamptz |  | `now()` |  |
 
 **Chỉ mục:**
 
+- `audit_logs_request_idx`: `request_id`
 - `audit_logs_entity_idx`: `entity_type`, `entity_id`
 - `audit_logs_created_idx`: `created_at`
 
@@ -250,6 +253,7 @@ Nhóm hàng dạng cây (parent_id).
 **Chỉ mục:**
 
 - `categories_parent_idx`: `parent_id`
+- `categories_sibling_name_unique` (unique): `coalesce(parentId, '00000000-0000-0000-0000-000000000000'::uuid)`, `f_search_text(name)` WHERE deletedAt is null
 
 ### products
 
@@ -276,6 +280,7 @@ Hàng hóa — chỉ thông tin DÙNG CHUNG giữa các chi nhánh. Giá bán �
 - `products_category_idx`: `category_id`
 - `products_search_trgm`: `f_search_text(code || ' ' || name) gin_trgm_ops`
 - `products_active_idx`: `is_active`
+- `products_code_lower_unique` (unique): `lower(code)`
 
 ### product_images
 

@@ -600,3 +600,10 @@ BEGIN
   RETURN NEW;
 END;
 $$;CREATE TRIGGER "stock_movements_append_only" BEFORE UPDATE OR DELETE ON "stock_movements" FOR EACH ROW EXECUTE FUNCTION "forbid_ledger_change"();CREATE TRIGGER "stock_movements_no_truncate" BEFORE TRUNCATE ON "stock_movements" FOR EACH STATEMENT EXECUTE FUNCTION "forbid_ledger_change"();CREATE TRIGGER "debt_ledger_append_only" BEFORE UPDATE OR DELETE ON "debt_ledger" FOR EACH ROW EXECUTE FUNCTION "forbid_ledger_change"();CREATE TRIGGER "debt_ledger_no_truncate" BEFORE TRUNCATE ON "debt_ledger" FOR EACH STATEMENT EXECUTE FUNCTION "forbid_ledger_change"();CREATE TRIGGER "cash_transactions_no_delete" BEFORE DELETE ON "cash_transactions" FOR EACH ROW EXECUTE FUNCTION "forbid_ledger_change"();CREATE TRIGGER "cash_transactions_guard_update" BEFORE UPDATE ON "cash_transactions" FOR EACH ROW EXECUTE FUNCTION "guard_cash_transaction_update"();CREATE TRIGGER "cash_transactions_no_truncate" BEFORE TRUNCATE ON "cash_transactions" FOR EACH STATEMENT EXECUTE FUNCTION "forbid_ledger_change"();
+
+-- ===== 0013_nhat_ky_request_id_chi_nhanh.sql =====
+ALTER TABLE "audit_logs" ADD COLUMN "request_id" text;ALTER TABLE "audit_logs" ADD COLUMN "branch_id" uuid;ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_branch_id_branches_id_fk" FOREIGN KEY ("branch_id") REFERENCES "public"."branches"("id") ON DELETE no action ON UPDATE no action;CREATE INDEX "audit_logs_request_idx" ON "audit_logs" USING btree ("request_id");
+-- ===== 0014_nhom_hang_ten_duy_nhat.sql =====
+CREATE UNIQUE INDEX "categories_sibling_name_unique" ON "categories" USING btree (coalesce("parent_id", '00000000-0000-0000-0000-000000000000'::uuid),f_search_text("name")) WHERE "categories"."deleted_at" is null;
+-- ===== 0015_hang_hoa_ma_khong_phan_biet_hoa_thuong.sql =====
+CREATE UNIQUE INDEX "products_code_lower_unique" ON "products" USING btree (lower("code"));

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { AuditModule } from '../audit/audit.module.js';
 import { PermissionGuard } from '../authorization/permission.guard.js';
 import { BranchContextGuard } from '../branches/branch-context.guard.js';
 import { AuthController } from './auth.controller.js';
@@ -14,6 +15,7 @@ import { TokenService } from './token.service.js';
  *   3. BranchContextGuard  — xác định chi nhánh làm việc cho @RequireBranch (cần người dùng)
  */
 @Module({
+  imports: [AuditModule],
   controllers: [AuthController],
   providers: [
     AuthService,

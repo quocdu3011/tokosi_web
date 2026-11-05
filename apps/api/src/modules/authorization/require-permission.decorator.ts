@@ -14,3 +14,13 @@ export const REQUIRED_PERMISSIONS_KEY = 'requiredPermissions';
  */
 export const RequirePermission = (...codes: PermissionCode[]) =>
   SetMetadata(REQUIRED_PERMISSIONS_KEY, codes);
+
+export const ANY_PERMISSIONS_KEY = 'anyPermissions';
+
+/**
+ * Yêu cầu người gọi có ÍT NHẤT MỘT trong các quyền liệt kê (khác `@RequirePermission` bắt phải đủ mọi quyền).
+ * Dùng khi hai quyền cùng cho phép một thao tác, vd tải ảnh: `product.edit` HOẶC `product.content.edit`.
+ * Các quyền người gọi có được ghi vào `request.grants`. Có thể dùng cùng `@RequirePermission`.
+ */
+export const RequireAnyPermission = (...codes: PermissionCode[]) =>
+  SetMetadata(ANY_PERMISSIONS_KEY, codes);

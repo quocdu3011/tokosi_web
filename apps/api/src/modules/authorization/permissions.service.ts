@@ -69,6 +69,11 @@ export class PermissionsService {
     return (await this.getGrants(role)).find((g) => g.code === code);
   }
 
+  /** Vai trò có quyền này không (Quản lý luôn có). Dùng để ẩn trường nhạy cảm như giá vốn khỏi phản hồi. */
+  async has(role: Role, code: PermissionCode): Promise<boolean> {
+    return (await this.getGrant(role, code)) !== undefined;
+  }
+
   /** Thay toàn bộ quyền của một vai trò. Trả về bộ quyền cuối cùng sau chuẩn hóa. */
   async setGrants(
     role: Role,

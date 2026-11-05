@@ -2,18 +2,15 @@ import { Inject, Injectable } from '@nestjs/common';
 import { ADMIN_ROLE, USER_CODE_PREFIX, normalizeVnPhone } from '@kiot/shared';
 import { and, count, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import { AppError } from '../../common/app-error.js';
+import { uniqueViolation } from '../../common/pg-errors.js';
 import type { AuthUser } from '../../common/auth-user.js';
 import { generatePassword, hashPassword } from '../../common/password.js';
 import { passwordProblems } from '../../common/password-policy.js';
-import { DB, type Database } from '../../db/database.module.js';
+import { DB, type Database, type Tx } from '../../db/database.module.js';
 import { nextDocumentCode } from '../../db/code-sequence.js';
 import { searchWhere } from '../../db/search.js';
-import {
-  auditLogs,
-  branches,
-  userBranches,
-  users,
-} from '../../db/schema/index.js';
+import { branches, userBranches, users } from '../../db/schema/index.js';
+import { AuditService } from '../audit/audit.service.js';
 import { AuthService, type RequestContext } from '../auth/auth.service.js';
 import {
   USERNAME_PATTERN,
@@ -27,7 +24,6 @@ import {
 } from './users.dto.js';
 
 type UserRow = typeof users.$inferSelect;
-type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
 
 /** Biểu thức tìm không dấu trên mã, tên đăng nhập, họ tên, SĐT (bảng nhỏ nên không cần chỉ mục). */
 const userSearchExpr = sql`f_search_text(concat_ws(' ', ${users.code}, ${users.username}, ${users.fullName}, ${users.phone}))`;
@@ -44,6 +40,7 @@ export class UsersService {
   constructor(
     @Inject(DB) private readonly db: Database,
     private readonly auth: AuthService,
+    private readonly auditLog: AuditService,
   ) {}
 
   async list(query: ListUsersQueryDto) {
@@ -498,13 +495,13 @@ export class UsersService {
     after: unknown,
     ctx: RequestContext,
   ): Promise<void> {
-    await tx.insert(auditLogs).values({
+    await this.auditLog.record(tx, {
       userId: actorId,
       action,
       entityType: 'user',
       entityId,
-      before: before ?? null,
-      after: after ?? null,
+      before,
+      after,
       ip: ctx.ip ?? null,
     });
   }
@@ -541,19 +538,4 @@ export class UsersService {
       [{ field: 'username', message: 'Tên đăng nhập đã được dùng' }],
     );
   }
-}
-
-/**
- * Nếu là lỗi trùng khóa duy nhất của PostgreSQL (mã 23505), trả về tên ràng buộc bị vi phạm (có thể không có
- * tên với một số driver). Driver có thể bọc lỗi gốc trong `cause`.
- */
-function uniqueViolation(e: unknown): { constraint?: string } | null {
-  for (const x of [e, (e as { cause?: unknown } | null)?.cause]) {
-    if (typeof x !== 'object' || x === null) continue;
-    const { code, constraint } = x as { code?: unknown; constraint?: unknown };
-    if (code === '23505') {
-      return typeof constraint === 'string' ? { constraint } : {};
-    }
-  }
-  return null;
 }

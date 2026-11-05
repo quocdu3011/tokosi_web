@@ -8,6 +8,7 @@ import { Reflector } from '@nestjs/core';
 import { and, eq, isNull } from 'drizzle-orm';
 import { AppError } from '../../common/app-error.js';
 import type { AppRequest } from '../../common/auth-user.js';
+import { currentContext } from '../../common/request-context.js';
 import { DB, type Database } from '../../db/database.module.js';
 import { users } from '../../db/schema/index.js';
 import {
@@ -80,6 +81,8 @@ export class AuthGuard implements CanActivate {
     }
 
     request.user = { id: user.id, role: user.role };
+    const ctx = currentContext();
+    if (ctx) ctx.userId = user.id;
     return true;
   }
 }

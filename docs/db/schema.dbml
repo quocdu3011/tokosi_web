@@ -127,9 +127,12 @@ Table audit_logs {
   before jsonb
   after jsonb
   ip text
+  request_id text
+  branch_id uuid
   created_at timestamptz [not null, default: `now()`]
 
   indexes {
+    (request_id) [name: 'audit_logs_request_idx']
     (entity_type, entity_id) [name: 'audit_logs_entity_idx']
     (created_at) [name: 'audit_logs_created_idx']
   }
@@ -224,6 +227,7 @@ Table categories {
 
   indexes {
     (parent_id) [name: 'categories_parent_idx']
+    (`coalesce(parentId, '00000000-0000-0000-0000-000000000000'::uuid)`, `f_search_text(name)`) [name: 'categories_sibling_name_unique', unique]
   }
 
   Note: '''Nhóm hàng dạng cây (parent_id).'''
@@ -638,6 +642,7 @@ Table products {
     (category_id) [name: 'products_category_idx']
     (`f_search_text(code || ' ' || name) gin_trgm_ops`) [name: 'products_search_trgm']
     (is_active) [name: 'products_active_idx']
+    (`lower(code)`) [name: 'products_code_lower_unique', unique]
   }
 
   Note: '''Hàng hóa — chỉ thông tin DÙNG CHUNG giữa các chi nhánh. Giá bán ở price_book_items, tồn kho/giá vốn/vị trí ở stocks (theo chi nhánh).'''
@@ -917,6 +922,7 @@ Table users {
 }
 
 Ref: audit_logs.user_id > users.id [delete: set null]
+Ref: audit_logs.branch_id > branches.id
 Ref: cash_accounts.branch_id > branches.id
 Ref: cash_transactions.branch_id > branches.id
 Ref: cash_transactions.category_id > cash_categories.id

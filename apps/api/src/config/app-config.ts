@@ -15,6 +15,19 @@ export interface AppConfig {
   /** Số lần đăng nhập sai tối đa trong cửa sổ thời gian trước khi bị chặn tạm. */
   loginMaxFailures: number;
   loginWindowSeconds: number;
+  /** Kho lưu file (ảnh hàng hóa) chuẩn S3, ví dụ MinIO. `null` = chưa cấu hình (chỉ cho phép khi dev/test). */
+  storage: StorageConfig | null;
+}
+
+export interface StorageConfig {
+  /** Địa chỉ S3 API, vd http://localhost:9000 */
+  endpoint: string;
+  region: string;
+  bucket: string;
+  accessKey: string;
+  secretKey: string;
+  /** Địa chỉ công khai tới bucket để ghép URL ảnh: `<publicBaseUrl>/<khóa đối tượng>`. */
+  publicBaseUrl: string;
 }
 
 export const MIN_JWT_SECRET_LENGTH = 32;
@@ -47,6 +60,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     );
   }
   const cookieSecureEnv = env.COOKIE_SECURE;
+  const storage = loadStorageConfig(env);
   return {
     jwtAccessSecret: secret,
     accessTtlSeconds: positiveInt(
@@ -73,6 +87,45 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       env.LOGIN_WINDOW_SECONDS,
       900,
     ),
+    storage,
+  };
+}
+
+const STORAGE_VARS = [
+  'S3_ENDPOINT',
+  'S3_BUCKET',
+  'S3_ACCESS_KEY',
+  'S3_SECRET_KEY',
+  'FILE_PUBLIC_BASE_URL',
+] as const;
+
+/**
+ * Cấu hình kho file. Không đặt biến nào → `null` (dev/test chạy được, chỉ tải ảnh lên sẽ báo lỗi 503);
+ * đặt một phần → ném lỗi ngay; production bắt buộc đặt đủ.
+ */
+function loadStorageConfig(env: NodeJS.ProcessEnv): StorageConfig | null {
+  const present = STORAGE_VARS.filter((v) => (env[v] ?? '') !== '');
+  if (present.length === 0) {
+    if (env.NODE_ENV === 'production') {
+      throw new Error(
+        `Production bắt buộc cấu hình kho file: ${STORAGE_VARS.join(', ')}`,
+      );
+    }
+    return null;
+  }
+  const missing = STORAGE_VARS.filter((v) => !present.includes(v));
+  if (missing.length > 0) {
+    throw new Error(
+      `Cấu hình kho file thiếu biến môi trường: ${missing.join(', ')}`,
+    );
+  }
+  return {
+    endpoint: env.S3_ENDPOINT as string,
+    region: env.S3_REGION || 'us-east-1',
+    bucket: env.S3_BUCKET as string,
+    accessKey: env.S3_ACCESS_KEY as string,
+    secretKey: env.S3_SECRET_KEY as string,
+    publicBaseUrl: (env.FILE_PUBLIC_BASE_URL as string).replace(/\/+$/, ''),
   };
 }
 

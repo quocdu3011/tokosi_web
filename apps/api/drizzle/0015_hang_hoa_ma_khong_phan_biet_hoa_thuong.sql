@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "products_code_lower_unique" ON "products" USING btree (lower("code"));

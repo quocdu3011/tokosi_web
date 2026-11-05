@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
+import { requestContext } from './request-context.js';
 
 export const REQUEST_ID_HEADER = 'x-request-id';
 
@@ -25,7 +26,8 @@ export function requestIdMiddleware(
       ? candidate
       : randomUUID();
   res.setHeader('X-Request-Id', req.requestId);
-  next();
+  // Mọi xử lý tiếp theo của yêu cầu này (guard, service, nhật ký) thấy cùng một ngữ cảnh
+  requestContext.run({ requestId: req.requestId, ip: req.ip }, () => next());
 }
 
 const NEWLINE = String.fromCharCode(10);
