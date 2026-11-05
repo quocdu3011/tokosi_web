@@ -224,6 +224,8 @@ export function createApiClient(deps: ApiClientDeps) {
       request<T>(path, { ...opts, method: 'PUT', body }),
     patch: <T>(path: string, body?: unknown, opts?: Omit<RequestOptions, 'method' | 'body'>) =>
       request<T>(path, { ...opts, method: 'PATCH', body }),
+    delete: <T = void>(path: string, opts?: Omit<RequestOptions, 'method' | 'body'>) =>
+      request<T>(path, { ...opts, method: 'DELETE' }),
   };
 }
 

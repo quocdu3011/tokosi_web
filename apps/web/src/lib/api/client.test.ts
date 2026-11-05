@@ -157,3 +157,11 @@ describe('createApiClient – tải file lên', () => {
     expect((init.headers as Record<string, string>)['Content-Type']).toBeUndefined();
   });
 });
+
+describe('createApiClient – delete', () => {
+  it('gửi DELETE và chấp nhận 204 không có thân', async () => {
+    const { api, fetchMock } = setup(async () => new Response(null, { status: 204 }));
+    await expect(api.delete('/products/p1/images/i1')).resolves.toBeUndefined();
+    expect(fetchMock.mock.calls[0]![1].method).toBe('DELETE');
+  });
+});

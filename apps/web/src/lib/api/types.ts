@@ -49,6 +49,21 @@ export type RoleCode = Schemas['RoleSummaryDto']['role'];
 export type Product = Schemas['ProductDto'];
 export type ProductList = Schemas['ProductListDto'];
 export type CategoryNode = Schemas['CategoryNodeDto'];
+export type CreateProductInput = Schemas['CreateProductDto'];
+export type UpdateProductInput = Schemas['UpdateProductDto'];
+export type ProductBranch = Schemas['ProductBranchDto'];
+export type ProductBranchSettings = Schemas['SetProductBranchSettingsDto'];
+export type ProductImage = Schemas['ProductImageDto'];
+export type ProductLookup = Schemas['ProductLookupDto'];
+export type CreateCategoryInput = Schemas['CreateCategoryDto'];
+export type UpdateCategoryInput = Schemas['UpdateCategoryDto'];
+/** openapi.json khai `unitCost` sai kiểu (`Record<string, never>`); theo docs/api đó là chuỗi thập phân. */
+export type StockCardMovement = Omit<Schemas['StockCardMovementDto'], 'unitCost'> & {
+  unitCost?: string;
+};
+export type StockCard = Omit<Schemas['StockCardDto'], 'movements'> & {
+  movements: StockCardMovement[];
+};
 
 /** Nhập dữ liệu từ Excel (docs/api/endpoints.md mục 9). */
 export type ImportJob = Schemas['ImportJobDto'];
