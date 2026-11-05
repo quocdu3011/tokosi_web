@@ -3,6 +3,7 @@ import { AuditModule } from '../audit/audit.module.js';
 import { FilesModule } from '../files/files.module.js';
 import { CategoriesController } from './categories.controller.js';
 import { CategoriesService } from './categories.service.js';
+import { OrphanImagesService } from './orphan-images.service.js';
 import { ProductImagesController } from './product-images.controller.js';
 import { ProductImagesService } from './product-images.service.js';
 import { ProductsController } from './products.controller.js';
@@ -16,7 +17,12 @@ import { ProductsService } from './products.service.js';
     ProductsController,
     ProductImagesController,
   ],
-  providers: [CategoriesService, ProductsService, ProductImagesService],
+  providers: [
+    CategoriesService,
+    ProductsService,
+    ProductImagesService,
+    OrphanImagesService,
+  ],
   exports: [CategoriesService, ProductsService],
 })
 export class CatalogModule {}

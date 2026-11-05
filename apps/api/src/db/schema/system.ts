@@ -55,6 +55,8 @@ export const users = pgTable(
     defaultBranchId: uuid().references(() => branches.id),
     isActive: boolean().notNull().default(true),
     lastLoginAt: tstz(),
+    /** Lần cuối đổi/đặt lại mật khẩu. Access token cấp TRƯỚC mốc này bị từ chối ngay (null = chưa từng đổi). */
+    passwordChangedAt: tstz(),
     ...timestamps(),
     ...softDelete(),
   },

@@ -127,6 +127,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
       );
     }
     if (!res.headersSent) {
+      // 429: báo cho client biết phải chờ bao nhiêu giây (chuẩn HTTP)
+      const wait = (body.details as { retryAfterSeconds?: unknown } | undefined)
+        ?.retryAfterSeconds;
+      if (status === 429 && typeof wait === 'number')
+        res.setHeader('Retry-After', String(wait));
       res.setHeader('X-Request-Id', requestId);
       res.status(status).json(body);
     }

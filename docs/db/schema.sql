@@ -607,3 +607,5 @@ ALTER TABLE "audit_logs" ADD COLUMN "request_id" text;ALTER TABLE "audit_logs" A
 CREATE UNIQUE INDEX "categories_sibling_name_unique" ON "categories" USING btree (coalesce("parent_id", '00000000-0000-0000-0000-000000000000'::uuid),f_search_text("name")) WHERE "categories"."deleted_at" is null;
 -- ===== 0015_hang_hoa_ma_khong_phan_biet_hoa_thuong.sql =====
 CREATE UNIQUE INDEX "products_code_lower_unique" ON "products" USING btree (lower("code"));
+-- ===== 0016_mat_khau_doi_luc.sql =====
+ALTER TABLE "users" ADD COLUMN "password_changed_at" timestamp with time zone;

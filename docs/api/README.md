@@ -147,6 +147,7 @@ Mọi lỗi có cùng cấu trúc:
 | 502  | `STORAGE_ERROR`             | Kho lưu file ảnh lỗi; thử lại                                                                                            |
 | 503  | `STORAGE_NOT_CONFIGURED`    | Máy chủ chưa cấu hình kho lưu file ảnh                                                                                   |
 | 409  | `IDEMPOTENCY_CONFLICT`      | Cùng `Idempotency-Key` nhưng nội dung khác                                                                               |
+| 409  | `REQUEST_IN_PROGRESS`       | Yêu cầu cùng `Idempotency-Key` đang được xử lý; đợi rồi xem kết quả, đừng gửi lại                                        |
 | 409  | `VERSION_CONFLICT`          | Dữ liệu đã bị người khác sửa (gửi lại `updatedAt` mới nhất)                                                              |
 | 422  | `STOCK_NOT_ENOUGH`          | Không đủ tồn để xuất hóa đơn                                                                                             |
 | 422  | `CREDIT_LIMIT_EXCEEDED`     | Vượt hạn mức công nợ **(cảnh báo mềm ở MVP: xem `warnings` ở endpoint)**                                                 |
@@ -154,7 +155,7 @@ Mọi lỗi có cùng cấu trúc:
 | 422  | `ALLOCATION_EXCEEDS`        | Số tiền cấn trừ lớn hơn số còn nợ của hóa đơn                                                                            |
 | 400  | `BRANCH_REQUIRED`           | Cần chọn chi nhánh làm việc (gửi `X-Branch-Id`)                                                                          |
 | 403  | `BRANCH_FORBIDDEN`          | Không được phép làm việc với chi nhánh này                                                                               |
-| 429  | `RATE_LIMITED`              | Gọi quá nhanh; thử lại sau                                                                                               |
+| 429  | `RATE_LIMITED`              | Gọi quá nhanh / đăng nhập sai nhiều lần; thử lại sau. Header `Retry-After` cho biết số giây phải chờ                     |
 | 500  | `INTERNAL_ERROR`            | Lỗi hệ thống; báo kèm `requestId`                                                                                        |
 
 ## 6. Idempotency (chống tạo trùng)
@@ -163,6 +164,14 @@ Các thao tác tạo chứng từ ảnh hưởng tiền/kho/nợ phải gửi `I
 
 - Mạng chậm/timeout → frontend **gửi lại đúng key cũ**: server trả lại **kết quả ban đầu** (cùng chứng từ), không tạo bản mới.
 - Người dùng bấm "Lưu" lần mới (sau khi sửa nội dung) → sinh key mới.
+- **Quy tắc kỹ thuật (đã triển khai trên server):**
+  - Header `Idempotency-Key`: 8–128 ký tự gồm chữ, số và `. _ : -` (UUID là phù hợp). Thiếu hoặc sai dạng → `400 VALIDATION_ERROR` (`field = Idempotency-Key`).
+  - Khóa là của **từng người dùng** và còn hiệu lực **24 giờ**.
+  - Gửi lại cùng khóa + **cùng nội dung** (body, query, chi nhánh làm việc) → trả lại đúng mã trạng thái và nội dung lần đầu, kèm header `Idempotent-Replay: true`; server không xử lý lại.
+  - Cùng khóa nhưng **nội dung khác** → `409 IDEMPOTENCY_CONFLICT` (hãy sinh khóa mới cho thao tác mới).
+  - Yêu cầu trước **đang xử lý** (gửi song song) → `409 REQUEST_IN_PROGRESS`: đợi giây lát rồi xem kết quả, đừng gửi lại.
+  - Yêu cầu **thất bại** (lỗi 4xx/5xx) thì khóa được nhả, có thể sửa rồi gửi lại cùng khóa.
+  - Hiếm: nếu máy chủ sập đúng lúc vừa lưu chứng từ, gửi lại có thể nhận `REQUEST_IN_PROGRESS` đến hết 24 giờ — khi đó kiểm tra danh sách chứng từ thay vì tạo lại (hệ thống không bao giờ tạo trùng).
 - Áp dụng cho: `POST /invoices`, `POST /orders/:id/invoice`, `POST /sales-returns`, `POST /goods-receipts`, `POST /purchase-returns`, `POST /cash-transactions`, `POST /customers/:id/receipts`.
 
 ## 7. Enum
@@ -310,3 +319,4 @@ Dùng để khởi tạo lần đầu (`pnpm db:seed`) và cho nút "Khôi phụ
 | 2026-11-04 | Người dùng: số điện thoại được **chuẩn hóa** (`+84 901 234 567` → `0901234567`) và kiểm tra định dạng; `409 DUPLICATE_CODE` khi bộ đếm mã nhân viên lệch                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | 2026-11-05 | **Phân hệ Hàng hóa đã triển khai** (mục 2.1–2.3, 9): nhóm hàng; danh sách hàng hóa (lọc, tìm không dấu, theo chi nhánh), thẻ kho, tồn tối thiểu/tối đa theo chi nhánh; **tải nhiều ảnh một lần** (kho file S3, mỗi ảnh một URL, thêm `GET/PUT order/DELETE` ảnh); thiết lập giá (lưới giá theo chi nhánh, lưu lưới, tăng/giảm hàng loạt có `dryRun` BẮT BUỘC, sao chép giữa chi nhánh, đổi tên/tắt bảng giá); xuất Excel `?format=xlsx`; nhập Excel `products`/`price-books` (xử lý ngay trong yêu cầu, `dryRun` mặc định `true`, tất cả hoặc không gì cả). `GET /categories` và `GET /price-books` cần quyền `product.view` (trước ghi "đăng nhập"). Quantity trả dạng `"515.000"`. Mã lỗi mới: `DUPLICATE_NAME`, `IMPORT_TYPE_NOT_SUPPORTED`, `STORAGE_ERROR`, `STORAGE_NOT_CONFIGURED` |
 | 2026-11-06 | Tham số đường dẫn (`:id`, `:imageId`, `:branchId`) sai dạng UUID nay trả `400 VALIDATION_ERROR` với `details: [{ field, message }]` (trước đây `BAD_REQUEST`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 2026-11-06 | Lỗi 429 có header `Retry-After` (giây); header bảo mật (helmet) trên mọi phản hồi; `Idempotency-Key` đã hoạt động ở phía server (mục 6) kèm mã `REQUEST_IN_PROGRESS` và header `Idempotent-Replay`; sau khi đổi/đặt lại mật khẩu, access token cấp trước đó bị `401 UNAUTHENTICATED` ngay (đăng nhập lại)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |

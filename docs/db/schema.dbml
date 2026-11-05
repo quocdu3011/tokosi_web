@@ -909,6 +909,7 @@ Table users {
   default_branch_id uuid
   is_active boolean [not null, default: true]
   last_login_at timestamptz
+  password_changed_at timestamptz
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
   deleted_at timestamptz

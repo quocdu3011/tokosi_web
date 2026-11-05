@@ -28,6 +28,28 @@ describe('S3FileStorage (máy chủ S3 giả cục bộ)', () => {
           headers: req.headers,
           body: Buffer.concat(chunks),
         });
+        if (req.method === 'GET' && (req.url ?? '').includes('list-type=2')) {
+          const token = new URL(req.url ?? '', 'http://x').searchParams.get(
+            'continuation-token',
+          );
+          const page = token
+            ? ['products/b/3.png']
+            : ['products/a/1.png', 'products/a/2.png'];
+          const contents = page
+            .map(
+              (k) =>
+                `<Contents><Key>${k}</Key><LastModified>2026-11-01T00:00:00.000Z</LastModified><Size>3</Size></Contents>`,
+            )
+            .join('');
+          const next = token
+            ? ''
+            : '<NextContinuationToken>trang-2</NextContinuationToken>';
+          res.setHeader('Content-Type', 'application/xml');
+          res.end(
+            `<?xml version="1.0" encoding="UTF-8"?><ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>product-images</Name><Prefix>products/</Prefix><KeyCount>${page.length}</KeyCount><MaxKeys>2</MaxKeys><IsTruncated>${token ? 'false' : 'true'}</IsTruncated>${next}${contents}</ListBucketResult>`,
+          );
+          return;
+        }
         res.statusCode = respondWith;
         if (respondWith >= 400) {
           res.setHeader('Content-Type', 'application/xml');
@@ -94,6 +116,19 @@ describe('S3FileStorage (máy chủ S3 giả cục bộ)', () => {
       response: { code: 'STORAGE_ERROR' },
     });
   }, 30_000);
+
+  it('list: liệt kê qua nhiều trang (ContinuationToken) và trả đúng khóa + thời điểm sửa', async () => {
+    const files = await make().list('products/');
+    expect(files.map((f) => f.key)).toEqual([
+      'products/a/1.png',
+      'products/a/2.png',
+      'products/b/3.png',
+    ]);
+    expect(files[0]!.lastModified.toISOString()).toBe(
+      '2026-11-01T00:00:00.000Z',
+    );
+    expect(captured.filter((c) => c.method === 'GET')).toHaveLength(2);
+  });
 
   it('publicUrl ghép địa chỉ công khai với khóa đối tượng', () => {
     expect(make().publicUrl('products/abc/x.png')).toBe(

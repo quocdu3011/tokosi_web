@@ -75,6 +75,7 @@ Người dùng đăng nhập. Vai trò cố định (enum user_role).
 | `default_branch_id` | uuid | ✔ |  | → `branches.id` |
 | `is_active` | boolean |  | `true` |  |
 | `last_login_at` | timestamptz | ✔ |  |  |
+| `password_changed_at` | timestamptz | ✔ |  |  |
 | `created_at` | timestamptz |  | `now()` |  |
 | `updated_at` | timestamptz |  | `now()` |  |
 | `deleted_at` | timestamptz | ✔ |  |  |

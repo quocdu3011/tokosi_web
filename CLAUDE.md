@@ -24,20 +24,22 @@ docs/           Tài liệu thiết kế, ERD, ADR
 
 ## Lệnh thường dùng (chạy ở thư mục gốc)
 
-| Lệnh                                                        | Việc                                                                                             |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `pnpm install`                                              | Cài phụ thuộc                                                                                    |
-| `pnpm dev`                                                  | Chạy web + api ở chế độ phát triển                                                               |
-| `pnpm build` / `pnpm lint` / `pnpm typecheck` / `pnpm test` | Qua Turborepo (có cache)                                                                         |
-| `pnpm db:up` / `pnpm db:down`                               | Bật/tắt PostgreSQL + MinIO (kho file ảnh) cục bộ (cần Docker)                                    |
-| `pnpm --filter @kiot/api test`                              | Chạy test của một gói                                                                            |
-| `pnpm --filter @kiot/api test:e2e`                          | Test e2e của API (không cần CSDL thật)                                                           |
-| `pnpm --filter @kiot/api db:seed`                           | Dữ liệu khởi tạo đầy đủ (xem `docs/db/README.md`); chạy lại an toàn                              |
-| `pnpm --filter @kiot/api db:seed:demo`                      | Dữ liệu MẪU để dev (60 hàng, tồn, giá 7 bảng giá × 2 chi nhánh); chỉ dev, từ chối ở production   |
-| `pnpm --filter @kiot/api storage:init`                      | Tạo bucket ảnh + cho phép đọc công khai trên MinIO dev (chạy sau `pnpm db:up`); chạy lại an toàn |
-| `pnpm --filter @kiot/api openapi:export`                    | Xuất `docs/api/openapi.json` (chạy khi đổi endpoint/DTO, commit kèm)                             |
+| Lệnh                                                        | Việc                                                                                                                              |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm install`                                              | Cài phụ thuộc                                                                                                                     |
+| `pnpm dev`                                                  | Chạy web + api ở chế độ phát triển                                                                                                |
+| `pnpm build` / `pnpm lint` / `pnpm typecheck` / `pnpm test` | Qua Turborepo (có cache)                                                                                                          |
+| `pnpm db:up` / `pnpm db:down`                               | Bật/tắt PostgreSQL + MinIO (kho file ảnh) cục bộ (cần Docker)                                                                     |
+| `pnpm --filter @kiot/api test`                              | Chạy test của một gói                                                                                                             |
+| `pnpm --filter @kiot/api test:e2e`                          | Test e2e của API (không cần CSDL thật)                                                                                            |
+| `pnpm --filter @kiot/api db:seed`                           | Dữ liệu khởi tạo đầy đủ (xem `docs/db/README.md`); chạy lại an toàn                                                               |
+| `pnpm --filter @kiot/api db:seed:demo`                      | Dữ liệu MẪU để dev (60 hàng, tồn, giá 7 bảng giá × 2 chi nhánh); chỉ dev, từ chối ở production                                    |
+| `pnpm --filter @kiot/api storage:init`                      | Tạo bucket ảnh + cho phép đọc công khai trên MinIO dev (chạy sau `pnpm db:up`); chạy lại an toàn                                  |
+| `pnpm --filter @kiot/api db:reconcile`                      | Đối soát sổ cái với số liệu cache (tồn, công nợ nội bộ, quỹ); thoát mã 1 nếu lệch. Chạy hằng ngày khi chạy song song với KiotViet |
+| `pnpm --filter @kiot/api storage:gc`                        | Liệt kê file ảnh mồ côi trên kho file (thêm `--apply` để xóa)                                                                     |
+| `pnpm --filter @kiot/api openapi:export`                    | Xuất `docs/api/openapi.json` (chạy khi đổi endpoint/DTO, commit kèm)                                                              |
 
-Mọi PR phải qua: `lint`, `typecheck`, `test`, `build` (CI chạy đúng bộ này).
+Mọi PR phải qua: `lint`, `typecheck`, `test`, `build`, và `openapi.json` + `docs/db/` đã sinh lại (CI chạy đúng bộ này và so sánh tài liệu sinh tự động).
 
 ## Hợp đồng API (backend ↔ frontend)
 
@@ -70,6 +72,11 @@ Mọi PR phải qua: `lint`, `typecheck`, `test`, `build` (CI chạy đúng bộ
 - **Tham số đường dẫn là UUID:** luôn `@Param('id', ParseIdPipe)` (`common/parse-id.pipe.ts`), không dùng `ParseUUIDPipe` của Nest (trả `BAD_REQUEST`, sai hợp đồng lỗi).
 - **Danh sách:** dùng `PageQueryDto`/`pageParams`/`pageMeta`/`parseSort` (`common/pagination.ts`); tham số boolean dùng `QueryBoolean`; mọi danh sách có `?format=xlsx` dùng `common/excel.ts`.
 - **File (ảnh):** chỉ qua `FileStorage` (`modules/files/`, chuẩn S3). Kiểm tra loại file theo **nội dung** (`detectImage`), không theo đuôi/Content-Type. Cấu hình `S3_*` + `FILE_PUBLIC_BASE_URL`; production bắt buộc.
+- **Chống tạo trùng chứng từ:** endpoint tạo chứng từ gắn `@Idempotent()` (`modules/idempotency/`): bắt buộc header `Idempotency-Key`, gửi lại cùng khóa thì trả kết quả cũ. Interceptor chạy sau guard nên có người dùng.
+- **Công nợ + hạn mức:** nghiệp vụ đọc số dư công nợ để quyết định rồi ghi `debt_ledger` phải gọi `lockPartyBranch(tx, loại, id, chiNhánh)` (`common/advisory-lock.ts`) ĐẦU TIÊN trong transaction, nếu không hai hóa đơn song song cùng vượt hạn mức.
+- **Đối soát:** mọi kịch bản chứng từ mới nên kết thúc bằng `new ReconciliationService().run(db)` trong test và kỳ vọng `ok`.
+- **Kết nối CSDL:** `buildPoolConfig` đặt `statement_timeout` và `idle_in_transaction_session_timeout` (mặc định 30 giây): không giữ transaction mở khi chờ việc chậm (gọi kho file, băm mật khẩu…); làm những việc đó NGOÀI transaction.
+- **Sau reverse proxy:** đặt `TRUST_PROXY` (vd `1`), nếu không giới hạn đăng nhập sai và nhật ký thấy mọi người cùng một IP.
 - **Giá bán là số nguyên đồng** (kiểm tra ở API và khi nhập Excel); giá vốn/giá nhập mới có 4 chữ số thập phân.
 - **Test HTTP:** dùng `createHttpTestApp` (`src/test-utils/http-app.ts`) — ứng dụng thật đủ ba guard trên PostgreSQL trong bộ nhớ. Với phần chạm tiền/kho, làm thêm **kiểm tra ngược** (tạm gỡ bản sửa, test phải thất bại).
 

@@ -417,6 +417,8 @@ describe('Quản lý người dùng qua HTTP', () => {
       .set('Cookie', cookie.split(';')[0]!)
       .expect(401); // ...không làm mới được nữa
     await login('kho01', 'Mat-khau-ban-dau-kho1').expect(401);
+    const [afterReset] = await db.select().from(users).where(eq(users.id, id));
+    expect(afterReset!.passwordChangedAt).toBeInstanceOf(Date); // mốc để token cũ bị từ chối ngay
     const again = await login('kho01', res.body.temporaryPassword).expect(200);
     expect(again.body.user.mustChangePassword).toBe(true);
 

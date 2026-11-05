@@ -297,7 +297,12 @@ export class UsersService {
     await this.db.transaction(async (tx) => {
       await tx
         .update(users)
-        .set({ passwordHash, mustChangePassword: true, updatedAt: new Date() })
+        .set({
+          passwordHash,
+          mustChangePassword: true,
+          passwordChangedAt: new Date(),
+          updatedAt: new Date(),
+        })
         .where(eq(users.id, id));
       await this.auth.revokeAllSessions(id, 'admin', tx);
       await this.audit(

@@ -31,6 +31,13 @@ class MemoryStorage extends FileStorage {
   publicUrl(key: string): string {
     return `https://files.test/product-images/${key}`;
   }
+  list(prefix: string) {
+    return Promise.resolve(
+      [...this.objects.keys()]
+        .filter((k) => k.startsWith(prefix))
+        .map((key) => ({ key, lastModified: new Date() })),
+    );
+  }
   reset() {
     this.objects.clear();
     this.deleted = [];

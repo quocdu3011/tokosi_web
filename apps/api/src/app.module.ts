@@ -6,6 +6,7 @@ import { AuthModule } from './modules/auth/auth.module.js';
 import { AuthorizationModule } from './modules/authorization/authorization.module.js';
 import { BranchesModule } from './modules/branches/branches.module.js';
 import { CatalogModule } from './modules/catalog/catalog.module.js';
+import { IdempotencyModule } from './modules/idempotency/idempotency.module.js';
 import { ImportsModule } from './modules/imports/imports.module.js';
 import { FilesModule } from './modules/files/files.module.js';
 import { PricingModule } from './modules/pricing/pricing.module.js';
@@ -24,6 +25,7 @@ import { UsersModule } from './modules/users/users.module.js';
     CatalogModule,
     PricingModule,
     ImportsModule,
+    IdempotencyModule,
   ],
 })
 export class AppModule {}

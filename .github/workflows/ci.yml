@@ -36,3 +36,13 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      # openapi.json và docs/db/ do mã sinh ra: nếu quên sinh lại thì tài liệu cho frontend lệch với mã
+      - name: Tài liệu sinh tự động đã được cập nhật
+        run: |
+          pnpm --filter @kiot/api openapi:export
+          pnpm --filter @kiot/api db:docs
+          git diff --exit-code -- docs/api/openapi.json docs/db || {
+            echo "::error::openapi.json hoặc docs/db chưa cập nhật. Chạy 'pnpm --filter @kiot/api openapi:export' và 'pnpm --filter @kiot/api db:docs' rồi commit."
+            exit 1
+          }

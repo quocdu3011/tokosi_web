@@ -6,7 +6,7 @@ import { AppError } from '../../common/app-error.js';
 import { hashPassword, verifyPassword } from '../../common/password.js';
 import { passwordProblems } from '../../common/password-policy.js';
 import { APP_CONFIG, type AppConfig } from '../../config/app-config.js';
-import { DB, type Database } from '../../db/database.module.js';
+import { DB, type Database, type DbOrTx } from '../../db/database.module.js';
 import { refreshTokens, users } from '../../db/schema/index.js';
 import { AuditService } from '../audit/audit.service.js';
 import { BranchAccessService } from '../branches/branch-access.service.js';
@@ -239,19 +239,28 @@ export class AuthService {
       user.username,
     );
 
-    await this.db
-      .update(users)
-      .set({
-        passwordHash: await hashPassword(input.newPassword),
-        mustChangePassword: false,
-      })
-      .where(eq(users.id, userId));
-    await this.revokeAllSessions(userId, 'password_change');
-    await this.audit(userId, 'auth.password_changed', { ip: ctx.ip ?? null });
-    return {
-      session: await this.createSession(userId, ctx),
-      user: await this.buildUserView(userId),
-    };
+    // Băm mật khẩu (chậm) NGOÀI transaction; cập nhật mật khẩu + thu hồi phiên + nhật ký + phiên mới là MỘT khối:
+    // lỗi giữa chừng thì không có tình trạng mật khẩu đã đổi mà phiên cũ vẫn sống (hoặc ngược lại).
+    const passwordHash = await hashPassword(input.newPassword);
+    const session = await this.db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set({
+          passwordHash,
+          mustChangePassword: false,
+          passwordChangedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+      await this.revokeAllSessions(userId, 'password_change', tx);
+      await this.audit(
+        userId,
+        'auth.password_changed',
+        { ip: ctx.ip ?? null },
+        tx,
+      );
+      return this.createSession(userId, ctx, tx);
+    });
+    return { session, user: await this.buildUserView(userId) };
   }
 
   /** Thông tin người dùng + quyền hiện tại + chi nhánh được phép (cho `GET /auth/me`). */
@@ -300,12 +309,13 @@ export class AuthService {
   private async createSession(
     userId: string,
     ctx: RequestContext,
+    db: Pick<Database, 'insert'> = this.db,
   ): Promise<Session> {
     const refreshToken = generateRefreshToken();
     const refreshExpiresAt = new Date(
       Date.now() + this.config.refreshTtlDays * 24 * 3600 * 1000,
     );
-    await this.db.insert(refreshTokens).values({
+    await db.insert(refreshTokens).values({
       userId,
       tokenHash: hashRefreshToken(refreshToken),
       expiresAt: refreshExpiresAt,
@@ -359,8 +369,9 @@ export class AuthService {
     userId: string | null,
     action: string,
     after: Record<string, unknown>,
+    db: DbOrTx = this.db,
   ): Promise<void> {
-    await this.auditLog.record(this.db, {
+    await this.auditLog.record(db, {
       userId,
       action,
       entityType: 'auth',

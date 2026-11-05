@@ -31,6 +31,7 @@ import { AuthorizationModule } from '../authorization/authorization.module.js';
 import { BranchesModule } from '../branches/branches.module.js';
 import { RequireBranch } from '../branches/require-branch.decorator.js';
 import { AuthModule } from './auth.module.js';
+import { AuthService } from './auth.service.js';
 import { TokenService, hashRefreshToken } from './token.service.js';
 
 process.env.JWT_ACCESS_SECRET = 'http-test-secret-http-test-secret-0123456789';
@@ -286,6 +287,9 @@ describe('Xác thực qua HTTP (đủ AuthGuard + PermissionGuard + BranchContex
     for (let i = 0; i < 5; i++) await login('sale2', 'sai-sai-sai').expect(401);
     const blocked = await login('sale2', USER_PW).expect(429);
     expect(blocked.body.code).toBe('RATE_LIMITED');
+    expect(Number(blocked.headers['retry-after'])).toBe(
+      blocked.body.details.retryAfterSeconds,
+    );
     expect(blocked.body.details.retryAfterSeconds).toBeGreaterThan(0);
     // tài khoản khác cùng IP không bị ảnh hưởng
     await login('sale1', USER_PW).expect(200);
@@ -614,6 +618,75 @@ describe('Xác thực qua HTTP (đủ AuthGuard + PermissionGuard + BranchContex
     expect(results.filter((s) => s === 429).length).toBeGreaterThanOrEqual(25);
     await login('sale6', USER_PW).expect(429);
   }, 60_000);
+
+  it('đổi mật khẩu: access token cấp TRƯỚC đó bị từ chối NGAY (không chờ 15 phút), token mới dùng được; ghi mốc password_changed_at', async () => {
+    const u = await makeUser('pw1', 'sales', {
+      branchIds: [sg],
+      defaultBranchId: sg,
+    });
+    // token cấp từ 5 giây trước (thiết bị khác đang đăng nhập)
+    const oldToken = (
+      await tokens.signAccessToken(u.id, new Date(Date.now() - 5000))
+    ).token;
+    await http().get('/api/v1/auth/me').set(bearer(oldToken)).expect(200);
+
+    const a = await loginOk('pw1');
+    const changed = await http()
+      .post('/api/v1/auth/change-password')
+      .set(bearer(a.token))
+      .send({
+        currentPassword: USER_PW,
+        newPassword: 'Mat-khau-hoan-toan-moi-1',
+      })
+      .expect(200);
+    const rejected = await http()
+      .get('/api/v1/auth/me')
+      .set(bearer(oldToken))
+      .expect(401);
+    expect(rejected.body.code).toBe('UNAUTHENTICATED');
+    await http()
+      .get('/api/v1/auth/me')
+      .set(bearer(changed.body.accessToken))
+      .expect(200);
+    const [row] = await db.select().from(users).where(eq(users.id, u.id));
+    expect(row!.passwordChangedAt).toBeInstanceOf(Date);
+  });
+
+  it('đổi mật khẩu là MỘT khối: lỗi giữa chừng thì mật khẩu KHÔNG đổi và phiên cũ KHÔNG bị thu hồi', async () => {
+    const u = await makeUser('pw2', 'sales', {
+      branchIds: [sg],
+      defaultBranchId: sg,
+    });
+    const s = await loginOk('pw2');
+    const spy = vi
+      .spyOn(
+        AuthService.prototype as unknown as {
+          createSession: () => Promise<unknown>;
+        },
+        'createSession',
+      )
+      .mockRejectedValueOnce(new Error('lỗi giả lập khi tạo phiên mới'));
+    try {
+      await http()
+        .post('/api/v1/auth/change-password')
+        .set(bearer(s.token))
+        .send({
+          currentPassword: USER_PW,
+          newPassword: 'Mat-khau-hoan-toan-moi-2',
+        })
+        .expect(500);
+    } finally {
+      spy.mockRestore();
+    }
+
+    await login('pw2', USER_PW).expect(200); // mật khẩu cũ vẫn dùng được
+    await http()
+      .post('/api/v1/auth/refresh')
+      .set('Cookie', s.cookie)
+      .expect(200); // phiên cũ chưa bị thu hồi
+    const [row] = await db.select().from(users).where(eq(users.id, u.id));
+    expect(row!.passwordChangedAt).toBeNull();
+  });
 
   it('đăng xuất: 204, xóa cookie, refresh token không dùng lại được; gọi lặp không lỗi', async () => {
     const s = await loginOk('sale1');
