@@ -188,3 +188,49 @@
   padding: 2px 8px;
   font-size: 12px;
 }
+
+/* Số liệu canh phải trong ô/tiêu đề cột của bảng */
+.num {
+  display: block;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.stock-low {
+  color: var(--red);
+}
+
+/* Lưới giá: ô nhập giá, thanh lưu thay đổi, xem trước điều chỉnh hàng loạt */
+.price-input {
+  width: 128px;
+  margin-left: auto;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.price-input[data-changed="true"] {
+  border-color: var(--amber);
+}
+.save-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-xl);
+  border: 1px solid var(--amber);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+}
+.save-bar-actions {
+  display: flex;
+  gap: var(--space-md);
+}
+.save-bar-error {
+  color: var(--red);
+}
+.bulk-preview {
+  display: grid;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+  max-height: 320px;
+  overflow: auto;
+}

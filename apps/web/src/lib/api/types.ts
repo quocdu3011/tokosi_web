@@ -45,6 +45,21 @@ export interface SetUserBranchesInput {
 }
 export type RoleCode = Schemas['RoleSummaryDto']['role'];
 
+/** Phân hệ Hàng hóa (docs/api/endpoints.md mục 2). */
+export type Product = Schemas['ProductDto'];
+export type ProductList = Schemas['ProductListDto'];
+export type CategoryNode = Schemas['CategoryNodeDto'];
+
+/** Thiết lập giá (docs/api/endpoints.md mục 2.3). */
+export type PriceBook = Schemas['PriceBookDto'];
+export type PriceGrid = Schemas['GridDto'];
+export type PriceGridRow = Schemas['GridRowDto'];
+export type SaveGridResult = Schemas['SaveGridResultDto'];
+export type BulkAdjustInput = Schemas['BulkAdjustDto'];
+export type BulkAdjustResult = Schemas['BulkAdjustResultDto'];
+export type CopyBranchInput = Schemas['CopyBranchDto'];
+export type CopyBranchResult = Schemas['CopyBranchResultDto'];
+
 /** Phân trang chuẩn của mọi danh sách (docs/api/README.md mục 4). */
 export interface PageMeta {
   page: number;

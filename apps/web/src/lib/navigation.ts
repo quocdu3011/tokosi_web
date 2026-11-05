@@ -47,9 +47,9 @@ export const NAV_SECTIONS: NavSection[] = [
         href: '/products',
         label: 'Danh sách hàng hóa',
         permissions: ['product.view'],
-        ready: false,
+        ready: true,
       },
-      { href: '/price-books', label: 'Thiết lập giá', permissions: ['product.view'], ready: false },
+      { href: '/price-books', label: 'Thiết lập giá', permissions: ['product.view'], ready: true },
     ],
   },
   {
