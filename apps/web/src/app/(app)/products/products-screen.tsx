@@ -48,7 +48,6 @@ const PAGE_SORT: Record<string, (p: Product) => SortValue> = {
   costPrice: (p) => decimalSortValue(p.costPrice),
   reserved: (p) => decimalSortValue(p.reserved),
   available: (p) => decimalSortValue(p.available),
-  location: (p) => p.location,
   status: (p) => (p.isActive ? 0 : 1),
 };
 const SORTABLE_IDS: readonly string[] = [...SERVER_SORT_IDS, ...Object.keys(PAGE_SORT)];
@@ -64,7 +63,6 @@ const DEFAULT_WIDTHS = {
   onHand: 110,
   reserved: 110,
   available: 120,
-  location: 120,
   status: 210,
 };
 const COLUMN_LABELS: Record<string, string> = {
@@ -74,7 +72,6 @@ const COLUMN_LABELS: Record<string, string> = {
   onHand: 'tồn kho',
   reserved: 'khách đặt',
   available: 'có thể bán',
-  location: 'vị trí',
   status: 'trạng thái',
 };
 
@@ -148,18 +145,7 @@ export function ProductsScreen() {
       {
         id: 'onHand',
         header: () => <span className="num">Tồn kho</span>,
-        cell: ({ row }) => {
-          const { onHand, minStock } = row.original;
-          const low = minStock !== null && Number(onHand) < Number(minStock);
-          return (
-            <span
-              className={low ? 'num stock-low' : 'num'}
-              title={low ? 'Dưới tồn tối thiểu' : undefined}
-            >
-              {formatDecimal(onHand) || '0'}
-            </span>
-          );
-        },
+        cell: ({ row }) => <span className="num">{formatDecimal(row.original.onHand) || '0'}</span>,
       },
       {
         id: 'reserved',
@@ -175,7 +161,6 @@ export function ProductsScreen() {
           <span className="num">{formatDecimal(row.original.available) || '0'}</span>
         ),
       },
-      { id: 'location', header: 'Vị trí', cell: ({ row }) => row.original.location ?? '' },
       {
         id: 'status',
         header: 'Trạng thái',
@@ -216,7 +201,6 @@ export function ProductsScreen() {
       { header: 'Tồn kho', value: (p) => formatDecimal(p.onHand) || '0', numeric: true },
       { header: 'Khách đặt', value: (p) => formatDecimal(p.reserved) || '0', numeric: true },
       { header: 'Có thể bán', value: (p) => formatDecimal(p.available) || '0', numeric: true },
-      { header: 'Vị trí', value: (p) => p.location ?? '' },
       {
         header: 'Trạng thái',
         value: (p) => (p.isActive ? 'Đang kinh doanh' : 'Ngừng kinh doanh'),
