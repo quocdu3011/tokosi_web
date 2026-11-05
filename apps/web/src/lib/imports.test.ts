@@ -25,8 +25,8 @@ describe('isModeSupported', () => {
   it('import đè luôn dùng được', () => {
     expect(isModeSupported('products', 'overwrite')).toBe(true);
   });
-  it('import thêm bị khóa tới khi API hỗ trợ (tránh ghi đè nhầm số lượng)', () => {
-    expect(isModeSupported('products', 'add')).toBe(false);
+  it('import thêm dùng được cho hàng hóa (API đã có mode=add)', () => {
+    expect(isModeSupported('products', 'add')).toBe(true);
   });
 });
 

@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { errorMessage } from '@/lib/api';
 import type { ImportJob } from '@/lib/api/types';
+import { useAuthStore } from '@/lib/auth/store';
 import { useBranchStore } from '@/lib/branch';
 import {
   IMPORT_MODE_LABELS,
@@ -41,6 +42,7 @@ const MAX_ERRORS_SHOWN = 50;
 export function ImportDialog({ type, onClose }: { type: ImportType; onClose: () => void }) {
   const config = IMPORT_TYPES[type];
   const branchId = useBranchStore((s) => s.branchId);
+  const branchName = useAuthStore((s) => s.user?.branches.find((b) => b.id === branchId)?.name);
   const mutation = useRunImport();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -181,6 +183,30 @@ export function ImportDialog({ type, onClose }: { type: ImportType; onClose: () 
             </p>
           )}
         </div>
+
+        {mode === 'add' && (
+          <div className="alert alert-warning" role="note">
+            <strong>Import thêm làm đổi tồn kho của {branchName ?? 'chi nhánh đang chọn'}.</strong>
+            <ul className="import-notes">
+              <li>
+                Cột &quot;Tồn kho&quot; được CỘNG vào tồn hiện có; số âm là TRỪ (không xuống dưới
+                0).
+              </li>
+              <li>
+                Cột &quot;Giá vốn&quot; (nếu có) là giá nhập của lô cộng thêm; thiếu thì giữ giá vốn
+                hiện tại.
+              </li>
+              <li>
+                Hàng đã có chỉ đổi tồn, mọi thông tin khác giữ nguyên; mã mới được tạo (cần tên
+                hàng).
+              </li>
+              <li>
+                <strong>Chạy lại cùng file sẽ cộng thêm lần nữa.</strong> Hãy bấm &quot;Kiểm tra
+                file&quot; rồi nhập đúng một lần.
+              </li>
+            </ul>
+          </div>
+        )}
 
         {checked && <ImportResult job={checked} />}
 

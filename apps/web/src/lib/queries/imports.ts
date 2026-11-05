@@ -13,7 +13,7 @@ export interface RunImportArgs {
   file: File;
   /** `true` = chỉ kiểm tra, không ghi gì (mặc định của API); `false` mới ghi thật. */
   dryRun: boolean;
-  /** Chi nhánh cho tồn tối thiểu-tối đa / vị trí. */
+  /** Chi nhánh cho tồn tối thiểu-tối đa / vị trí và tồn kho của Import thêm. */
   branchId: string | null;
 }
 
@@ -25,7 +25,8 @@ export function runImport({ type, mode, file, dryRun, branchId }: RunImportArgs)
   const body = new FormData();
   body.append('file', file);
   return api.post<ImportJob>(`/imports/${type}`, body, {
-    query: { dryRun, branchId },
+    // `mode` luôn gửi rõ ràng (không dựa vào mặc định của API) để không bao giờ nhầm đè với thêm.
+    query: { dryRun, branchId, mode },
   });
 }
 

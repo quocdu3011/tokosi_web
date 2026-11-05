@@ -10,8 +10,9 @@ export type ImportType = 'products';
 
 /**
  * - `overwrite` (Import đè): cùng khóa (mã) thì ghi thông tin trong file lên bản ghi cũ; ô trống hoặc
- *   mã không có trong file thì giữ nguyên. Đây chính là cách API `/imports/:type` hiện chạy.
- * - `add` (Import thêm): cùng khóa thì CỘNG THÊM số lượng, thông tin khác giữ nguyên bản cũ.
+ *   mã không có trong file thì giữ nguyên. Cột Tồn kho/Giá vốn bị bỏ qua.
+ * - `add` (Import thêm): cùng khóa thì CỘNG cột Tồn kho vào tồn của chi nhánh đang chọn (số âm = trừ),
+ *   thông tin khác giữ nguyên bản cũ; mã mới được tạo. KHÔNG idempotent: chạy lại sẽ cộng thêm lần nữa.
  */
 export type ImportMode = 'overwrite' | 'add';
 
@@ -25,7 +26,7 @@ export interface ImportTypeConfig {
   /** Mô tả khóa so khớp, hiện ở phần giải thích chế độ. */
   keyLabel: string;
   /**
-   * API đã có chế độ "Import thêm" cho loại này chưa. Hiện CHƯA (API chỉ có chế độ đè) → nút bị khóa,
+   * API đã có chế độ "Import thêm" cho loại này chưa (`?mode=add`). Loại nào chưa có thì nút bị khóa,
    * tuyệt đối không giả lập bằng cách gửi file đè vì sẽ ghi sai số liệu.
    */
   addModeSupported: boolean;
@@ -37,7 +38,7 @@ export const IMPORT_TYPES: Record<ImportType, ImportTypeConfig> = {
     templateFilename: 'mau-nhap-hang-hoa.xlsx',
     needsBranch: true,
     keyLabel: 'Mã hàng',
-    addModeSupported: false,
+    addModeSupported: true,
   },
 };
 
@@ -49,7 +50,8 @@ export const IMPORT_MODE_LABELS: Record<ImportMode, { title: string; description
   },
   add: {
     title: 'Import thêm',
-    description: 'Cùng khóa (mã) thì cộng thêm số lượng vào bản cũ; các thông tin khác giữ nguyên.',
+    description:
+      'Cùng mã thì CỘNG cột Tồn kho vào tồn của chi nhánh đang chọn (số âm = trừ tồn); Giá vốn trong file là giá nhập của lô cộng. Thông tin khác giữ nguyên; mã mới được tạo.',
   },
 };
 

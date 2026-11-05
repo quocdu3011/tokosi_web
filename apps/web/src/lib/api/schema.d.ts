@@ -600,7 +600,7 @@ export interface paths {
     put?: never;
     /**
      * Tải file Excel lên để nhập (type: products)
-     * @description Mặc định chỉ KIỂM TRA (dryRun=true), không ghi gì; gửi dryRun=false để ghi thật. Xử lý ngay trong yêu cầu nên kết quả (status completed hoặc failed) có sẵn trong phản hồi; vẫn xem lại được qua GET /imports/:id. Tất cả hoặc không gì cả: có dòng lỗi thì không ghi gì. Chạy lại cùng file không tạo trùng (cập nhật theo mã hàng).
+     * @description Mặc định chỉ KIỂM TRA (dryRun=true), không ghi gì; gửi dryRun=false để ghi thật. Xử lý ngay trong yêu cầu nên kết quả (status completed hoặc failed) có sẵn trong phản hồi; vẫn xem lại được qua GET /imports/:id. Tất cả hoặc không gì cả: có dòng lỗi thì không ghi gì. mode=overwrite (mặc định): cập nhật theo mã hàng, chạy lại cùng file không tạo trùng. mode=add: CỘNG tồn kho theo cột Tồn kho nên chạy lại sẽ cộng thêm lần nữa.
      */
     post: operations['ImportsController_run'];
     delete?: never;
@@ -1150,6 +1150,11 @@ export interface components {
       id: string;
       /** @enum {string} */
       type: 'products' | 'customers' | 'suppliers';
+      /**
+       * @description `overwrite` = đè theo mã; `add` = cộng thêm tồn kho (cột Tồn kho), giữ nguyên thông tin cũ
+       * @enum {string}
+       */
+      mode: 'overwrite' | 'add';
       /**
        * @description Hiện nhập xử lý ngay trong yêu cầu nên chỉ gặp completed hoặc failed. failed = có dòng lỗi hoặc lỗi hệ thống, KHÔNG ghi gì
        * @enum {string}
@@ -2306,9 +2311,11 @@ export interface operations {
   ImportsController_run: {
     parameters: {
       query?: {
+        /** @description `overwrite` (mặc định) = Import đè: cùng mã thì ghi thông tin trong file lên bản cũ, ô trống giữ nguyên. `add` = Import thêm: cùng mã thì CỘNG cột Tồn kho vào tồn của chi nhánh (số âm = trừ, không xuống dưới 0), thông tin khác giữ nguyên bản cũ; mã mới được tạo đầy đủ. Bắt buộc có branchId. Chạy lại sẽ cộng thêm lần nữa */
+        mode?: 'overwrite' | 'add';
         /** @description true (mặc định) = chỉ kiểm tra, không ghi gì. Phải gửi dryRun=false mới ghi thật */
         dryRun?: boolean;
-        /** @description Chi nhánh cho tồn tối thiểu/tối đa, vị trí kho. Bắt buộc nếu file có các cột đó */
+        /** @description Chi nhánh cho tồn tối thiểu/tối đa, vị trí kho và tồn kho (Import thêm). Bắt buộc nếu file có các cột đó hoặc mode=add */
         branchId?: string;
       };
       header?: never;
