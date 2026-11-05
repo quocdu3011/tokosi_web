@@ -625,3 +625,20 @@ CREATE TABLE "user_identities" (
 	"linked_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 ALTER TABLE "system_settings" ADD CONSTRAINT "system_settings_updated_by_users_id_fk" FOREIGN KEY ("updated_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;ALTER TABLE "user_identities" ADD CONSTRAINT "user_identities_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;CREATE UNIQUE INDEX "user_identities_provider_subject_unique" ON "user_identities" USING btree ("provider","provider_subject");CREATE INDEX "user_identities_user_idx" ON "user_identities" USING btree ("user_id");
+-- ===== 0018_loai_hang_combo.sql =====
+CREATE TYPE "public"."product_type" AS ENUM('goods', 'combo');CREATE TABLE "product_components" (
+	"combo_id" uuid NOT NULL,
+	"component_id" uuid NOT NULL,
+	"qty" integer NOT NULL,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	CONSTRAINT "product_components_combo_id_component_id_pk" PRIMARY KEY("combo_id","component_id"),
+	CONSTRAINT "product_components_qty_positive" CHECK ("product_components"."qty" > 0),
+	CONSTRAINT "product_components_not_self" CHECK ("product_components"."combo_id" <> "product_components"."component_id")
+);
+ALTER TABLE "product_components" ADD CONSTRAINT "product_components_combo_id_products_id_fk" FOREIGN KEY ("combo_id") REFERENCES "public"."products"("id") ON DELETE cascade ON UPDATE no action;ALTER TABLE "product_components" ADD CONSTRAINT "product_components_component_id_products_id_fk" FOREIGN KEY ("component_id") REFERENCES "public"."products"("id") ON DELETE no action ON UPDATE no action;CREATE INDEX "product_components_component_idx" ON "product_components" USING btree ("component_id");ALTER TABLE "products" DROP COLUMN "unit";ALTER TABLE "products" DROP COLUMN "weight_g";ALTER TABLE "products" DROP COLUMN "is_sellable";ALTER TABLE "invoice_items" DROP COLUMN "unit";ALTER TABLE "products" ADD COLUMN "product_type" "product_type" DEFAULT 'goods' NOT NULL;CREATE INDEX "products_type_idx" ON "products" USING btree ("product_type");
+
+-- ===== 0019_bo_gia_ban.sql =====
+ALTER TABLE "price_book_items" DISABLE ROW LEVEL SECURITY;ALTER TABLE "price_books" DISABLE ROW LEVEL SECURITY;DROP TABLE "price_book_items" CASCADE;DROP TABLE "price_books" CASCADE;ALTER TABLE "customers" DROP CONSTRAINT IF EXISTS "customers_default_price_book_id_price_books_id_fk";
+ALTER TABLE "invoices" DROP CONSTRAINT IF EXISTS "invoices_price_book_id_price_books_id_fk";
+ALTER TABLE "orders" DROP CONSTRAINT IF EXISTS "orders_price_book_id_price_books_id_fk";
+DROP INDEX IF EXISTS "customers_price_book_idx";ALTER TABLE "customers" DROP COLUMN "default_price_book_id";ALTER TABLE "invoices" DROP COLUMN "price_book_id";ALTER TABLE "orders" DROP COLUMN "price_book_id";DELETE FROM "role_permissions" WHERE "permission_code" = 'price.edit';

@@ -15,7 +15,6 @@ import {
   codeSequences,
   companyProfile,
   customers,
-  priceBooks,
   suppliers,
   users,
 } from '../schema/index.js';
@@ -25,7 +24,6 @@ import {
   CASH_ACCOUNT_TEMPLATES,
   CASH_CATEGORIES,
   CODE_SEQUENCES,
-  PRICE_BOOKS,
 } from './data.js';
 
 export interface SeedOptions {
@@ -40,7 +38,6 @@ export interface SeedOptions {
 export interface SeedReport {
   branches: number;
   branchPartners: number;
-  priceBooks: number;
   cashAccounts: number;
   cashCategories: number;
   codeSequences: number;
@@ -80,7 +77,6 @@ export async function runSeed(
   const report: SeedReport = {
     branches: 0,
     branchPartners: 0,
-    priceBooks: 0,
     cashAccounts: 0,
     cashCategories: 0,
     codeSequences: 0,
@@ -133,15 +129,6 @@ export async function runSeed(
           .returning({ id: suppliers.id })
       ).length;
     }
-
-    // Bảng giá
-    report.priceBooks = (
-      await tx
-        .insert(priceBooks)
-        .values(PRICE_BOOKS.map((p) => ({ ...p })))
-        .onConflictDoNothing()
-        .returning({ id: priceBooks.id })
-    ).length;
 
     // Quỹ riêng từng chi nhánh (chỉ tạo cho chi nhánh CHƯA có quỹ nào, vì tên quỹ do người dùng đặt)
     for (const b of allBranches) {

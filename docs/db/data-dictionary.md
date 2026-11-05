@@ -2,12 +2,12 @@
 
 > **Sinh tự động** từ `apps/api/src/db/schema` bằng `pnpm db:docs` — không sửa tay. Tổng quan và cách xem sơ đồ: [`README.md`](README.md).
 
-**41 bảng · 17 kiểu liệt kê (enum)**
+**40 bảng · 18 kiểu liệt kê (enum)**
 
 ## Mục lục
 
 - **Hệ thống**: [`branches`](#branches), [`users`](#users), [`refresh_tokens`](#refresh_tokens), [`audit_logs`](#audit_logs), [`code_sequences`](#code_sequences), [`company_profile`](#company_profile), [`idempotency_keys`](#idempotency_keys), [`import_jobs`](#import_jobs), [`user_branches`](#user_branches), [`role_permissions`](#role_permissions), [`user_identities`](#user_identities), [`system_settings`](#system_settings)
-- **Hàng hóa & giá**: [`categories`](#categories), [`products`](#products), [`product_images`](#product_images), [`price_books`](#price_books), [`price_book_items`](#price_book_items)
+- **Hàng hóa & giá**: [`categories`](#categories), [`products`](#products), [`product_images`](#product_images), [`product_components`](#product_components), [`price_books`](#price_books), [`price_book_items`](#price_book_items)
 - **Tồn kho & chuyển kho**: [`stocks`](#stocks), [`stock_movements`](#stock_movements), [`stock_transfers`](#stock_transfers), [`stock_transfer_items`](#stock_transfer_items)
 - **Đối tác**: [`customers`](#customers), [`customer_branch_terms`](#customer_branch_terms), [`customer_invoice_profiles`](#customer_invoice_profiles), [`suppliers`](#suppliers)
 - **Đơn hàng**: [`orders`](#orders), [`order_items`](#order_items), [`invoices`](#invoices), [`invoice_items`](#invoice_items), [`invoice_payments`](#invoice_payments), [`sales_returns`](#sales_returns), [`sales_return_items`](#sales_return_items)
@@ -29,6 +29,7 @@
 | `party_type` | `customer`, `supplier`, `employee` |
 | `payment_method` | `cash`, `bank` |
 | `permission_scope` | `all`, `own` |
+| `product_type` | `goods`, `combo` |
 | `return_settlement` | `offset_debt`, `refund` |
 | `shipping_payer` | `sender`, `receiver` |
 | `stock_ref_type` | `opening`, `goods_receipt`, `invoice`, `sales_return`, `purchase_return`, `adjustment`, `transfer_out`, `transfer_in`, `transfer_cancel` |
@@ -295,11 +296,9 @@ Hàng hóa — chỉ thông tin DÙNG CHUNG giữa các chi nhánh. Giá bán �
 | `code` | text |  |  | unique |
 | `name` | text |  |  |  |
 | `category_id` | uuid | ✔ |  | → `categories.id` |
-| `unit` | text |  | `'Cái'` | Đơn vị tính (quy cách thường nằm trong tên hàng) |
+| `product_type` | product_type |  | `'goods'` | Loại hàng: goods = Hàng hóa (mặc định), combo = gói các hàng thành phần (không có tồn/giá vốn riêng) |
 | `description` | text | ✔ |  |  |
-| `weight_g` | numeric(12,2) | ✔ |  |  |
 | `is_active` | boolean |  | `true` |  |
-| `is_sellable` | boolean |  | `true` |  |
 | `created_by` | uuid | ✔ |  | → `users.id` |
 | `created_at` | timestamptz |  | `now()` |  |
 | `updated_at` | timestamptz |  | `now()` |  |
@@ -310,6 +309,7 @@ Hàng hóa — chỉ thông tin DÙNG CHUNG giữa các chi nhánh. Giá bán �
 - `products_category_idx`: `category_id`
 - `products_search_trgm`: `f_search_text(code || ' ' || name) gin_trgm_ops`
 - `products_active_idx`: `is_active`
+- `products_type_idx`: `product_type`
 - `products_code_lower_unique` (unique): `lower(code)`
 
 ### product_images
@@ -329,44 +329,27 @@ Hàng hóa — chỉ thông tin DÙNG CHUNG giữa các chi nhánh. Giá bán �
 
 - `product_images_product_idx`: `product_id`
 
-### price_books
+### product_components
 
-Bảng giá theo hạng khách (Chung, Lớn, Vừa, VIP và 3 bản VAT). Thiếu giá thì lùi về bảng mặc định.
+Thành phần của combo: combo_id → component_id (hàng hóa) với qty nguyên dương. Combo không có tồn/giá vốn riêng, luôn tính từ thành phần.
 
 | Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
 | --- | --- | :-: | --- | --- |
-| `id` | uuid |  | `gen_random_uuid()` | **PK** |
-| `code` | text |  |  | unique |
-| `name` | text |  |  |  |
-| `with_vat` | boolean |  | `false` |  |
-| `is_default` | boolean |  | `false` |  |
-| `is_active` | boolean |  | `true` |  |
+| `combo_id` | uuid |  |  | **PK**; → `products.id` (on delete cascade) |
+| `component_id` | uuid |  |  | **PK**; → `products.id` |
+| `qty` | integer |  |  |  |
 | `sort_order` | integer |  | `0` |  |
-| `created_at` | timestamptz |  | `now()` |  |
-| `updated_at` | timestamptz |  | `now()` |  |
+
+**Khóa chính ghép:** (`combo_id`, `component_id`)
 
 **Chỉ mục:**
 
-- `price_books_one_default` (unique): `is_default` WHERE isDefault
+- `product_components_component_idx`: `component_id`
 
-### price_book_items
+**Ràng buộc CHECK:**
 
-Giá bán của từng sản phẩm trong từng bảng giá, TẠI TỪNG CHI NHÁNH.
-
-| Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
-| --- | --- | :-: | --- | --- |
-| `price_book_id` | uuid |  |  | **PK**; → `price_books.id` (on delete cascade) |
-| `branch_id` | uuid |  |  | **PK**; → `branches.id` |
-| `product_id` | uuid |  |  | **PK**; → `products.id` (on delete cascade) |
-| `price` | numeric(18,4) |  |  | Giá bán tại chi nhánh (branch_id) trong bảng giá (price_book_id) |
-| `updated_by` | uuid | ✔ |  | → `users.id` |
-| `updated_at` | timestamptz |  | `now()` |  |
-
-**Khóa chính ghép:** (`price_book_id`, `branch_id`, `product_id`)
-
-**Chỉ mục:**
-
-- `price_book_items_branch_product_idx`: `branch_id`, `product_id`
+- `product_components_qty_positive`: `qty > 0`
+- `product_components_not_self`: `comboId <> componentId`
 
 ## Tồn kho & chuyển kho
 
@@ -494,7 +477,6 @@ Khách hàng. Công nợ không lưu ở đây: số dư = tổng debt_ledger (c
 | `address` | text | ✔ |  |  |
 | `facebook` | text | ✔ |  |  |
 | `sales_owner_id` | uuid | ✔ |  | → `users.id`; Nhân viên phụ trách (ở KiotViet là "Nhóm khách hàng") |
-| `default_price_book_id` | uuid | ✔ |  | → `price_books.id`; Bảng giá tự áp khi đặt hàng |
 | `linked_branch_id` | uuid | ✔ |  | unique; → `branches.id`; Khách hàng hệ thống đại diện một chi nhánh (chuyển kho nội bộ) |
 | `note` | text | ✔ |  |  |
 | `is_active` | boolean |  | `true` |  |
@@ -507,7 +489,6 @@ Khách hàng. Công nợ không lưu ở đây: số dư = tổng debt_ledger (c
 
 - `customers_search_trgm`: `f_search_text(code || ' ' || name || ' ' || coalesce(phone, '')) gin_trgm_ops`
 - `customers_sales_owner_idx`: `sales_owner_id`
-- `customers_price_book_idx`: `default_price_book_id`
 
 ### customer_branch_terms
 
@@ -579,7 +560,6 @@ Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng 
 | `branch_id` | uuid |  |  | → `branches.id` |
 | `customer_id` | uuid |  |  | → `customers.id` |
 | `status` | order_status |  | `'draft'` |  |
-| `price_book_id` | uuid |  |  | → `price_books.id` |
 | `seller_id` | uuid | ✔ |  | → `users.id` |
 | `ordered_at` | timestamptz |  |  |  |
 | `subtotal` | numeric(18,0) |  | `0` |  |
@@ -643,7 +623,6 @@ Hóa đơn bán. Không sửa sau khi tạo (hủy và tạo lại). root_invoic
 | `branch_id` | uuid |  |  | → `branches.id` |
 | `order_id` | uuid | ✔ |  | unique; → `orders.id` |
 | `customer_id` | uuid |  |  | → `customers.id` |
-| `price_book_id` | uuid |  |  | → `price_books.id` |
 | `seller_id` | uuid | ✔ |  | → `users.id` |
 | `invoiced_at` | timestamptz |  |  |  |
 | `subtotal` | numeric(18,0) |  |  |  |
@@ -680,7 +659,6 @@ Dòng hóa đơn; lưu bản sao mã/tên/đơn vị/giá vốn tại thời đi
 | `product_id` | uuid |  |  | → `products.id` |
 | `product_code` | text |  |  |  |
 | `product_name` | text |  |  |  |
-| `unit` | text | ✔ |  |  |
 | `qty` | numeric(14,3) |  |  |  |
 | `list_price` | numeric(18,4) |  |  |  |
 | `discount_per_unit` | numeric(18,4) |  | `0` | Giảm giá tính trên 1 đơn vị (số tiền, không phải %) |

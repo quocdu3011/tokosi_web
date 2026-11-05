@@ -275,7 +275,7 @@ Các file chứng từ đều là dạng **phẳng**: thông tin phiếu lặp l
 
 **A. Hàng hóa**
 - Cấu trúc **phẳng**: không có biến thể, mã vạch, thương hiệu, combo ("Hàng thành phần" rỗng), lô/hạn dùng, trọng lượng (rỗng). Cột **ĐVT rỗng 100%**; đơn vị/quy cách nằm trong tên (1.013/2.787 tên có dạng "… (Chiếc)", "… (50 tờ)") → mỗi quy cách là **một SKU riêng**.
-  → **Bỏ khỏi MVP:** `product_variants`, `product_combos`, `lô/HSD`, `barcodes` riêng, quy đổi đơn vị. Chỉ giữ cột `unit` (text) trên sản phẩm; quy đổi đơn vị để Phase 2.
+  → **Bỏ khỏi MVP:** `product_variants`, `lô/HSD`, `barcodes` riêng, quy đổi đơn vị. **Cập nhật 05/11/2026:** bỏ luôn các cột `unit`, `weight_g`, `is_sellable` của sản phẩm; **thêm loại hàng Combo** (`product_type` = `goods`/`combo`, bảng `product_components`): combo chỉ để chọn nhanh khi lập đơn, tồn/giá vốn tính từ hàng thành phần, chứng từ và báo cáo chỉ có hàng thành phần.
 - Mã hàng: chữ-số không dấu, không khoảng trắng, tối đa 13 ký tự, không trùng → dùng làm **khóa nghiệp vụ duy nhất**, độ dài cột 30.
 - Nhóm hàng dạng cây phân tách bằng `>>` (khi xuất từ file Bảng giá có khoảng trắng quanh `>>`, file sản phẩm thì không → **chuẩn hóa khi import**). 91 nhóm, tối đa 2 cấp hiện tại (KiotViet cho 3 cấp) → bảng `categories` có `parent_id`.
 - Có dùng: giá bán chung (chỉ 45% SP có giá > 0), giá vốn (96%), tồn kho, `Đặt NCC` (SL đang đặt nhà cung cấp), `KH đặt` (SL khách đã đặt), tồn lớn nhất (95% có giá trị; "tồn nhỏ nhất" rỗng), **vị trí kho** (59%, giá trị dạng số "11", "26"), mô tả (91%), ảnh (98%).
@@ -351,8 +351,7 @@ Lược đồ chính thức: `apps/api/src/db/schema/` (Drizzle) và `docs/db/` 
 ```
 Hệ thống  : company_profile, branches, users, role_permissions, user_branches, refresh_tokens,
             audit_logs, code_sequences, idempotency_keys, import_jobs
-Hàng hóa  : categories (cây), products, product_images, price_books (7 bảng giá),
-            price_book_items (khóa: bảng giá + chi nhánh + sản phẩm)
+Hàng hóa  : categories (cây), products, product_components (combo), product_images
 Tồn kho   : stocks (chi nhánh + sản phẩm: tồn, giá vốn bình quân, giá nhập cuối, tối thiểu/tối đa, vị trí),
             stock_movements (sổ cái, chỉ thêm),
             stock_transfers, stock_transfer_items      -- chuyển kho 2 bước giữa HN và SG
@@ -376,9 +375,7 @@ Quy ước: `NUMERIC(18,0)` = tiền chứng từ (đồng); `NUMERIC(18,4)` = �
 
 | Bảng | Cột chính |
 |---|---|
-| `products` | **Chỉ thông tin dùng chung:** `code` (unique, ≤30), `name`, `category_id`, `unit` (text, mặc định "Cái"), `description`, `weight_g`, `is_active`, `is_sellable`. Giá bán ở `price_book_items`; tồn, giá vốn, giá nhập cuối, tồn min/max, vị trí kho ở `stocks` (theo chi nhánh) |
-| `price_books` | `code`, `name`, `with_vat` (bool), `is_default`. Seed: Chung, Lớn, Vừa, VIP, Lớn VAT, Vừa VAT, VIP VAT |
-| `price_book_items` | `price_book_id`, **`branch_id`**, `product_id`, `price` — thiếu giá trong bảng → **lùi về bảng chung CỦA CÙNG chi nhánh** |
+| `products` | **Chỉ thông tin dùng chung:** `code` (unique, ≤30), `name`, `category_id`, `product_type` (`goods` mặc định / `combo`), `description`, `is_active`. Combo có thành phần ở `product_components` (`combo_id`, `component_id`, `qty` nguyên dương), không có dòng `stocks` riêng. Giá bán ở `price_book_items`; tồn, giá vốn, giá nhập cuối, tồn min/max, vị trí kho ở `stocks` (theo chi nhánh) |
 | `customers` | `code`, `name`, `type` (`individual`/`company`), `phone` (unique, đã chuẩn hóa), `address`, `facebook`, `sales_owner_id` → `users` (nhân viên phụ trách), `default_price_book_id`, `note`, `is_active` |
 | `customer_invoice_profiles` | `customer_id`, `buyer_name`, `company_name`, `tax_code`, `address`, `email`, `phone`, `bank_name`, `bank_account` |
 | `suppliers` | `code`, `name`, `kind` (`goods`/`driver`/`other`), `phone` (không validate), `address`, `tax_code`, `note`, `is_active` |
@@ -442,7 +439,7 @@ Thứ tự import (mỗi bước idempotent theo mã nghiệp vụ, chạy thử
 
 | # | Nguồn | Đích | Xử lý |
 |---|---|---|---|
-| 1 | SanPham | `categories`, `products` | Tách cây nhóm theo `>>` (trim khoảng trắng); `unit` lấy từ ngoặc cuối tên nếu có, ngược lại "Cái"; giữ nguyên tên |
+| 1 | SanPham | `categories`, `products` | Tách cây nhóm theo `>>` (trim khoảng trắng); giữ nguyên tên (không còn cột đơn vị tính); cột `Loại hàng`/`Hàng thành phần` (dạng `MSP/SL,MSP/SL`) → `product_type` và `product_components` |
 | 2 | SanPham (ảnh) | `product_images` | **Tải ảnh từ CDN KiotViet về kho file riêng**, ghi lại URL mới; chạy sớm vì phụ thuộc KiotViet còn hoạt động |
 | 3 | BangGia (+ 6 bảng cần xuất thêm) | `price_books`, `price_book_items` | Seed 7 bảng giá; thiếu giá → dùng bảng chung |
 | 4 | Danh sách nhân viên (cần xuất thêm) / giá trị distinct từ chứng từ | `users` | Tạo tài khoản, gán vai trò thủ công |
@@ -924,10 +921,10 @@ Mốc khó nhất; **ưu tiên đúng nghiệp vụ hơn đẹp giao diện**.
 | ADR-04 | Tồn kho dạng ledger append-only | Truy vết, đối soát, an toàn dữ liệu |
 | ADR-05 | Single-tenant (nội bộ công ty), multi-branch/kho từ đầu (nay là 2 chi nhánh: Hà Nội, Sài Gòn) | Đơn giản hơn; đa chi nhánh khó bổ sung về sau |
 | ADR-06 | ~~POS offline ở Phase 2~~ → hạ xuống Phase 3; ưu tiên quy trình đơn sỉ + công nợ | Chốt bán sỉ: ít đơn/giá trị lớn, thường có mạng |
-| ADR-07 | Engine giá riêng: giá riêng khách > bảng giá của khách > Bảng giá chung **cùng chi nhánh**; giảm giá là số tiền/đơn vị. Bậc thang/đơn vị: sau | Bán sỉ phụ thuộc bảng giá phức tạp |
+| ADR-07 | ⛔ **Đã bỏ 05/11/2026 (ADR-23):** Engine giá riêng: giá riêng khách > bảng giá của khách > Bảng giá chung **cùng chi nhánh**; giảm giá là số tiền/đơn vị. Bậc thang/đơn vị: sau | Bán sỉ phụ thuộc bảng giá phức tạp |
 | ADR-08 | Đơn hàng dùng state machine, hỗ trợ giao từng phần | Vòng đời đơn sỉ nhiều bước |
 | ADR-09 | Công nợ theo sổ cái, cho phép số dư âm, thu theo khách rồi cấn trừ hóa đơn | 90% hóa đơn mua chịu; 111 khách có số dư âm; thu nợ không gắn hóa đơn |
-| ADR-10 | Sản phẩm phẳng (không biến thể/combo/lô/HSD), 1 SKU = 1 quy cách | Dữ liệu thực không dùng các khái niệm này |
+| ADR-10 | Sản phẩm phẳng (không biến thể/lô/HSD), 1 SKU = 1 quy cách. Combo (từ 05/11/2026) chỉ là gói chọn nhanh, không có tồn/giá vốn riêng | Dữ liệu thực không dùng biến thể/lô; combo thêm theo yêu cầu để lập đơn mua nhanh |
 | ADR-11 | Đơn giá/giá vốn `NUMERIC(18,4)` | Giá nhập thực tế có phần thập phân |
 | ADR-12 | Kiểm kho là module riêng; không dùng "NCC ảo" | Hiện đang điều chỉnh kho bằng phiếu nhập/trả NCC "kiểm kê" |
 | ADR-13 | "Nhóm khách hàng" của KiotViet → `sales_owner_id`; hạng giá là trường riêng | Dữ liệu cho thấy nhóm = tên nhân viên phụ trách |
@@ -940,5 +937,6 @@ Mốc khó nhất; **ưu tiên đúng nghiệp vụ hơn đẹp giao diện**.
 | ADR-20 | Mọi lỗi API theo `{ code, message, details, requestId }` qua bộ lọc lỗi toàn cục | Frontend xử lý lỗi thống nhất; không lộ chi tiết nội bộ |
 | ADR-21 | Chi nhánh mặc định là Hà Nội (04/11/2026) | Chủ dự án quyết định |
 | ADR-22 | Nhóm nhà cung cấp chỉ là cột dữ liệu `suppliers.group_name` (có thể trống), không có nghiệp vụ riêng | Công ty không cần theo dõi nợ/ứng riêng cho tài xế, nhân viên |
+| ADR-23 | **Bỏ toàn bộ giá bán** (05/11/2026): xóa bảng giá, lưới giá, báo giá, quyền `price.edit`, `price_id` trên khách/đơn/hóa đơn. Giá bán quy ước chung ở mô tả sản phẩm; đơn giá trên dòng đơn/hóa đơn do người lập đơn nhập (vẫn lưu để làm sổ sách, lãi gộp). Thay thế ADR-07 và các mục "bảng giá" cũ trong tài liệu này | Quyết định của chủ hệ thống |
 
 > Các quyết định trên có thể thay đổi khi các câu hỏi còn mở ở mục 5.8 được trả lời.

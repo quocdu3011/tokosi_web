@@ -87,14 +87,7 @@ export const PERMISSIONS = [
     code: 'product.content.edit',
     module: 'product',
     label: 'Sửa mô tả, ảnh hàng hóa',
-    description: 'Chỉ mô tả và ảnh, không sửa mã/tên/giá',
-    requires: ['product.view'],
-  },
-  {
-    code: 'price.edit',
-    module: 'product',
-    label: 'Thiết lập giá',
-    description: 'Sửa giá bán, bảng giá, tăng/giảm giá hàng loạt',
+    description: 'Chỉ mô tả và ảnh, không sửa mã/tên',
     requires: ['product.view'],
   },
   {
@@ -300,7 +293,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Exclude<Role, 'manager'>, RoleDefa
   ]),
   accountant: all([
     'product.view',
-    'price.edit',
     'product.cost.view',
     'purchase.view',
     'purchase.edit',

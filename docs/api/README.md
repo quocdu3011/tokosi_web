@@ -35,7 +35,7 @@ Công ty có **2 chi nhánh dùng chung một hệ thống**. Người dùng là
 | Dữ liệu                                                                                            | Dùng chung hay riêng chi nhánh                                           |
 | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | Hàng hóa (mã, tên, nhóm, đơn vị, ảnh), khách hàng, nhà cung cấp, 7 hạng giá, danh mục thu chi      | **Dùng chung**                                                           |
-| Giá bán (từng ô trong lưới giá), tồn kho, giá vốn, giá nhập cuối, tồn tối thiểu/tối đa, vị trí kho | **Riêng từng chi nhánh**                                                 |
+| Tồn kho, giá vốn, giá nhập cuối, tồn tối thiểu/tối đa, vị trí kho | **Riêng từng chi nhánh**                                                 |
 | Công nợ khách hàng và nhà cung cấp, hạn mức và kỳ hạn công nợ                                      | **Riêng từng chi nhánh**, tách biệt hoàn toàn (không cấn trừ chéo)       |
 | Đơn hàng, hóa đơn, trả hàng, phiếu nhập, sổ quỹ (quỹ tiền mặt, ngân hàng), phiếu thu/chi           | **Riêng từng chi nhánh** — mỗi chứng từ có `branch` (Hà Nội hay Sài Gòn) |
 
@@ -72,7 +72,7 @@ Chi tiết endpoint và ví dụ: [`endpoints.md`](endpoints.md) mục 1. Quy t�
 | Số lượng         | `"1095"`, `"2.500"` | Tối đa 3 chữ số thập phân (hiện dữ liệu là số nguyên)              |
 
 - Frontend **chỉ hiển thị** (dùng `formatVnd` trong `@kiot/shared`) và nhập liệu; **không tự tính tổng tiền để lưu** — server là nơi tính lại và là nguồn sự thật. Nếu cần hiển thị tạm tổng trên form, dùng thư viện số thập phân (vd `decimal.js`), **không** dùng `number` để cộng nhiều dòng.
-- Server luôn **tính lại** giá, thành tiền và tổng khi nhận đơn; giá client gửi chỉ là gợi ý (xem `pricing/quote` trong `endpoints.md`).
+- Server luôn **tính lại** thành tiền và tổng khi nhận đơn (đơn giá do người lập đơn nhập).
 
 ### Thời gian
 
@@ -147,7 +147,7 @@ Mọi lỗi có cùng cấu trúc:
 | 429  | `SIGNUP_LIMIT`              | Quá nhiều tài khoản đang chờ cấp quyền                                                                                   |
 | 503  | `GOOGLE_NOT_CONFIGURED`     | Máy chủ chưa cấu hình đăng nhập Google                                                                                   |
 | 409  | `DUPLICATE_USERNAME`        | Trùng tên đăng nhập (không phân biệt hoa thường)                                                                         |
-| 409  | `DUPLICATE_NAME`            | Trùng tên (nhóm hàng cùng nhóm cha, bảng giá)                                                                            |
+| 409  | `DUPLICATE_NAME`            | Trùng tên (nhóm hàng cùng nhóm cha)                                                                            |
 | 400  | `IMPORT_TYPE_NOT_SUPPORTED` | Loại nhập Excel chưa hỗ trợ (khách hàng, nhà cung cấp)                                                                   |
 | 413  | `PAYLOAD_TOO_LARGE`         | File tải lên quá lớn (ảnh > 5 MB, file Excel > 10 MB)                                                                    |
 | 502  | `STORAGE_ERROR`             | Kho lưu file ảnh lỗi; thử lại                                                                                            |
@@ -157,7 +157,6 @@ Mọi lỗi có cùng cấu trúc:
 | 409  | `VERSION_CONFLICT`          | Dữ liệu đã bị người khác sửa (gửi lại `updatedAt` mới nhất)                                                              |
 | 422  | `STOCK_NOT_ENOUGH`          | Không đủ tồn để xuất hóa đơn                                                                                             |
 | 422  | `CREDIT_LIMIT_EXCEEDED`     | Vượt hạn mức công nợ **(cảnh báo mềm ở MVP: xem `warnings` ở endpoint)**                                                 |
-| 422  | `PRICE_NOT_FOUND`           | Sản phẩm không có giá ở bảng giá và cả bảng chung                                                                        |
 | 422  | `ALLOCATION_EXCEEDS`        | Số tiền cấn trừ lớn hơn số còn nợ của hóa đơn                                                                            |
 | 400  | `BRANCH_REQUIRED`           | Cần chọn chi nhánh làm việc (gửi `X-Branch-Id`)                                                                          |
 | 403  | `BRANCH_FORBIDDEN`          | Không được phép làm việc với chi nhánh này                                                                               |
@@ -229,7 +228,6 @@ Các thao tác tạo chứng từ ảnh hưởng tiền/kho/nợ phải gửi `I
 | ----------------------------------------------------------------- | --------------------------------------- |
 | `costPrice`, `lastPurchasePrice`, `unitCost`, lãi gộp             | `product.cost.view`                     |
 | `balance`, `creditLimit`, `debt`, `paid` của khách / nhà cung cấp | `debt.view`                             |
-| Sửa `basePrice` và bảng giá                                       | `price.edit`                            |
 | Sửa `listPrice` trên dòng hàng khi tạo đơn                        | `price.override`                        |
 | Giá trên phiếu giao hàng                                          | luôn ẩn (`delivery.view` không gồm giá) |
 
@@ -243,7 +241,6 @@ Dùng để khởi tạo lần đầu (`pnpm db:seed`) và cho nút "Khôi phụ
 | `product.view` Xem hàng hóa                                  |    ✔    |   ✔    |    ✔    |  ✔  |        |    ✔     |     ✔     |
 | `product.edit` Thêm/sửa hàng hóa                             |    ✔    |   ✔    |         |  ✔  |        |          |           |
 | `product.content.edit` Sửa mô tả, ảnh hàng hóa               |    ✔    |        |         |     |        |          |     ✔     |
-| `price.edit` Thiết lập giá                                   |    ✔    |        |    ✔    |     |        |          |           |
 | `price.override` Sửa giá khi bán                             |    ✔    |        |         |     |        |          |           |
 | `product.cost.view` Xem giá vốn / giá nhập                   |    ✔    |        |    ✔    |     |        |          |           |
 | **Mua hàng**                                                 |         |        |         |     |        |          |           |
@@ -291,7 +288,7 @@ Dùng để khởi tạo lần đầu (`pnpm db:seed`) và cho nút "Khôi phụ
 
 ## 9. Quy tắc nghiệp vụ frontend cần biết
 
-1. **Giá bán** do server quyết định theo thứ tự: giá riêng khách (Phase 2) > **bảng giá của khách** (`defaultPriceBookId`) > **Bảng giá chung**. Giảm giá là **số tiền trên 1 đơn vị**, không phải %. Hiển thị `listPrice − discountPerUnit = unitPrice`.
+1. **Giá bán không nằm trong hệ thống** (không có bảng giá): giá được quy ước chung ở mô tả sản phẩm và **người lập đơn nhập đơn giá** từng dòng. Giảm giá là **số tiền trên 1 đơn vị**, không phải %. Hiển thị `unitPrice` (sau giảm) = đơn giá − giảm giá.
 2. **Công nợ có thể âm** (khách trả dư/ứng trước). Hiển thị số âm rõ ràng (vd "Dư có").
 3. **Một đơn → tối đa một hóa đơn.** Hóa đơn đã tạo **không sửa**; muốn sửa thì hủy và tạo lại (có nhật ký).
 4. **Không xóa chứng từ**: chỉ `cancel`. Chứng từ hủy vẫn xem được, có `status = cancelled`.
@@ -327,3 +324,5 @@ Dùng để khởi tạo lần đầu (`pnpm db:seed`) và cho nút "Khôi phụ
 | 2026-11-06 | Tham số đường dẫn (`:id`, `:imageId`, `:branchId`) sai dạng UUID nay trả `400 VALIDATION_ERROR` với `details: [{ field, message }]` (trước đây `BAD_REQUEST`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 2026-11-06 | Lỗi 429 có header `Retry-After` (giây); header bảo mật (helmet) trên mọi phản hồi; `Idempotency-Key` đã hoạt động ở phía server (mục 6) kèm mã `REQUEST_IN_PROGRESS` và header `Idempotent-Replay`; sau khi đổi/đặt lại mật khẩu, access token cấp trước đó bị `401 UNAUTHENTICATED` ngay (đăng nhập lại)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 2026-11-07 | **Đăng nhập bằng Google (Supabase):** `POST /auth/google`, `POST /auth/google/signup`, `GET/PATCH /settings/auth` (Quản lý bật/tắt tự đăng ký và tên miền email được phép); vai trò mới `pending` (Chờ cấp quyền, không quyền nào) có thể xuất hiện ở `role` của `/auth/me` và `/users`; bộ lọc `GET /users?role=pending`; mã lỗi `SIGNUP_DISABLED`, `SIGNUP_TOKEN_INVALID`, `GOOGLE_ALREADY_REGISTERED`, `SIGNUP_LIMIT`, `GOOGLE_NOT_CONFIGURED`                                                                                                                                                                                                                                                                                                                                         |
+| 2026-11-05 | **Hàng hóa: bỏ `unit`, `weightG`, `isSellable`** (cả ở Product, lookup, tạo/sửa, cột Excel `Đơn vị tính`/`Trọng lượng`/`Được bán trực tiếp`; lookup không còn lọc theo "được bán"). **Thêm loại hàng `productType`** (`goods` mặc định, `combo`), `components` (chuỗi `MSP/SL,MSP/SL`) và `componentItems`; bộ lọc `GET /products?productType=`; combo tính tồn/giá vốn từ thành phần, không có tồn/thẻ kho riêng; cột Excel mới `Loại hàng`, `Hàng thành phần`. Xem endpoints.md mục 2.2 |
+| 2026-11-05 | **Bỏ toàn bộ giá bán**: xóa `/price-books/*`, `/pricing/quote`, `POST /imports/price-books`, quyền `price.edit`; bỏ `basePrice`, `prices` (theo chi nhánh) khỏi hàng hóa/lookup/Excel và `priceBookId` khỏi khách/đơn/hóa đơn (bảng `price_books`, `price_book_items` bị xóa). Cột `Giá bán` trong file nhập hàng hóa bị bỏ qua. Dòng đơn/hóa đơn vẫn có đơn giá do người lập đơn nhập |

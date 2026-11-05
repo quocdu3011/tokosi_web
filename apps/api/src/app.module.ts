@@ -9,7 +9,6 @@ import { CatalogModule } from './modules/catalog/catalog.module.js';
 import { IdempotencyModule } from './modules/idempotency/idempotency.module.js';
 import { ImportsModule } from './modules/imports/imports.module.js';
 import { FilesModule } from './modules/files/files.module.js';
-import { PricingModule } from './modules/pricing/pricing.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { GoogleAuthModule } from './modules/google-auth/google-auth.module.js';
 
@@ -25,7 +24,6 @@ import { GoogleAuthModule } from './modules/google-auth/google-auth.module.js';
     GoogleAuthModule,
     FilesModule,
     CatalogModule,
-    PricingModule,
     ImportsModule,
     IdempotencyModule,
   ],

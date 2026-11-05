@@ -1,3 +1,4 @@
+import { assertNoCombo } from '../catalog/combo.js';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { AppError } from '../../common/app-error.js';
@@ -63,6 +64,7 @@ export class InventoryService {
     tx: Tx,
     inputs: StockMovementInput[],
   ): Promise<StockMovementResult[]> {
+    await assertNoCombo(tx, [...new Set(inputs.map((m) => m.productId))]);
     const keys = [
       ...new Set(inputs.map((m) => `${m.branchId}|${m.productId}`)),
     ].sort();
@@ -71,7 +73,7 @@ export class InventoryService {
       await this.lockStock(tx, branchId, productId);
     }
     const results: StockMovementResult[] = [];
-    for (const m of inputs) results.push(await this.applyMovement(tx, m));
+    for (const m of inputs) results.push(await this.applyOne(tx, m));
     return results;
   }
 
@@ -98,6 +100,15 @@ export class InventoryService {
    * `applyMovements` để tránh bế tắc.
    */
   async applyMovement(
+    tx: Tx,
+    m: StockMovementInput,
+  ): Promise<StockMovementResult> {
+    await assertNoCombo(tx, [m.productId]);
+    return this.applyOne(tx, m);
+  }
+
+  /** Áp dụng một dòng (đã kiểm tra không phải combo). */
+  private async applyOne(
     tx: Tx,
     m: StockMovementInput,
   ): Promise<StockMovementResult> {

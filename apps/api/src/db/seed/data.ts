@@ -14,44 +14,6 @@ export const BRANCHES = [
   { code: 'HN', name: 'Chi nhánh Hà Nội', isDefault: true },
 ] as const;
 
-/**
- * 7 bảng giá theo hạng khách của công ty (theo hóa đơn KiotViet). Thiếu giá ở bảng nào thì lùi về bảng chung.
- * Chưa biết khách hạng "Mới" dùng bảng nào — xem docs/TAI_LIEU_THIET_KE.md mục 5.8.
- */
-export const PRICE_BOOKS = [
-  {
-    code: 'CHUNG',
-    name: 'Bảng giá chung',
-    withVat: false,
-    isDefault: true,
-    sortOrder: 0,
-  },
-  { code: 'LON', name: 'Lớn', withVat: false, isDefault: false, sortOrder: 1 },
-  { code: 'VUA', name: 'Vừa', withVat: false, isDefault: false, sortOrder: 2 },
-  { code: 'VIP', name: 'VIP', withVat: false, isDefault: false, sortOrder: 3 },
-  {
-    code: 'LON_VAT',
-    name: 'Lớn VAT',
-    withVat: true,
-    isDefault: false,
-    sortOrder: 4,
-  },
-  {
-    code: 'VUA_VAT',
-    name: 'Vừa VAT',
-    withVat: true,
-    isDefault: false,
-    sortOrder: 5,
-  },
-  {
-    code: 'VIP_VAT',
-    name: 'VIP VAT',
-    withVat: true,
-    isDefault: false,
-    sortOrder: 6,
-  },
-] as const;
-
 /** Mỗi chi nhánh có quỹ tiền mặt và tài khoản ngân hàng RIÊNG; tên quỹ = `<tên> <tên chi nhánh>`. */
 export const CASH_ACCOUNT_TEMPLATES = [
   { name: 'Tiền mặt', type: 'cash' },

@@ -1,4 +1,5 @@
 import { pgEnum } from 'drizzle-orm/pg-core';
+import { PRODUCT_TYPES } from '@kiot/shared';
 
 /**
  * Vai trò theo cơ cấu thực tế của công ty:
@@ -90,3 +91,6 @@ export const transferStatus = pgEnum('transfer_status', [
 
 /** Ai ứng tiền trả phí vận chuyển của phiếu chuyển kho. */
 export const shippingPayer = pgEnum('shipping_payer', ['sender', 'receiver']);
+
+/** Loại hàng: goods = Hàng hóa (mặc định), combo = gói nhiều hàng hóa thành phần (không có tồn/giá vốn riêng). */
+export const productType = pgEnum('product_type', PRODUCT_TYPES);

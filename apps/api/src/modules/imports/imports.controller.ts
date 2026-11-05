@@ -67,7 +67,7 @@ export class ImportsController {
     },
   })
   @ApiOperation({
-    summary: 'Tải file Excel lên để nhập (type: products | price-books)',
+    summary: 'Tải file Excel lên để nhập (type: products)',
     description:
       'Mặc định chỉ KIỂM TRA (dryRun=true), không ghi gì; gửi dryRun=false để ghi thật. Xử lý ngay trong yêu cầu nên kết quả (status completed hoặc failed) có sẵn trong phản hồi; vẫn xem lại được qua GET /imports/:id. Tất cả hoặc không gì cả: có dòng lỗi thì không ghi gì. Chạy lại cùng file không tạo trùng (cập nhật theo mã hàng).',
   })

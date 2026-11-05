@@ -116,7 +116,7 @@ export class ProductsController {
   @ApiOperation({
     summary: 'Tạo hàng hóa',
     description:
-      'Chỉ chứa thông tin dùng chung hai chi nhánh. Giá bán đặt qua lưới giá; tồn tối thiểu/tối đa và vị trí đặt qua PUT /products/:id/branches/:branchId; ảnh tải qua POST /products/:id/images (gọi sau khi có id).',
+      'Chỉ chứa thông tin dùng chung hai chi nhánh. Tồn tối thiểu/tối đa và vị trí đặt qua PUT /products/:id/branches/:branchId; ảnh tải qua POST /products/:id/images (gọi sau khi có id).',
   })
   @ApiCreatedResponse({ type: ProductDto })
   @ApiConflictResponse({ description: 'DUPLICATE_CODE' })
@@ -154,8 +154,7 @@ export class ProductsController {
   @RequirePermission('product.view')
   @ApiOperation({
     summary: 'Chi tiết theo từng chi nhánh người dùng được phép',
-    description:
-      'Tồn, giá vốn (theo quyền), tồn tối thiểu/tối đa, vị trí kho và giá của cả 7 bảng giá.',
+    description: 'Tồn, giá vốn (theo quyền), tồn tối thiểu/tối đa, vị trí kho.',
   })
   @ApiOkResponse({ type: [ProductBranchDto] })
   @ApiNotFoundResponse({ description: 'Không tìm thấy hàng hóa' })

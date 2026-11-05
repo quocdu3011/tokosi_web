@@ -16,7 +16,6 @@ import {
   type ImportJobDto,
   type SupportedImportType,
 } from './imports.dto.js';
-import { importPriceBooks } from './price-books.importer.js';
 import { importProducts } from './products.importer.js';
 
 /** Ném để hủy transaction (chạy thử hoặc có lỗi) nhưng vẫn mang kết quả ra ngoài. */
@@ -76,16 +75,10 @@ export class ImportsService {
     let systemError: string | null = null;
     try {
       outcome = await this.db.transaction(async (tx) => {
-        const result =
-          kind === 'products'
-            ? await importProducts(tx, sheet, {
-                branchId: opts.branchId,
-                userId: user.id,
-              })
-            : await importPriceBooks(tx, sheet, {
-                branchId: opts.branchId,
-                userId: user.id,
-              });
+        const result = await importProducts(tx, sheet, {
+          branchId: opts.branchId,
+          userId: user.id,
+        });
         if (opts.dryRun || result.errors.length > 0) throw new Rollback(result);
         await this.auditLog.record(tx, {
           action: 'import.run',
@@ -148,57 +141,50 @@ export class ImportsService {
 
   /** File Excel mẫu: tiêu đề giống file KiotViet kèm một dòng ví dụ (dữ liệu giả). */
   async template(type: string): Promise<Buffer> {
-    const kind = this.parseType(type);
-    if (kind === 'products') {
-      return writeSheet(
-        'Hàng hóa',
-        [
-          { header: 'Mã hàng', width: 16 },
-          { header: 'Tên hàng', width: 36 },
-          { header: 'Nhóm hàng(3 Cấp)', width: 30 },
-          { header: 'Đơn vị tính', width: 12 },
-          { header: 'Giá bán', width: 14 },
-          { header: 'Tồn nhỏ nhất', width: 14 },
-          { header: 'Tồn lớn nhất', width: 14 },
-          { header: 'Vị trí', width: 12 },
-          { header: 'Trọng lượng', width: 14 },
-          { header: 'Mô tả', width: 30 },
-          { header: 'Đang kinh doanh', width: 16 },
-          { header: 'Được bán trực tiếp', width: 18 },
-          { header: 'Hình ảnh (url1,url2...)', width: 40 },
-        ],
-        [
-          [
-            'VD001',
-            'Hàng ví dụ',
-            'NHÀ BẾP>>Dao kéo',
-            'Cái',
-            33500,
-            10,
-            2000,
-            'Kệ A1',
-            850,
-            'Mô tả ngắn',
-            1,
-            1,
-            'https://example.com/anh1.jpg',
-          ],
-        ],
-      );
-    }
+    this.parseType(type); // hiện chỉ có mẫu hàng hóa; loại không hỗ trợ ném lỗi
     return writeSheet(
-      'Bảng giá',
+      'Hàng hóa',
       [
         { header: 'Mã hàng', width: 16 },
-        { header: 'Bảng giá chung', width: 16 },
-        { header: 'Lớn', width: 12 },
-        { header: 'Vừa', width: 12 },
-        { header: 'VIP', width: 12 },
-        { header: 'Lớn VAT', width: 12 },
-        { header: 'Vừa VAT', width: 12 },
-        { header: 'VIP VAT', width: 12 },
+        { header: 'Tên hàng', width: 36 },
+        { header: 'Nhóm hàng(3 Cấp)', width: 30 },
+        { header: 'Loại hàng', width: 12 },
+        { header: 'Hàng thành phần', width: 30 },
+        { header: 'Tồn nhỏ nhất', width: 14 },
+        { header: 'Tồn lớn nhất', width: 14 },
+        { header: 'Vị trí', width: 12 },
+        { header: 'Mô tả', width: 30 },
+        { header: 'Đang kinh doanh', width: 16 },
+        { header: 'Hình ảnh (url1,url2...)', width: 40 },
       ],
-      [['VD001', 33500, 33000, 33200, 32800, 36300, 36500, 36100]],
+      [
+        [
+          'VD001',
+          'Hàng ví dụ',
+          'NHÀ BẾP>>Dao kéo',
+          'Hàng hóa',
+          null,
+          10,
+          2000,
+          'Kệ A1',
+          'Mô tả ngắn',
+          1,
+          'https://example.com/anh1.jpg',
+        ],
+        [
+          'VD-COMBO',
+          'Combo ví dụ',
+          'NHÀ BẾP>>Dao kéo',
+          'Combo',
+          'VD001/2',
+          null,
+          null,
+          null,
+          null,
+          1,
+          null,
+        ],
+      ],
     );
   }
 

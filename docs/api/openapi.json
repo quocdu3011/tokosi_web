@@ -1113,6 +1113,19 @@
             }
           },
           {
+            "name": "productType",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo loại hàng",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "goods",
+                "combo"
+              ]
+            }
+          },
+          {
             "name": "inStock",
             "required": false,
             "in": "query",
@@ -1157,7 +1170,7 @@
         ]
       },
       "post": {
-        "description": "Chỉ chứa thông tin dùng chung hai chi nhánh. Giá bán đặt qua lưới giá; tồn tối thiểu/tối đa và vị trí đặt qua PUT /products/:id/branches/:branchId; ảnh tải qua POST /products/:id/images (gọi sau khi có id).",
+        "description": "Chỉ chứa thông tin dùng chung hai chi nhánh. Tồn tối thiểu/tối đa và vị trí đặt qua PUT /products/:id/branches/:branchId; ảnh tải qua POST /products/:id/images (gọi sau khi có id).",
         "operationId": "ProductsController_create",
         "parameters": [],
         "requestBody": {
@@ -1328,7 +1341,7 @@
     },
     "/api/v1/products/{id}/branches": {
       "get": {
-        "description": "Tồn, giá vốn (theo quyền), tồn tối thiểu/tối đa, vị trí kho và giá của cả 7 bảng giá.",
+        "description": "Tồn, giá vốn (theo quyền), tồn tối thiểu/tối đa, vị trí kho.",
         "operationId": "ProductsController_branches",
         "parameters": [
           {
@@ -1674,288 +1687,6 @@
         ]
       }
     },
-    "/api/v1/price-books": {
-      "get": {
-        "operationId": "PricingController_list",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/PriceBookDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Danh sách 7 bảng giá",
-        "tags": [
-          "Thiết lập giá"
-        ]
-      }
-    },
-    "/api/v1/price-books/grid": {
-      "get": {
-        "description": "Chi nhánh lấy từ tham số branchId hoặc header X-Branch-Id. Ô chưa có giá là null (khi bán sẽ lùi về Bảng giá chung của CÙNG chi nhánh).",
-        "operationId": "PricingController_grid",
-        "parameters": [
-          {
-            "name": "branchId",
-            "required": false,
-            "in": "query",
-            "description": "Chi nhánh của lưới giá; bỏ trống = chi nhánh làm việc (X-Branch-Id). Phải là chi nhánh người dùng được phép",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "q",
-            "required": false,
-            "in": "query",
-            "description": "Tìm không dấu theo mã và tên",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "categoryId",
-            "required": false,
-            "in": "query",
-            "description": "Gồm cả hàng của các nhóm con",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 200,
-              "default": 50,
-              "type": "number"
-            }
-          },
-          {
-            "name": "format",
-            "required": false,
-            "in": "query",
-            "description": "xlsx = tải Excel theo bộ lọc (bỏ qua page/limit)",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "xlsx"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GridDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Lưới giá: mỗi dòng một sản phẩm, mỗi cột một bảng giá, theo MỘT chi nhánh",
-        "tags": [
-          "Thiết lập giá"
-        ]
-      },
-      "put": {
-        "description": "Giá là số nguyên đồng; price = null xóa giá ô đó. Tối đa 500 ô; tất cả hoặc không gì cả.",
-        "operationId": "PricingController_saveGrid",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SaveGridDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaveGridResultDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Lưu nhiều ô giá cùng lúc (chỉ gửi các ô thay đổi)",
-        "tags": [
-          "Thiết lập giá"
-        ]
-      }
-    },
-    "/api/v1/price-books/bulk-adjust": {
-      "post": {
-        "description": "dryRun bắt buộc: true = chỉ xem trước. Chỉ áp dụng cho ô ĐÃ có giá; giá mới âm thì bỏ qua; luôn làm tròn ra số nguyên đồng.",
-        "operationId": "PricingController_bulkAdjust",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BulkAdjustDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BulkAdjustResultDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Tăng/giảm giá hàng loạt (có chế độ xem trước)",
-        "tags": [
-          "Thiết lập giá"
-        ]
-      }
-    },
-    "/api/v1/price-books/copy-branch": {
-      "post": {
-        "description": "Dùng để khởi tạo giá chi nhánh mới. overwrite=false (mặc định) chỉ chép ô đích chưa có giá.",
-        "operationId": "PricingController_copyBranch",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CopyBranchDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CopyBranchResultDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Sao chép giá từ chi nhánh này sang chi nhánh kia",
-        "tags": [
-          "Thiết lập giá"
-        ]
-      }
-    },
-    "/api/v1/price-books/{id}": {
-      "patch": {
-        "description": "Không tắt được Bảng giá chung.",
-        "operationId": "PricingController_update",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdatePriceBookDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PriceBookDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Không tìm thấy bảng giá"
-          },
-          "409": {
-            "description": "DUPLICATE_NAME"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Đổi tên / bật tắt bảng giá",
-        "tags": [
-          "Thiết lập giá"
-        ]
-      }
-    },
     "/api/v1/imports/{type}/template": {
       "get": {
         "operationId": "ImportsController_template",
@@ -2012,7 +1743,7 @@
             "name": "branchId",
             "required": false,
             "in": "query",
-            "description": "Chi nhánh cho giá bán, tồn tối thiểu/tối đa, vị trí kho. Bắt buộc nếu file có các cột đó",
+            "description": "Chi nhánh cho tồn tối thiểu/tối đa, vị trí kho. Bắt buộc nếu file có các cột đó",
             "schema": {
               "type": "string"
             }
@@ -2054,7 +1785,7 @@
             "bearer": []
           }
         ],
-        "summary": "Tải file Excel lên để nhập (type: products | price-books)",
+        "summary": "Tải file Excel lên để nhập (type: products)",
         "tags": [
           "Nhập dữ liệu từ Excel"
         ]
@@ -3010,6 +2741,32 @@
           }
         }
       },
+      "ProductComponentDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "DAO01"
+          },
+          "name": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "number",
+            "example": 2,
+            "description": "Số lượng trong MỘT combo"
+          }
+        },
+        "required": [
+          "productId",
+          "code",
+          "name",
+          "qty"
+        ]
+      },
       "ProductImageDto": {
         "type": "object",
         "properties": {
@@ -3052,19 +2809,29 @@
             "nullable": true,
             "example": "ĐIỆN GIA DỤNG > Quạt điện"
           },
-          "unit": {
+          "productType": {
             "type": "string",
-            "example": "Cái"
+            "enum": [
+              "goods",
+              "combo"
+            ],
+            "description": "`goods` = Hàng hóa, `combo` = gói nhiều hàng thành phần. Combo không có tồn/giá vốn riêng: onHand, available, costPrice, lastPurchasePrice luôn tính từ thành phần; reserved luôn \"0\"; minStock/maxStock/location luôn null"
+          },
+          "components": {
+            "type": "string",
+            "example": "DAO01/2,KEO03/1",
+            "description": "Hàng thành phần của combo, dạng `MSP/SL,MSP/SL`; chuỗi rỗng với hàng hóa"
+          },
+          "componentItems": {
+            "description": "Chi tiết hàng thành phần (rỗng với hàng hóa)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductComponentDto"
+            }
           },
           "branchId": {
             "type": "string",
-            "description": "Chi nhánh mà các trường giá/tồn/vị trí bên dưới tính cho (= chi nhánh làm việc, header X-Branch-Id)"
-          },
-          "basePrice": {
-            "type": "string",
-            "nullable": true,
-            "description": "Giá Bảng giá chung TẠI chi nhánh này (số nguyên đồng); null nếu chưa có giá",
-            "example": "33500"
+            "description": "Chi nhánh mà các trường tồn/giá vốn/vị trí bên dưới tính cho (= chi nhánh làm việc, header X-Branch-Id)"
           },
           "costPrice": {
             "type": "string",
@@ -3108,10 +2875,6 @@
             "type": "string",
             "nullable": true
           },
-          "weightG": {
-            "type": "string",
-            "nullable": true
-          },
           "images": {
             "type": "array",
             "items": {
@@ -3119,9 +2882,6 @@
             }
           },
           "isActive": {
-            "type": "boolean"
-          },
-          "isSellable": {
             "type": "boolean"
           },
           "createdAt": {
@@ -3139,9 +2899,10 @@
           "name",
           "categoryId",
           "categoryPath",
-          "unit",
+          "productType",
+          "components",
+          "componentItems",
           "branchId",
-          "basePrice",
           "onHand",
           "reserved",
           "available",
@@ -3150,10 +2911,8 @@
           "maxStock",
           "location",
           "description",
-          "weightG",
           "images",
           "isActive",
-          "isSellable",
           "createdAt",
           "updatedAt"
         ]
@@ -3211,12 +2970,17 @@
           "name": {
             "type": "string"
           },
-          "unit": {
-            "type": "string"
-          },
-          "basePrice": {
+          "productType": {
             "type": "string",
-            "nullable": true
+            "enum": [
+              "goods",
+              "combo"
+            ]
+          },
+          "components": {
+            "type": "string",
+            "example": "DAO01/2,KEO03/1",
+            "description": "Với combo: thành phần để thêm vào đơn (chọn combo = thêm từng thành phần × SL); hàng hóa: rỗng"
           },
           "available": {
             "type": "string"
@@ -3230,8 +2994,8 @@
           "id",
           "code",
           "name",
-          "unit",
-          "basePrice",
+          "productType",
+          "components",
           "available",
           "imageUrl"
         ]
@@ -3252,22 +3016,21 @@
             "type": "string",
             "description": "Nhóm hàng (GET /categories)"
           },
-          "unit": {
+          "productType": {
             "type": "string",
-            "example": "Cái",
-            "default": "Cái"
+            "enum": [
+              "goods",
+              "combo"
+            ],
+            "default": "goods"
+          },
+          "components": {
+            "type": "string",
+            "example": "DAO01/2,KEO03/1",
+            "description": "Bắt buộc (ít nhất 1 thành phần) khi productType = combo, dạng `MSP/SL,MSP/SL`: mã hàng hóa (không phải combo), số lượng nguyên dương, mã không lặp. Không được gửi với hàng hóa"
           },
           "description": {
             "type": "string"
-          },
-          "weightG": {
-            "type": "string",
-            "description": "Trọng lượng gram",
-            "example": "850"
-          },
-          "isSellable": {
-            "type": "boolean",
-            "default": true
           }
         },
         "required": [
@@ -3289,48 +3052,29 @@
             "type": "string",
             "nullable": true
           },
-          "unit": {
-            "type": "string"
+          "productType": {
+            "type": "string",
+            "enum": [
+              "goods",
+              "combo"
+            ],
+            "description": "Chỉ đổi được khi hàng chưa có giao dịch và (khi đổi sang combo) chưa là thành phần của combo nào"
+          },
+          "components": {
+            "type": "string",
+            "example": "DAO01/2,KEO03/1",
+            "description": "Thay toàn bộ hàng thành phần của combo (`MSP/SL,MSP/SL`). Đổi sang combo thì bắt buộc gửi kèm"
           },
           "description": {
             "type": "string",
             "nullable": true,
             "description": "Người chỉ có quyền \"Sửa mô tả, ảnh hàng hóa\" (product.content.edit) chỉ được sửa trường này"
           },
-          "weightG": {
-            "type": "string",
-            "nullable": true
-          },
           "isActive": {
             "type": "boolean",
             "description": "false = ngưng kinh doanh"
-          },
-          "isSellable": {
-            "type": "boolean"
           }
         }
-      },
-      "ProductBranchPriceDto": {
-        "type": "object",
-        "properties": {
-          "priceBookId": {
-            "type": "string"
-          },
-          "priceBookCode": {
-            "type": "string",
-            "example": "LON"
-          },
-          "price": {
-            "type": "string",
-            "nullable": true,
-            "example": "33000"
-          }
-        },
-        "required": [
-          "priceBookId",
-          "priceBookCode",
-          "price"
-        ]
       },
       "ProductBranchDto": {
         "type": "object",
@@ -3374,13 +3118,6 @@
           "location": {
             "type": "string",
             "nullable": true
-          },
-          "prices": {
-            "description": "Giá của cả 7 bảng giá TẠI chi nhánh này (null = chưa có giá)",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ProductBranchPriceDto"
-            }
           }
         },
         "required": [
@@ -3392,8 +3129,7 @@
           "available",
           "minStock",
           "maxStock",
-          "location",
-          "prices"
+          "location"
         ]
       },
       "SetProductBranchSettingsDto": {
@@ -3502,354 +3238,6 @@
           "imageIds"
         ]
       },
-      "PriceBookDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "code": {
-            "type": "string",
-            "example": "CHUNG"
-          },
-          "name": {
-            "type": "string",
-            "example": "Bảng giá chung"
-          },
-          "withVat": {
-            "type": "boolean"
-          },
-          "isDefault": {
-            "type": "boolean",
-            "description": "Bảng giá chung: dùng khi bảng khác thiếu giá"
-          },
-          "isActive": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "id",
-          "code",
-          "name",
-          "withVat",
-          "isDefault",
-          "isActive"
-        ]
-      },
-      "GridBookDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "code": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "code",
-          "name"
-        ]
-      },
-      "GridRowDto": {
-        "type": "object",
-        "properties": {
-          "productId": {
-            "type": "string"
-          },
-          "code": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "costPrice": {
-            "type": "string",
-            "description": "Giá vốn của chi nhánh. VẮNG MẶT nếu thiếu product.cost.view"
-          },
-          "prices": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string",
-              "nullable": true
-            },
-            "description": "Khóa = priceBookId, giá trị = giá bán (số nguyên đồng) hoặc null nếu chưa có giá"
-          }
-        },
-        "required": [
-          "productId",
-          "code",
-          "name",
-          "prices"
-        ]
-      },
-      "GridMetaDto": {
-        "type": "object",
-        "properties": {
-          "page": {
-            "type": "number"
-          },
-          "limit": {
-            "type": "number"
-          },
-          "total": {
-            "type": "number"
-          },
-          "totalPages": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "page",
-          "limit",
-          "total",
-          "totalPages"
-        ]
-      },
-      "GridDto": {
-        "type": "object",
-        "properties": {
-          "branchId": {
-            "type": "string"
-          },
-          "books": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/GridBookDto"
-            }
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/GridRowDto"
-            }
-          },
-          "meta": {
-            "$ref": "#/components/schemas/GridMetaDto"
-          }
-        },
-        "required": [
-          "branchId",
-          "books",
-          "data",
-          "meta"
-        ]
-      },
-      "GridChangeDto": {
-        "type": "object",
-        "properties": {
-          "productId": {
-            "type": "string"
-          },
-          "priceBookId": {
-            "type": "string"
-          },
-          "price": {
-            "type": "string",
-            "nullable": true,
-            "example": "33000",
-            "description": "Giá mới (số nguyên đồng); null = xóa giá, lùi về bảng chung"
-          }
-        },
-        "required": [
-          "productId",
-          "priceBookId",
-          "price"
-        ]
-      },
-      "SaveGridDto": {
-        "type": "object",
-        "properties": {
-          "branchId": {
-            "type": "string",
-            "description": "Chi nhánh được sửa giá"
-          },
-          "changes": {
-            "description": "Tối đa 500 ô mỗi lần",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/GridChangeDto"
-            }
-          }
-        },
-        "required": [
-          "branchId",
-          "changes"
-        ]
-      },
-      "SaveGridResultDto": {
-        "type": "object",
-        "properties": {
-          "updated": {
-            "type": "number",
-            "description": "Số ô thực sự thay đổi (bỏ qua ô giữ nguyên giá)"
-          }
-        },
-        "required": [
-          "updated"
-        ]
-      },
-      "BulkAdjustDto": {
-        "type": "object",
-        "properties": {
-          "branchId": {
-            "type": "string"
-          },
-          "priceBookId": {
-            "type": "string"
-          },
-          "categoryId": {
-            "type": "string",
-            "description": "Chỉ điều chỉnh hàng của nhóm này (gồm nhóm con)"
-          },
-          "mode": {
-            "type": "string",
-            "enum": [
-              "percent",
-              "amount"
-            ],
-            "description": "percent = theo %, amount = cộng/trừ số tiền cố định mỗi ô"
-          },
-          "value": {
-            "type": "string",
-            "example": "5",
-            "description": "Số có dấu: dương = tăng, âm = giảm. Ví dụ 5 với percent = tăng 5%"
-          },
-          "roundTo": {
-            "type": "string",
-            "example": "100",
-            "default": "1",
-            "description": "Làm tròn đến bội số này (số nguyên >= 1, nửa lên). Giá bán luôn là số nguyên đồng"
-          },
-          "dryRun": {
-            "type": "boolean",
-            "description": "true = chỉ xem trước, KHÔNG lưu; false = lưu thật. Bắt buộc gửi rõ để không lưu nhầm"
-          }
-        },
-        "required": [
-          "branchId",
-          "priceBookId",
-          "mode",
-          "value",
-          "dryRun"
-        ]
-      },
-      "BulkAdjustPreviewDto": {
-        "type": "object",
-        "properties": {
-          "productId": {
-            "type": "string"
-          },
-          "code": {
-            "type": "string"
-          },
-          "oldPrice": {
-            "type": "string",
-            "example": "33000"
-          },
-          "newPrice": {
-            "type": "string",
-            "example": "34700"
-          }
-        },
-        "required": [
-          "productId",
-          "code",
-          "oldPrice",
-          "newPrice"
-        ]
-      },
-      "BulkAdjustResultDto": {
-        "type": "object",
-        "properties": {
-          "dryRun": {
-            "type": "boolean"
-          },
-          "affected": {
-            "type": "number",
-            "description": "Số ô đổi giá"
-          },
-          "skipped": {
-            "type": "number",
-            "description": "Số ô bỏ qua vì giá mới âm"
-          },
-          "unchanged": {
-            "type": "number",
-            "description": "Số ô giá không đổi sau khi làm tròn"
-          },
-          "preview": {
-            "description": "Tối đa 200 dòng đầu",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/BulkAdjustPreviewDto"
-            }
-          }
-        },
-        "required": [
-          "dryRun",
-          "affected",
-          "skipped",
-          "unchanged",
-          "preview"
-        ]
-      },
-      "CopyBranchDto": {
-        "type": "object",
-        "properties": {
-          "fromBranchId": {
-            "type": "string"
-          },
-          "toBranchId": {
-            "type": "string"
-          },
-          "priceBookId": {
-            "type": "string",
-            "description": "Chỉ chép bảng giá này; bỏ trống = mọi bảng giá"
-          },
-          "overwrite": {
-            "type": "boolean",
-            "default": false,
-            "description": "false = chỉ chép ô chi nhánh đích CHƯA có giá; true = ghi đè ô đã có"
-          }
-        },
-        "required": [
-          "fromBranchId",
-          "toBranchId"
-        ]
-      },
-      "CopyBranchResultDto": {
-        "type": "object",
-        "properties": {
-          "copied": {
-            "type": "number",
-            "description": "Số ô được chép / cập nhật"
-          },
-          "skipped": {
-            "type": "number",
-            "description": "Số ô bỏ qua (đã có giá hoặc giá giống nhau)"
-          }
-        },
-        "required": [
-          "copied",
-          "skipped"
-        ]
-      },
-      "UpdatePriceBookDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "isActive": {
-            "type": "boolean",
-            "description": "false = tắt bảng giá. Không tắt được Bảng giá chung"
-          }
-        }
-      },
       "ImportErrorDto": {
         "type": "object",
         "properties": {
@@ -3882,7 +3270,6 @@
             "type": "string",
             "enum": [
               "products",
-              "price-books",
               "customers",
               "suppliers"
             ]
@@ -3911,7 +3298,7 @@
           },
           "created": {
             "type": "number",
-            "description": "Sẽ tạo / đã tạo (hàng hóa mới; với price-books là số ô giá mới). Bằng 0 khi có lỗi"
+            "description": "Sẽ tạo / đã tạo (hàng hóa mới). Bằng 0 khi có lỗi"
           },
           "updated": {
             "type": "number",

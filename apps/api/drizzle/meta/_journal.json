@@ -127,6 +127,20 @@
       "when": 1793860058733,
       "tag": "0017_dang_nhap_google",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793864238169,
+      "tag": "0018_loai_hang_combo",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793865465716,
+      "tag": "0019_bo_gia_ban",
+      "breakpoints": true
     }
   ]
 }

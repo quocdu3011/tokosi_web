@@ -10,7 +10,7 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   const port = process.env.PORT ?? 3001;
-  
+
   await app.listen(port, '0.0.0.0');
   const localIp = ip.address();
   console.log(`Local API:   http://localhost:${port}/api/v1`);

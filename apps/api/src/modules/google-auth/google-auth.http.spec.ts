@@ -4,7 +4,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { auditLogs, userIdentities, users } from '../../db/schema/index.js';
 import { createHttpTestApp } from '../../test-utils/http-app.js';
 import { CatalogModule } from '../catalog/catalog.module.js';
-import { PricingModule } from '../pricing/pricing.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { GoogleAuthModule } from './google-auth.module.js';
 import { MAX_PENDING_ACCOUNTS } from './google-auth.service.js';
@@ -85,7 +84,7 @@ describe('Đăng nhập / đăng ký bằng Google (Supabase)', () => {
       alg: 'ES256',
     };
     t = await createHttpTestApp({
-      imports: [GoogleAuthModule, UsersModule, CatalogModule, PricingModule],
+      imports: [GoogleAuthModule, UsersModule, CatalogModule],
       overrides: [[SUPABASE_KEYS, createLocalJWKSet({ keys: [jwk] })]],
     });
     await t.makeUser('sale1', 'sales', [t.sg]);
@@ -228,7 +227,6 @@ describe('Đăng nhập / đăng ký bằng Google (Supabase)', () => {
     for (const url of [
       '/products',
       '/categories',
-      '/price-books/grid',
       '/users',
       '/roles',
       '/settings/auth',

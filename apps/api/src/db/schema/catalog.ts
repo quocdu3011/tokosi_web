@@ -2,18 +2,19 @@ import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
   boolean,
+  check,
   index,
   integer,
-  numeric,
   pgTable,
   primaryKey,
   text,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { pk, price, softDelete, timestamps, tstz } from './_helpers.js';
+import { productType } from './enums.js';
+import { pk, softDelete, timestamps, tstz } from './_helpers.js';
 import { productSearchExpr, trgmIndex } from './_search.js';
-import { branches, users } from './system.js';
+import { users } from './system.js';
 
 /** Nhóm hàng dạng cây (hiện tối đa 2 cấp, hỗ trợ nhiều cấp). */
 export const categories = pgTable(
@@ -39,8 +40,9 @@ export const categories = pgTable(
 );
 
 /**
- * Hàng hóa. Mỗi quy cách là một SKU riêng (đơn vị nằm trong tên), không có biến thể/combo/lô.
- * Chỉ chứa thông tin DÙNG CHUNG giữa các chi nhánh. Giá bán nằm ở `price_book_items` (theo chi nhánh);
+ * Hàng hóa. Mỗi quy cách là một SKU riêng (đơn vị nằm trong tên), không có biến thể/lô.
+ * `product_type`: `goods` (Hàng hóa) hoặc `combo` (gói các hàng thành phần ở `product_components`; KHÔNG có dòng tồn
+ * riêng — tồn, giá vốn của combo luôn tính từ thành phần). Chỉ chứa thông tin DÙNG CHUNG giữa các chi nhánh. Không có giá bán trong hệ thống (giá quy ước chung ở mô tả hàng);
  * tồn kho, giá vốn bình quân, giá nhập cuối, tồn tối thiểu/tối đa và vị trí kho nằm ở `stocks` (theo chi nhánh).
  */
 export const products = pgTable(
@@ -50,11 +52,9 @@ export const products = pgTable(
     code: text().notNull().unique(),
     name: text().notNull(),
     categoryId: uuid().references(() => categories.id),
-    unit: text().notNull().default('Cái'),
+    productType: productType().notNull().default('goods'),
     description: text(),
-    weightG: numeric({ precision: 12, scale: 2 }),
     isActive: boolean().notNull().default(true),
-    isSellable: boolean().notNull().default(true),
     createdBy: uuid().references(() => users.id),
     ...timestamps(),
     ...softDelete(),
@@ -63,8 +63,33 @@ export const products = pgTable(
     index('products_category_idx').on(t.categoryId),
     trgmIndex('products_search_trgm', productSearchExpr(t)),
     index('products_active_idx').on(t.isActive),
+    index('products_type_idx').on(t.productType),
     // Mã hàng không trùng kể cả khác hoa thường (cột `code` đã có ràng buộc duy nhất phân biệt hoa thường)
     uniqueIndex('products_code_lower_unique').on(sql`lower(${t.code})`),
+  ],
+);
+
+/**
+ * Thành phần của combo: một combo gồm nhiều hàng hóa (loại `goods`), mỗi hàng một số lượng nguyên dương.
+ * Chuỗi hiển thị/nhập Excel: `MSP/SL,MSP/SL`.
+ */
+export const productComponents = pgTable(
+  'product_components',
+  {
+    comboId: uuid()
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    componentId: uuid()
+      .notNull()
+      .references(() => products.id),
+    qty: integer().notNull(),
+    sortOrder: integer().notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.comboId, t.componentId] }),
+    index('product_components_component_idx').on(t.componentId),
+    check('product_components_qty_positive', sql`${t.qty} > 0`),
+    check('product_components_not_self', sql`${t.comboId} <> ${t.componentId}`),
   ],
 );
 
@@ -81,50 +106,4 @@ export const productImages = pgTable(
     createdAt: tstz().notNull().defaultNow(),
   },
   (t) => [index('product_images_product_idx').on(t.productId)],
-);
-
-/**
- * Bảng giá theo hạng khách: Chung (mặc định), Lớn, Vừa, VIP và 3 bản VAT.
- * Sản phẩm thiếu giá ở một bảng thì lùi về bảng mặc định.
- */
-export const priceBooks = pgTable(
-  'price_books',
-  {
-    id: pk(),
-    code: text().notNull().unique(),
-    name: text().notNull(),
-    withVat: boolean().notNull().default(false),
-    isDefault: boolean().notNull().default(false),
-    isActive: boolean().notNull().default(true),
-    sortOrder: integer().notNull().default(0),
-    ...timestamps(),
-  },
-  (t) => [
-    uniqueIndex('price_books_one_default')
-      .on(t.isDefault)
-      .where(sql`${t.isDefault}`),
-  ],
-);
-
-/** Giá bán của từng sản phẩm, trong từng bảng giá, TẠI TỪNG CHI NHÁNH. */
-export const priceBookItems = pgTable(
-  'price_book_items',
-  {
-    priceBookId: uuid()
-      .notNull()
-      .references(() => priceBooks.id, { onDelete: 'cascade' }),
-    branchId: uuid()
-      .notNull()
-      .references(() => branches.id),
-    productId: uuid()
-      .notNull()
-      .references(() => products.id, { onDelete: 'cascade' }),
-    price: price().notNull(),
-    updatedBy: uuid().references(() => users.id),
-    updatedAt: tstz().notNull().defaultNow(),
-  },
-  (t) => [
-    primaryKey({ columns: [t.priceBookId, t.branchId, t.productId] }),
-    index('price_book_items_branch_product_idx').on(t.branchId, t.productId),
-  ],
 );

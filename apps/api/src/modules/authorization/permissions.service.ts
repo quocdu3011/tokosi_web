@@ -69,7 +69,10 @@ export class PermissionsService {
     return grants;
   }
 
-  async getGrant(role: UserRole, code: PermissionCode): Promise<Grant | undefined> {
+  async getGrant(
+    role: UserRole,
+    code: PermissionCode,
+  ): Promise<Grant | undefined> {
     return (await this.getGrants(role)).find((g) => g.code === code);
   }
 

@@ -10,7 +10,6 @@ import {
   codeSequences,
   companyProfile,
   customers,
-  priceBooks,
   rolePermissions,
   suppliers,
   users,
@@ -43,7 +42,6 @@ describe('runSeed (CSDL thật trong bộ nhớ)', () => {
     expect(report).toMatchObject({
       branches: 2,
       branchPartners: 4,
-      priceBooks: 7,
       cashAccounts: 4,
       codeSequences: CODE_SEQUENCES.length,
       companyProfile: 1,
@@ -51,21 +49,6 @@ describe('runSeed (CSDL thật trong bộ nhớ)', () => {
     });
     expect(report.cashCategories).toBeGreaterThanOrEqual(10);
     expect(report.rolePermissions).toBeGreaterThan(40);
-  });
-
-  it('bảng giá: đúng 7, duy nhất một bảng mặc định, 3 bảng có VAT', async () => {
-    await runSeed(db, { adminPassword: PASSWORD });
-    const books = await db.select().from(priceBooks);
-    expect(books).toHaveLength(7);
-    expect(books.filter((b) => b.isDefault).map((b) => b.code)).toEqual([
-      'CHUNG',
-    ]);
-    expect(
-      books
-        .filter((b) => b.withVat)
-        .map((b) => b.code)
-        .sort(),
-    ).toEqual(['LON_VAT', 'VIP_VAT', 'VUA_VAT']);
   });
 
   it('hai chi nhánh (Hà Nội mặc định, Sài Gòn), mỗi chi nhánh có quỹ tiền mặt + ngân hàng riêng', async () => {
@@ -187,15 +170,11 @@ describe('runSeed (CSDL thật trong bộ nhớ)', () => {
       /ít nhất/,
     );
     expect(await total(users)).toBe(0);
-    expect(await total(priceBooks)).toBe(0);
+    expect(await total(branches)).toBe(0);
   });
 
   it('chạy lại: không thêm gì, không đổi mật khẩu, không ghi đè dữ liệu đã chỉnh', async () => {
     await runSeed(db, { adminPassword: PASSWORD });
-    await db
-      .update(priceBooks)
-      .set({ name: 'Giá sỉ lớn' })
-      .where(eq(priceBooks.code, 'LON'));
     await db
       .update(codeSequences)
       .set({ nextValue: 20000 })
@@ -209,11 +188,6 @@ describe('runSeed (CSDL thật trong bộ nhớ)', () => {
 
     expect(Object.values(report).reduce((a, b) => a + b, 0)).toBe(0);
     expect(adminUsername).toBeUndefined();
-    const lon = await db
-      .select()
-      .from(priceBooks)
-      .where(eq(priceBooks.code, 'LON'));
-    expect(lon[0]?.name).toBe('Giá sỉ lớn');
     const hd = await db
       .select()
       .from(codeSequences)

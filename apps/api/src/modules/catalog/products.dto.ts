@@ -9,6 +9,7 @@ import {
   MinLength,
   IsBoolean,
 } from 'class-validator';
+import { PRODUCT_TYPES, type ProductType } from '@kiot/shared';
 import { PageQueryDto } from '../../common/pagination.js';
 import { QueryBoolean } from '../../common/query.js';
 
@@ -31,6 +32,14 @@ export class ProductImageDto {
   @ApiProperty() sortOrder!: number;
 }
 
+export class ProductComponentDto {
+  @ApiProperty() productId!: string;
+  @ApiProperty({ example: 'DAO01' }) code!: string;
+  @ApiProperty() name!: string;
+  @ApiProperty({ example: 2, description: 'Số lượng trong MỘT combo' })
+  qty!: number;
+}
+
 export class ProductDto {
   @ApiProperty() id!: string;
   @ApiProperty({ example: 'QKBSP' }) code!: string;
@@ -42,20 +51,28 @@ export class ProductDto {
     example: 'ĐIỆN GIA DỤNG > Quạt điện',
   })
   categoryPath!: string | null;
-  @ApiProperty({ example: 'Cái' }) unit!: string;
+  @ApiProperty({
+    enum: PRODUCT_TYPES,
+    description:
+      '`goods` = Hàng hóa, `combo` = gói nhiều hàng thành phần. Combo không có tồn/giá vốn riêng: onHand, available, costPrice, lastPurchasePrice luôn tính từ thành phần; reserved luôn "0"; minStock/maxStock/location luôn null',
+  })
+  productType!: ProductType;
+  @ApiProperty({
+    example: 'DAO01/2,KEO03/1',
+    description:
+      'Hàng thành phần của combo, dạng `MSP/SL,MSP/SL`; chuỗi rỗng với hàng hóa',
+  })
+  components!: string;
+  @ApiProperty({
+    type: () => [ProductComponentDto],
+    description: 'Chi tiết hàng thành phần (rỗng với hàng hóa)',
+  })
+  componentItems!: ProductComponentDto[];
   @ApiProperty({
     description:
-      'Chi nhánh mà các trường giá/tồn/vị trí bên dưới tính cho (= chi nhánh làm việc, header X-Branch-Id)',
+      'Chi nhánh mà các trường tồn/giá vốn/vị trí bên dưới tính cho (= chi nhánh làm việc, header X-Branch-Id)',
   })
   branchId!: string;
-  @ApiProperty({
-    nullable: true,
-    type: String,
-    description:
-      'Giá Bảng giá chung TẠI chi nhánh này (số nguyên đồng); null nếu chưa có giá',
-    example: '33500',
-  })
-  basePrice!: string | null;
   @ApiPropertyOptional({
     description:
       'Giá vốn bình quân của chi nhánh này. VẮNG MẶT nếu thiếu quyền product.cost.view',
@@ -83,10 +100,8 @@ export class ProductDto {
   @ApiProperty({ nullable: true, type: String }) maxStock!: string | null;
   @ApiProperty({ nullable: true, type: String }) location!: string | null;
   @ApiProperty({ nullable: true, type: String }) description!: string | null;
-  @ApiProperty({ nullable: true, type: String }) weightG!: string | null;
   @ApiProperty({ type: [ProductImageDto] }) images!: ProductImageDto[];
   @ApiProperty() isActive!: boolean;
-  @ApiProperty() isSellable!: boolean;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
 }
@@ -122,6 +137,14 @@ export class ListProductsQueryDto extends PageQueryDto {
   @ApiPropertyOptional() @QueryBoolean() isActive?: boolean;
 
   @ApiPropertyOptional({
+    enum: PRODUCT_TYPES,
+    description: 'Lọc theo loại hàng',
+  })
+  @IsOptional()
+  @IsIn(PRODUCT_TYPES)
+  productType?: ProductType;
+
+  @ApiPropertyOptional({
     description: 'true = chỉ hàng còn tồn tại chi nhánh làm việc',
   })
   @QueryBoolean()
@@ -151,8 +174,13 @@ export class ProductLookupDto {
   @ApiProperty() id!: string;
   @ApiProperty() code!: string;
   @ApiProperty() name!: string;
-  @ApiProperty() unit!: string;
-  @ApiProperty({ nullable: true, type: String }) basePrice!: string | null;
+  @ApiProperty({ enum: PRODUCT_TYPES }) productType!: ProductType;
+  @ApiProperty({
+    example: 'DAO01/2,KEO03/1',
+    description:
+      'Với combo: thành phần để thêm vào đơn (chọn combo = thêm từng thành phần × SL); hàng hóa: rỗng',
+  })
+  components!: string;
   @ApiProperty() available!: string;
   @ApiProperty({ nullable: true, type: String }) imageUrl!: string | null;
 }
@@ -180,28 +208,26 @@ export class CreateProductDto {
   @IsUUID()
   categoryId?: string;
 
-  @ApiPropertyOptional({ example: 'Cái', default: 'Cái' })
+  @ApiPropertyOptional({ enum: PRODUCT_TYPES, default: 'goods' })
+  @IsOptional()
+  @IsIn(PRODUCT_TYPES)
+  productType?: ProductType;
+
+  @ApiPropertyOptional({
+    example: 'DAO01/2,KEO03/1',
+    description:
+      'Bắt buộc (ít nhất 1 thành phần) khi productType = combo, dạng `MSP/SL,MSP/SL`: mã hàng hóa (không phải combo), số lượng nguyên dương, mã không lặp. Không được gửi với hàng hóa',
+  })
   @IsOptional()
   @IsString()
-  @MinLength(1)
-  @MaxLength(30)
-  unit?: string;
+  @MaxLength(5000)
+  components?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   @MaxLength(5000)
   description?: string;
-
-  @ApiPropertyOptional({ description: 'Trọng lượng gram', example: '850' })
-  @IsOptional()
-  @Matches(/^\d{1,10}(\.\d{1,2})?$/, { message: 'Trọng lượng không hợp lệ' })
-  weightG?: string;
-
-  @ApiPropertyOptional({ default: true })
-  @IsOptional()
-  @IsBoolean()
-  isSellable?: boolean;
 }
 
 export class UpdateProductDto {
@@ -227,12 +253,24 @@ export class UpdateProductDto {
   @IsUUID()
   categoryId?: string | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    enum: PRODUCT_TYPES,
+    description:
+      'Chỉ đổi được khi hàng chưa có giao dịch và (khi đổi sang combo) chưa là thành phần của combo nào',
+  })
+  @IsOptional()
+  @IsIn(PRODUCT_TYPES)
+  productType?: ProductType;
+
+  @ApiPropertyOptional({
+    example: 'DAO01/2,KEO03/1',
+    description:
+      'Thay toàn bộ hàng thành phần của combo (`MSP/SL,MSP/SL`). Đổi sang combo thì bắt buộc gửi kèm',
+  })
   @IsOptional()
   @IsString()
-  @MinLength(1)
-  @MaxLength(30)
-  unit?: string;
+  @MaxLength(5000)
+  components?: string;
 
   @ApiPropertyOptional({
     nullable: true,
@@ -245,24 +283,10 @@ export class UpdateProductDto {
   @MaxLength(5000)
   description?: string | null;
 
-  @ApiPropertyOptional({ nullable: true, type: String })
-  @IsOptional()
-  @Matches(/^\d{1,10}(\.\d{1,2})?$/, { message: 'Trọng lượng không hợp lệ' })
-  weightG?: string | null;
-
   @ApiPropertyOptional({ description: 'false = ngưng kinh doanh' })
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
-
-  @ApiPropertyOptional() @IsOptional() @IsBoolean() isSellable?: boolean;
-}
-
-export class ProductBranchPriceDto {
-  @ApiProperty() priceBookId!: string;
-  @ApiProperty({ example: 'LON' }) priceBookCode!: string;
-  @ApiProperty({ nullable: true, type: String, example: '33000' })
-  price!: string | null;
 }
 
 export class ProductBranchDto {
@@ -283,11 +307,6 @@ export class ProductBranchDto {
   @ApiProperty({ nullable: true, type: String }) minStock!: string | null;
   @ApiProperty({ nullable: true, type: String }) maxStock!: string | null;
   @ApiProperty({ nullable: true, type: String }) location!: string | null;
-  @ApiProperty({
-    type: [ProductBranchPriceDto],
-    description: 'Giá của cả 7 bảng giá TẠI chi nhánh này (null = chưa có giá)',
-  })
-  prices!: ProductBranchPriceDto[];
 }
 
 export class SetProductBranchSettingsDto {
