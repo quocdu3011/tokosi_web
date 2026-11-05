@@ -1,14 +1,20 @@
 import type { QueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
-import type { AuthUser, SessionResponse } from '@/lib/api/types';
+import type {
+  AuthUser,
+  GoogleSignupInput,
+  GoogleSignupRequired,
+  SessionResponse,
+} from '@/lib/api/types';
+import { isSignupRequired } from '@/lib/google-auth';
 import { useBranchStore } from '@/lib/branch';
 
 import { useAuthStore } from './store';
 
 /** Các thao tác phiên đăng nhập: đăng nhập, khôi phục phiên khi tải trang, đăng xuất, đổi mật khẩu. */
 
-function applySession(session: SessionResponse) {
+export function applySession(session: SessionResponse) {
   useAuthStore.getState().setSession(session.accessToken, session.user);
   useBranchStore.getState().syncWithUser(session.user);
 }
@@ -61,6 +67,32 @@ export async function changePassword(currentPassword: string, newPassword: strin
     { currentPassword, newPassword },
     { branchId: null },
   );
+  applySession(session);
+  return session.user;
+}
+
+/**
+ * Đăng nhập bằng token Supabase (`POST /auth/google`). Có tài khoản → áp dụng phiên; chưa có và được
+ * phép tự đăng ký → trả `signup_required` (chưa tạo gì) để màn hình hiện form hồ sơ.
+ */
+export async function googleLogin(
+  accessToken: string,
+): Promise<SessionResponse | GoogleSignupRequired> {
+  const res = await api.post<SessionResponse | GoogleSignupRequired>(
+    '/auth/google',
+    { accessToken },
+    { auth: false, branchId: null },
+  );
+  if (!isSignupRequired(res)) applySession(res);
+  return res;
+}
+
+/** Hoàn tất tự đăng ký từ Google; tài khoản mới có vai trò `pending` cho tới khi Quản lý cấp quyền. */
+export async function googleSignup(input: GoogleSignupInput): Promise<AuthUser> {
+  const session = await api.post<SessionResponse>('/auth/google/signup', input, {
+    auth: false,
+    branchId: null,
+  });
   applySession(session);
   return session.user;
 }

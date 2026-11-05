@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
 import { AuthCard } from '@/components/common/auth-card';
+import { GoogleIcon } from '@/components/common/google-icon';
 import { Field } from '@/components/common/field';
 import { FullPageLoader } from '@/components/common/full-page-loader';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { errorMessage, isApiError } from '@/lib/api';
 import { login } from '@/lib/auth/session';
 import { useAuthStore } from '@/lib/auth/store';
+import { isGoogleConfigured, startGoogleLogin } from '@/lib/auth/supabase';
 
 const schema = z.object({
   username: z.string().trim().min(1, 'Nhập tên đăng nhập'),
@@ -34,6 +36,8 @@ export function LoginForm() {
   const status = useAuthStore((s) => s.status);
   const mustChange = useAuthStore((s) => s.user?.mustChangePassword ?? false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const googleEnabled = isGoogleConfigured();
 
   const {
     register,
@@ -64,6 +68,18 @@ export function LoginForm() {
       }
     }
   });
+
+  const onGoogle = async () => {
+    setFormError(null);
+    setGoogleBusy(true);
+    try {
+      await startGoogleLogin(next);
+      // Trình duyệt đang chuyển sang Google; giữ nút ở trạng thái bận.
+    } catch (e) {
+      setGoogleBusy(false);
+      setFormError(errorMessage(e));
+    }
+  };
 
   if (status === 'loading') return <FullPageLoader />;
 
@@ -100,6 +116,23 @@ export function LoginForm() {
           {isSubmitting && <span className="spinner" aria-hidden="true" />}
           Đăng nhập
         </Button>
+        {googleEnabled && (
+          <>
+            <div className="auth-divider" role="separator">
+              <span>hoặc</span>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={() => void onGoogle()}
+              disabled={googleBusy || isSubmitting}
+            >
+              {googleBusy ? <span className="spinner" aria-hidden="true" /> : <GoogleIcon />}
+              Đăng nhập bằng Google
+            </Button>
+          </>
+        )}
       </form>
     </AuthCard>
   );

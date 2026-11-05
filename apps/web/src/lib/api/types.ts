@@ -69,6 +69,18 @@ export type StockCard = Omit<Schemas['StockCardDto'], 'movements'> & {
 export type ImportJob = Schemas['ImportJobDto'];
 export type ImportRowError = Schemas['ImportErrorDto'];
 
+/** Đăng nhập Google và cài đặt tự đăng ký (docs/api/endpoints.md mục 1). */
+export type GoogleSignupInput = Schemas['GoogleSignupDto'];
+export type AuthSettings = Schemas['AuthSettingsDto'];
+export type UpdateAuthSettingsInput = Schemas['UpdateAuthSettingsDto'];
+/** `POST /auth/google` trả 202 khi chưa có tài khoản và được phép tự đăng ký (chưa tạo gì). */
+export interface GoogleSignupRequired {
+  status: 'signup_required';
+  signupToken: string;
+  email: string;
+  suggestedName: string;
+}
+
 /** Phân trang chuẩn của mọi danh sách (docs/api/README.md mục 4). */
 export interface PageMeta {
   page: number;
