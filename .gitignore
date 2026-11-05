@@ -27,6 +27,7 @@ data/
 
 # Công cụ phân tích cục bộ
 _rea/
+graphify-out/
 
 # Mật khẩu Quản lý do seed sinh ra
 .seed-admin-credentials.txt
