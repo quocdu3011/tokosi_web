@@ -74,6 +74,11 @@ enum permission_scope {
   "own"
 }
 
+enum product_type {
+  "goods"
+  "combo"
+}
+
 enum return_settlement {
   "offset_debt"
   "refund"
@@ -116,6 +121,7 @@ enum user_role {
   "driver"
   "sales"
   "marketing"
+  "pending"
 }
 
 Table audit_logs {
@@ -295,7 +301,6 @@ Table customers {
   address text
   facebook text
   sales_owner_id uuid [note: 'Nhân viên phụ trách (ở KiotViet là "Nhóm khách hàng")']
-  default_price_book_id uuid [note: 'Bảng giá tự áp khi đặt hàng']
   linked_branch_id uuid [unique, note: 'Khách hàng hệ thống đại diện một chi nhánh (chuyển kho nội bộ)']
   note text
   is_active boolean [not null, default: true]
@@ -307,7 +312,6 @@ Table customers {
   indexes {
     (`f_search_text(code || ' ' || name || ' ' || coalesce(phone, '')) gin_trgm_ops`) [name: 'customers_search_trgm']
     (sales_owner_id) [name: 'customers_sales_owner_idx']
-    (default_price_book_id) [name: 'customers_price_book_idx']
   }
 
   Note: '''Khách hàng. Công nợ không lưu ở đây: số dư = tổng debt_ledger (có thể âm). sales_owner_id = nhân viên phụ trách.'''
@@ -431,7 +435,6 @@ Table invoice_items {
   product_id uuid [not null]
   product_code text [not null]
   product_name text [not null]
-  unit text
   qty numeric(14,3) [not null]
   list_price numeric(18,4) [not null]
   discount_per_unit numeric(18,4) [not null, default: 0, note: 'Giảm giá tính trên 1 đơn vị (số tiền, không phải %)']
@@ -475,7 +478,6 @@ Table invoices {
   branch_id uuid [not null]
   order_id uuid [unique]
   customer_id uuid [not null]
-  price_book_id uuid [not null]
   seller_id uuid
   invoiced_at timestamptz [not null]
   subtotal numeric(18,0) [not null]
@@ -531,7 +533,6 @@ Table orders {
   branch_id uuid [not null]
   customer_id uuid [not null]
   status order_status [not null, default: 'draft']
-  price_book_id uuid [not null]
   seller_id uuid
   ordered_at timestamptz [not null]
   subtotal numeric(18,0) [not null, default: 0]
@@ -574,38 +575,20 @@ Table payment_allocations {
 CHECK payment_allocations_amount_pos: amount > 0'''
 }
 
-Table price_book_items {
-  price_book_id uuid [not null]
-  branch_id uuid [not null]
-  product_id uuid [not null]
-  price numeric(18,4) [not null, note: 'Giá bán tại chi nhánh (branch_id) trong bảng giá (price_book_id)']
-  updated_by uuid
-  updated_at timestamptz [not null, default: `now()`]
-
-  indexes {
-    (price_book_id, branch_id, product_id) [pk]
-    (branch_id, product_id) [name: 'price_book_items_branch_product_idx']
-  }
-
-  Note: '''Giá bán của từng sản phẩm trong từng bảng giá, TẠI TỪNG CHI NHÁNH.'''
-}
-
-Table price_books {
-  id uuid [pk, default: `gen_random_uuid()`]
-  code text [not null, unique]
-  name text [not null]
-  with_vat boolean [not null, default: false]
-  is_default boolean [not null, default: false]
-  is_active boolean [not null, default: true]
+Table product_components {
+  combo_id uuid [not null]
+  component_id uuid [not null]
+  qty integer [not null]
   sort_order integer [not null, default: 0]
-  created_at timestamptz [not null, default: `now()`]
-  updated_at timestamptz [not null, default: `now()`]
 
   indexes {
-    (is_default) [name: 'price_books_one_default', unique]
+    (combo_id, component_id) [pk]
+    (component_id) [name: 'product_components_component_idx']
   }
 
-  Note: '''Bảng giá theo hạng khách (Chung, Lớn, Vừa, VIP và 3 bản VAT). Thiếu giá thì lùi về bảng mặc định.'''
+  Note: '''Thành phần của combo: combo_id → component_id (hàng hóa) với qty nguyên dương. Combo không có tồn/giá vốn riêng, luôn tính từ thành phần.
+CHECK product_components_qty_positive: qty > 0
+CHECK product_components_not_self: comboId <> componentId'''
 }
 
 Table product_images {
@@ -628,11 +611,9 @@ Table products {
   code text [not null, unique]
   name text [not null]
   category_id uuid
-  unit text [not null, default: 'Cái', note: 'Đơn vị tính (quy cách thường nằm trong tên hàng)']
+  product_type product_type [not null, default: 'goods', note: 'Loại hàng: goods = Hàng hóa (mặc định), combo = gói các hàng thành phần (không có tồn/giá vốn riêng)']
   description text
-  weight_g numeric(12,2)
   is_active boolean [not null, default: true]
-  is_sellable boolean [not null, default: true]
   created_by uuid
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
@@ -642,6 +623,7 @@ Table products {
     (category_id) [name: 'products_category_idx']
     (`f_search_text(code || ' ' || name) gin_trgm_ops`) [name: 'products_search_trgm']
     (is_active) [name: 'products_active_idx']
+    (product_type) [name: 'products_type_idx']
     (`lower(code)`) [name: 'products_code_lower_unique', unique]
   }
 
@@ -884,6 +866,15 @@ Table suppliers {
   Note: '''Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng khác; group_name là nhóm NCC (chuỗi tự do, có thể để trống).'''
 }
 
+Table system_settings {
+  key text [pk]
+  value jsonb [not null]
+  updated_by uuid
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: '''Cài đặt hệ thống dạng khóa → JSON do Quản lý chỉnh (vd mở/tắt tự đăng ký bằng Google).'''
+}
+
 Table user_branches {
   user_id uuid [not null]
   branch_id uuid [not null]
@@ -895,6 +886,22 @@ Table user_branches {
   }
 
   Note: '''Chi nhánh người dùng được làm việc (Quản lý thấy tất cả, không cần dòng ở đây).'''
+}
+
+Table user_identities {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  provider text [not null]
+  provider_subject text [not null]
+  email text [not null]
+  linked_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (provider, provider_subject) [name: 'user_identities_provider_subject_unique', unique]
+    (user_id) [name: 'user_identities_user_idx']
+  }
+
+  Note: '''Danh tính đăng nhập bên ngoài (Google qua Supabase) gắn với người dùng; khớp theo provider_subject, không theo email.'''
 }
 
 Table users {
@@ -909,6 +916,7 @@ Table users {
   default_branch_id uuid
   is_active boolean [not null, default: true]
   last_login_at timestamptz
+  password_changed_at timestamptz
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
   deleted_at timestamptz
@@ -933,7 +941,6 @@ Ref: customer_branch_terms.customer_id > customers.id [delete: cascade]
 Ref: customer_branch_terms.branch_id > branches.id
 Ref: customer_invoice_profiles.customer_id > customers.id [delete: cascade]
 Ref: customers.sales_owner_id > users.id
-Ref: customers.default_price_book_id > price_books.id
 Ref: customers.linked_branch_id > branches.id
 Ref: customers.created_by > users.id
 Ref: debt_ledger.branch_id > branches.id
@@ -955,22 +962,18 @@ Ref: invoices.root_invoice_id > invoices.id
 Ref: invoices.branch_id > branches.id
 Ref: invoices.order_id > orders.id
 Ref: invoices.customer_id > customers.id
-Ref: invoices.price_book_id > price_books.id
 Ref: invoices.seller_id > users.id
 Ref: invoices.created_by > users.id
 Ref: order_items.order_id > orders.id [delete: cascade]
 Ref: order_items.product_id > products.id
 Ref: orders.branch_id > branches.id
 Ref: orders.customer_id > customers.id
-Ref: orders.price_book_id > price_books.id
 Ref: orders.seller_id > users.id
 Ref: orders.created_by > users.id
 Ref: payment_allocations.cash_transaction_id > cash_transactions.id
 Ref: payment_allocations.invoice_id > invoices.id
-Ref: price_book_items.price_book_id > price_books.id [delete: cascade]
-Ref: price_book_items.branch_id > branches.id
-Ref: price_book_items.product_id > products.id [delete: cascade]
-Ref: price_book_items.updated_by > users.id
+Ref: product_components.combo_id > products.id [delete: cascade]
+Ref: product_components.component_id > products.id
 Ref: product_images.product_id > products.id [delete: cascade]
 Ref: products.category_id > categories.id
 Ref: products.created_by > users.id
@@ -1004,8 +1007,10 @@ Ref: stocks.branch_id > branches.id
 Ref: stocks.product_id > products.id
 Ref: suppliers.linked_branch_id > branches.id
 Ref: suppliers.created_by > users.id
+Ref: system_settings.updated_by > users.id [delete: set null]
 Ref: user_branches.user_id > users.id [delete: cascade]
 Ref: user_branches.branch_id > branches.id
+Ref: user_identities.user_id > users.id [delete: cascade]
 Ref: users.default_branch_id > branches.id
 
 TableGroup "Hệ thống" {
@@ -1019,12 +1024,15 @@ TableGroup "Hệ thống" {
   import_jobs
   user_branches
   role_permissions
+  user_identities
+  system_settings
 }
 
 TableGroup "Hàng hóa & giá" {
   categories
   products
   product_images
+  product_components
   price_books
   price_book_items
 }

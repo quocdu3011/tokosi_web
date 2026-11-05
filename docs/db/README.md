@@ -33,9 +33,7 @@ erDiagram
   products ||--o{ stocks : ""
   products ||--o{ stock_movements : "sổ cái kho"
   categories ||--o{ products : ""
-  products ||--o{ price_book_items : ""
-  price_books ||--o{ price_book_items : "7 bảng giá"
-  price_books ||--o{ customers : "bảng giá mặc định"
+  products ||--o{ product_components : "combo gồm"
   users ||--o{ customers : "nhân viên phụ trách"
 
   customers ||--o{ orders : ""
@@ -97,7 +95,6 @@ Hai chi nhánh dùng chung một hệ thống. **Dùng chung:** hàng hóa, khá
 
 | Dữ liệu                                                                         | Nằm ở                                                                                     | Khóa chi nhánh                      |
 | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------- |
-| Giá bán                                                                         | `price_book_items` (khóa chính: hạng giá, chi nhánh, sản phẩm)                            | `branch_id`                         |
 | Tồn kho, **giá vốn bình quân**, giá nhập cuối, tồn tối thiểu/tối đa, vị trí kho | `stocks` (khóa chính: chi nhánh, sản phẩm)                                                | `branch_id`                         |
 | Công nợ khách / nhà cung cấp                                                    | `debt_ledger` — số dư = tổng theo (đối tác, chi nhánh); **tách biệt, không cấn trừ chéo** | `branch_id`                         |
 | Hạn mức, kỳ hạn công nợ                                                         | `customer_branch_terms`                                                                   | `branch_id`                         |
@@ -115,7 +112,7 @@ Phiếu chuyển kho **không phải hóa đơn bán** nên không vào doanh th
 **Điều khác cần biết:**
 
 - Mọi thay đổi tồn kho đi qua `InventoryService.applyMovement` (`apps/api/src/modules/inventory`): khóa dòng tồn, không cho âm, cập nhật giá vốn bình quân của đúng chi nhánh, ghi sổ cái — cùng transaction với chứng từ.
-- Các bảng mới `branch_id NOT NULL` (`price_book_items`, `debt_ledger`) chỉ thêm được vì lúc migrate chưa có dữ liệu; nếu sau này cần migrate khi đã có dữ liệu thì phải điền giá trị trước.
+- Các bảng mới `branch_id NOT NULL` (`debt_ledger`) chỉ thêm được vì lúc migrate chưa có dữ liệu; nếu sau này cần migrate khi đã có dữ liệu thì phải điền giá trị trước.
 - Dữ liệu KiotViet hiện chỉ có 1 chi nhánh ("Chi nhánh trung tâm"); chi nhánh còn lại cũng đang ở KiotViet và sẽ nhập sau. Công cụ import cần tham số chi nhánh đích.
 
 ## Dữ liệu khởi tạo (seed)
@@ -126,7 +123,6 @@ Phiếu chuyển kho **không phải hóa đơn bán** nên không vào doanh th
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Chi nhánh          | `HN` Chi nhánh Hà Nội (mặc định) và `SG` Chi nhánh Sài Gòn                                                                                                                      |
 | Khách/NCC nội bộ   | Mỗi chi nhánh có 1 khách hàng và 1 nhà cung cấp hệ thống (`CN-SG`, `CN-HN`) để chuyển kho coi chi nhánh kia là khách/nhà cung cấp                                               |
-| Bảng giá           | 7 bảng: `CHUNG` (mặc định), `LON`, `VUA`, `VIP` và 3 bản VAT `LON_VAT`, `VUA_VAT`, `VIP_VAT`                                                                                    |
 | Quỹ                | **4 quỹ**: "Tiền mặt" và "Ngân hàng" riêng cho từng chi nhánh (số dư đầu kỳ = 0, đặt lại khi cắt chuyển)                                                                        |
 | Danh mục thu chi   | 15 danh mục, có `code` ổn định; 4 danh mục hệ thống (`customer_payment`, `supplier_refund`, `supplier_payment`, `customer_refund`)                                              |
 | Bộ đếm mã chứng từ | `KH`, `NCC`, `DH`, `HD`, `TH`, `PDN`, `PN`, `THN`, `TT`, `CTM`, `CH` (chuyển kho) (6 chữ số) và `NV` (4 chữ số). Số bắt đầu = mã lớn nhất trong dữ liệu KiotViet 03/11/2026 + 1 |

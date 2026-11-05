@@ -8,7 +8,7 @@ import { Test } from '@nestjs/testing';
 import { eq } from 'drizzle-orm';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
-import type { Role } from '@kiot/shared';
+import type { UserRole } from '@kiot/shared';
 import { configureApp } from '../app.setup.js';
 import { hashPassword } from '../common/password.js';
 import { ConfigModule } from '../config/app-config.js';
@@ -72,7 +72,7 @@ export async function createHttpTestApp(opts: HttpTestOptions) {
 
   async function makeUser(
     username: string,
-    role: Role,
+    role: UserRole,
     branchIds: string[] = [],
     defaultBranchId?: string,
   ) {

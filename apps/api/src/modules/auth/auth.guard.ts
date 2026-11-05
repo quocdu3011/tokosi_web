@@ -48,13 +48,16 @@ export class AuthGuard implements CanActivate {
       typeof header === 'string' ? /^Bearer\s+(\S+)$/i.exec(header) : null;
     if (!match) throw new AppError(401, 'UNAUTHENTICATED', 'Bạn cần đăng nhập');
 
-    const userId = await this.tokens.verifyAccessToken(match[1] as string);
+    const { userId, issuedAt } = await this.tokens.verifyAccessTokenClaims(
+      match[1] as string,
+    );
     const [user] = await this.db
       .select({
         id: users.id,
         role: users.role,
         isActive: users.isActive,
         mustChangePassword: users.mustChangePassword,
+        passwordChangedAt: users.passwordChangedAt,
       })
       .from(users)
       .where(and(eq(users.id, userId), isNull(users.deletedAt)));
@@ -63,6 +66,19 @@ export class AuthGuard implements CanActivate {
         401,
         'UNAUTHENTICATED',
         'Tài khoản không còn hoạt động',
+      );
+    }
+
+    // Mật khẩu đã đổi/đặt lại sau khi token được cấp → token cũ vô hiệu ngay (không chờ hết 15 phút).
+    // So theo GIÂY nguyên: token cấp cùng giây với lần đổi vẫn hợp lệ (cửa sổ tối đa ~1 giây, chấp nhận được).
+    if (
+      user.passwordChangedAt &&
+      issuedAt < Math.floor(user.passwordChangedAt.getTime() / 1000)
+    ) {
+      throw new AppError(
+        401,
+        'UNAUTHENTICATED',
+        'Mật khẩu đã được đổi, hãy đăng nhập lại',
       );
     }
 

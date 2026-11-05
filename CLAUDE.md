@@ -24,20 +24,22 @@ docs/           Tài liệu thiết kế, ERD, ADR
 
 ## Lệnh thường dùng (chạy ở thư mục gốc)
 
-| Lệnh                                                        | Việc                                                                                             |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `pnpm install`                                              | Cài phụ thuộc                                                                                    |
-| `pnpm dev`                                                  | Chạy web + api ở chế độ phát triển                                                               |
-| `pnpm build` / `pnpm lint` / `pnpm typecheck` / `pnpm test` | Qua Turborepo (có cache)                                                                         |
-| `pnpm db:up` / `pnpm db:down`                               | Bật/tắt PostgreSQL + MinIO (kho file ảnh) cục bộ (cần Docker)                                    |
-| `pnpm --filter @kiot/api test`                              | Chạy test của một gói                                                                            |
-| `pnpm --filter @kiot/api test:e2e`                          | Test e2e của API (không cần CSDL thật)                                                           |
-| `pnpm --filter @kiot/api db:seed`                           | Dữ liệu khởi tạo đầy đủ (xem `docs/db/README.md`); chạy lại an toàn                              |
-| `pnpm --filter @kiot/api db:seed:demo`                      | Dữ liệu MẪU để dev (60 hàng, tồn, giá 7 bảng giá × 2 chi nhánh); chỉ dev, từ chối ở production   |
-| `pnpm --filter @kiot/api storage:init`                      | Tạo bucket ảnh + cho phép đọc công khai trên MinIO dev (chạy sau `pnpm db:up`); chạy lại an toàn |
-| `pnpm --filter @kiot/api openapi:export`                    | Xuất `docs/api/openapi.json` (chạy khi đổi endpoint/DTO, commit kèm)                             |
+| Lệnh                                                        | Việc                                                                                                                              |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm install`                                              | Cài phụ thuộc                                                                                                                     |
+| `pnpm dev`                                                  | Chạy web + api ở chế độ phát triển                                                                                                |
+| `pnpm build` / `pnpm lint` / `pnpm typecheck` / `pnpm test` | Qua Turborepo (có cache)                                                                                                          |
+| `pnpm db:up` / `pnpm db:down`                               | Bật/tắt PostgreSQL + MinIO (kho file ảnh) cục bộ (cần Docker)                                                                     |
+| `pnpm --filter @kiot/api test`                              | Chạy test của một gói                                                                                                             |
+| `pnpm --filter @kiot/api test:e2e`                          | Test e2e của API (không cần CSDL thật)                                                                                            |
+| `pnpm --filter @kiot/api db:seed`                           | Dữ liệu khởi tạo đầy đủ (xem `docs/db/README.md`); chạy lại an toàn                                                               |
+| `pnpm --filter @kiot/api db:seed:demo`                      | Dữ liệu MẪU để dev (60 hàng, 3 combo, tồn 2 chi nhánh); chỉ dev, từ chối ở production                                    |
+| `pnpm --filter @kiot/api storage:init`                      | Tạo bucket ảnh + cho phép đọc công khai trên MinIO dev (chạy sau `pnpm db:up`); chạy lại an toàn                                  |
+| `pnpm --filter @kiot/api db:reconcile`                      | Đối soát sổ cái với số liệu cache (tồn, công nợ nội bộ, quỹ); thoát mã 1 nếu lệch. Chạy hằng ngày khi chạy song song với KiotViet |
+| `pnpm --filter @kiot/api storage:gc`                        | Liệt kê file ảnh mồ côi trên kho file (thêm `--apply` để xóa)                                                                     |
+| `pnpm --filter @kiot/api openapi:export`                    | Xuất `docs/api/openapi.json` (chạy khi đổi endpoint/DTO, commit kèm)                                                              |
 
-Mọi PR phải qua: `lint`, `typecheck`, `test`, `build` (CI chạy đúng bộ này).
+Mọi PR phải qua: `lint`, `typecheck`, `test`, `build`, và `openapi.json` + `docs/db/` đã sinh lại (CI chạy đúng bộ này và so sánh tài liệu sinh tự động).
 
 ## Hợp đồng API (backend ↔ frontend)
 
@@ -53,11 +55,13 @@ Mọi PR phải qua: `lint`, `typecheck`, `test`, `build` (CI chạy đúng bộ
 - Quyền có phạm vi `own` (`req.grants['invoice.view'] === 'own'`) thì **service phải lọc** chỉ dữ liệu của người đó (khách có `sales_owner_id`, đơn/hóa đơn có `seller_id` là chính họ).
 - Trường nhạy cảm (giá vốn, công nợ…) chỉ trả về khi đủ quyền tương ứng — xem `docs/api/README.md` mục 8.
 - Thêm quyền mới: thêm vào danh mục + `DEFAULT_ROLE_PERMISSIONS` (nếu muốn cấp mặc định), cập nhật `docs/api/`. Cài đặt đã chạy rồi thì quyền mới chỉ Quản lý có cho tới khi được cấp (seed không ghi đè cấu hình hiện có).
+- **Đăng nhập Google (Supabase):** `modules/google-auth/`. Supabase chỉ chứng minh danh tính (kiểm tra JWT bằng JWKS, chỉ nhận provider `google` + email đã xác minh); mọi quyền do hệ thống quyết định. Tự đăng ký do Quản lý bật (`settings/auth`, mặc định tắt, bắt buộc có danh sách tên miền); người mới có vai trò `pending` (`PENDING_ROLE`, không nằm trong `ROLES`, không quyền nào, không chi nhánh) cho tới khi Quản lý cấp. Cấu hình `SUPABASE_URL`; trong Supabase phải TẮT đăng ký email/mật khẩu.
 - Ba guard toàn cục đăng ký trong `AuthModule` **theo đúng thứ tự: `AuthGuard` → `PermissionGuard` → `BranchContextGuard`** (đừng đổi). Endpoint mặc định **cần đăng nhập**; chỉ endpoint công khai mới gắn `@Public()`. Dùng `@CurrentUser()` lấy người dùng; handler làm việc theo chi nhánh gắn `@RequireBranch()` rồi lấy `@WorkingBranchId()`. Vai trò, trạng thái tài khoản đọc từ CSDL ở mỗi yêu cầu (token chỉ chứa id). Mật khẩu: argon2id; refresh token chỉ lưu bản băm; đừng ghi mật khẩu/tên đăng nhập gõ nhầm vào nhật ký.
 
 ## Nhiều chi nhánh (Hà Nội, Sài Gòn)
 
-- Dùng chung: hàng hóa, khách hàng, nhà cung cấp, hạng giá. **Riêng từng chi nhánh:** giá bán (`price_book_items.branch_id`), tồn kho + **giá vốn** + vị trí (`stocks`), công nợ (`debt_ledger.branch_id`), hạn mức (`customer_branch_terms`), quỹ, mọi chứng từ. **Không bao giờ dùng giá/tồn/công nợ của chi nhánh này cho chi nhánh kia**; thiếu giá thì lùi về Bảng giá chung của CÙNG chi nhánh.
+- **Loại hàng:** `goods` (Hàng hóa) và `combo` (gói các hàng thành phần ở `product_components`, chuỗi `MSP/SL,MSP/SL`). Combo KHÔNG có tồn/giá vốn riêng (luôn tính từ thành phần; `comboFigures` trong `modules/catalog/combo.ts`), không bao giờ có dòng sổ kho/chứng từ: `InventoryService` từ chối combo, lập đơn tách combo thành các dòng thành phần.
+- Dùng chung: hàng hóa, khách hàng, nhà cung cấp. **Riêng từng chi nhánh:** tồn kho + **giá vốn** + vị trí (`stocks`), công nợ (`debt_ledger.branch_id`), hạn mức (`customer_branch_terms`), quỹ, mọi chứng từ. **Không bao giờ dùng tồn/giá vốn/công nợ của chi nhánh này cho chi nhánh kia.** Hệ thống **không có giá bán** (không bảng giá): giá bán được quy ước chung ở mô tả sản phẩm, người lập đơn nhập đơn giá từng dòng.
 - Mọi truy vấn dữ liệu theo chi nhánh phải qua `BranchAccessService` (`resolveWorkingBranch` từ header `X-Branch-Id`, `assertAccess`). Nhân viên chỉ thấy chi nhánh được gán; Quản lý thấy cả hai.
 - Thay đổi tồn kho **chỉ** qua `InventoryService` (khóa dòng, không âm, cập nhật giá vốn bình quân của chi nhánh, ghi sổ cái) trong transaction của chứng từ. Chứng từ có **từ 2 dòng hàng trở lên PHẢI dùng `applyMovements`** (khóa trước theo thứ tự cố định chi nhánh → sản phẩm); gọi `applyMovement` trong vòng lặp sẽ gây bế tắc (deadlock → lỗi 500) khi hai chứng từ có cùng mặt hàng theo thứ tự ngược nhau chạy đồng thời. Quy tắc chung: khóa nhiều dòng thì luôn theo một thứ tự cố định. Cấp mã chứng từ qua `nextDocumentCode`. Tính tiền/giá vốn bằng `common/costing.ts` (Decimal), không dùng `number`.
 - Chuyển kho giữa 2 chi nhánh: `StockTransfersService` (2 bước gửi → nhận; giá nhập bên nhận = giá vốn gửi + phí phân bổ; công nợ đối ứng qua khách/NCC nội bộ có `linked_branch_id`). Đó **không phải hóa đơn bán**: mọi báo cáo doanh số/công nợ/danh sách khách, NCC phải **loại đối tác nội bộ** (`linked_branch_id IS NOT NULL`).
@@ -66,10 +70,15 @@ Mọi PR phải qua: `lint`, `typecheck`, `test`, `build` (CI chạy đúng bộ
 ## Quy ước kỹ thuật dùng chung
 
 - **Nhật ký thao tác:** luôn qua `AuditService.record(tx, {...})` (`modules/audit/`), trong CÙNG transaction với thay đổi. `requestId`, người dùng, chi nhánh, IP tự lấy từ ngữ cảnh yêu cầu (`common/request-context.ts`). Không tự `insert` vào `audit_logs`; không ghi mật khẩu/token/băm vào nhật ký.
-- **Ghi nhiều dòng cùng lúc (giá, tồn, nhập Excel…):** xử lý theo **thứ tự khóa cố định** (vd bảng giá → sản phẩm) rồi mới ghi, để hai người ghi cùng lúc không bế tắc (deadlock → lỗi 500). PGlite (test) chỉ có một kết nối nên KHÔNG tái hiện bế tắc: phần nào khóa nhiều dòng phải thử trên PostgreSQL thật nhiều kết nối.
+- **Ghi nhiều dòng cùng lúc (tồn, nhập Excel…):** xử lý theo **thứ tự khóa cố định** (vd chi nhánh → sản phẩm) rồi mới ghi, để hai người ghi cùng lúc không bế tắc (deadlock → lỗi 500). PGlite (test) chỉ có một kết nối nên KHÔNG tái hiện bế tắc: phần nào khóa nhiều dòng phải thử trên PostgreSQL thật nhiều kết nối.
 - **Tham số đường dẫn là UUID:** luôn `@Param('id', ParseIdPipe)` (`common/parse-id.pipe.ts`), không dùng `ParseUUIDPipe` của Nest (trả `BAD_REQUEST`, sai hợp đồng lỗi).
 - **Danh sách:** dùng `PageQueryDto`/`pageParams`/`pageMeta`/`parseSort` (`common/pagination.ts`); tham số boolean dùng `QueryBoolean`; mọi danh sách có `?format=xlsx` dùng `common/excel.ts`.
 - **File (ảnh):** chỉ qua `FileStorage` (`modules/files/`, chuẩn S3). Kiểm tra loại file theo **nội dung** (`detectImage`), không theo đuôi/Content-Type. Cấu hình `S3_*` + `FILE_PUBLIC_BASE_URL`; production bắt buộc.
+- **Chống tạo trùng chứng từ:** endpoint tạo chứng từ gắn `@Idempotent()` (`modules/idempotency/`): bắt buộc header `Idempotency-Key`, gửi lại cùng khóa thì trả kết quả cũ. Interceptor chạy sau guard nên có người dùng.
+- **Công nợ + hạn mức:** nghiệp vụ đọc số dư công nợ để quyết định rồi ghi `debt_ledger` phải gọi `lockPartyBranch(tx, loại, id, chiNhánh)` (`common/advisory-lock.ts`) ĐẦU TIÊN trong transaction, nếu không hai hóa đơn song song cùng vượt hạn mức.
+- **Đối soát:** mọi kịch bản chứng từ mới nên kết thúc bằng `new ReconciliationService().run(db)` trong test và kỳ vọng `ok`.
+- **Kết nối CSDL:** `buildPoolConfig` đặt `statement_timeout` và `idle_in_transaction_session_timeout` (mặc định 30 giây): không giữ transaction mở khi chờ việc chậm (gọi kho file, băm mật khẩu…); làm những việc đó NGOÀI transaction.
+- **Sau reverse proxy:** đặt `TRUST_PROXY` (vd `1`), nếu không giới hạn đăng nhập sai và nhật ký thấy mọi người cùng một IP.
 - **Giá bán là số nguyên đồng** (kiểm tra ở API và khi nhập Excel); giá vốn/giá nhập mới có 4 chữ số thập phân.
 - **Test HTTP:** dùng `createHttpTestApp` (`src/test-utils/http-app.ts`) — ứng dụng thật đủ ba guard trên PostgreSQL trong bộ nhớ. Với phần chạm tiền/kho, làm thêm **kiểm tra ngược** (tạm gỡ bản sửa, test phải thất bại).
 
@@ -80,7 +89,7 @@ Mọi PR phải qua: `lint`, `typecheck`, `test`, `build` (CI chạy đúng bộ
 3. **Tạo hóa đơn phải idempotent** (`Idempotency-Key`/`client_request_id`) và nguyên tử: trừ kho + ghi nợ + ghi quỹ cùng lúc hoặc không gì cả.
 4. **Không xóa cứng chứng từ.** Hủy = đổi trạng thái + ghi nhật ký.
 5. **Công nợ được phép số dư âm** (khách trả dư).
-6. **Giá bán** theo thứ tự: giá riêng khách > bảng giá của khách > Bảng giá chung. Giảm giá là **số tiền trên 1 đơn vị**, không phải %.
+6. **Giá bán** không lưu trong hệ thống (không bảng giá); đơn giá trên dòng đơn/hóa đơn do người lập đơn nhập. Giảm giá là **số tiền trên 1 đơn vị**, không phải %.
 7. Múi giờ: lưu UTC, hiển thị `Asia/Ho_Chi_Minh`.
 8. Mã chứng từ giữ tiền tố KiotViet (`HD`, `DH`, `PN`, …) — xem `packages/shared/src/codes.ts`.
 9. Phần chạm tiền/kho/nợ **bắt buộc có test** và **người duyệt** trước khi merge, kể cả khi AI viết code.

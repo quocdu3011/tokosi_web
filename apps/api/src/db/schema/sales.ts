@@ -26,7 +26,7 @@ import {
   timestamps,
   tstz,
 } from './_helpers.js';
-import { priceBooks, products } from './catalog.js';
+import { products } from './catalog.js';
 import { cashAccounts, cashTransactions } from './finance.js';
 import { customers } from './partners.js';
 import { branches, users } from './system.js';
@@ -44,9 +44,6 @@ export const orders = pgTable(
       .notNull()
       .references(() => customers.id),
     status: orderStatus().notNull().default('draft'),
-    priceBookId: uuid()
-      .notNull()
-      .references(() => priceBooks.id),
     sellerId: uuid().references(() => users.id),
     orderedAt: tstz().notNull(),
     subtotal: money().notNull().default('0'),
@@ -115,9 +112,6 @@ export const invoices = pgTable(
     customerId: uuid()
       .notNull()
       .references(() => customers.id),
-    priceBookId: uuid()
-      .notNull()
-      .references(() => priceBooks.id),
     sellerId: uuid().references(() => users.id),
     invoicedAt: tstz().notNull(),
     subtotal: money().notNull(),
@@ -155,7 +149,6 @@ export const invoiceItems = pgTable(
       .references(() => products.id),
     productCode: text().notNull(),
     productName: text().notNull(),
-    unit: text(),
     qty: quantity().notNull(),
     listPrice: price().notNull(),
     discountPerUnit: price().notNull().default('0'),

@@ -43,11 +43,14 @@ const GROUPS: Record<string, string[]> = {
     'import_jobs',
     'user_branches',
     'role_permissions',
+    'user_identities',
+    'system_settings',
   ],
   'Hàng hóa & giá': [
     'categories',
     'products',
     'product_images',
+    'product_components',
     'price_books',
     'price_book_items',
   ],
@@ -94,6 +97,10 @@ const TABLE_NOTES: Record<string, string> = {
     'Chi nhánh người dùng được làm việc (Quản lý thấy tất cả, không cần dòng ở đây).',
   role_permissions:
     'Quyền của từng vai trò do Quản lý cấu hình (vai trò manager luôn đủ quyền, không lưu ở đây).',
+  user_identities:
+    'Danh tính đăng nhập bên ngoài (Google qua Supabase) gắn với người dùng; khớp theo provider_subject, không theo email.',
+  system_settings:
+    'Cài đặt hệ thống dạng khóa → JSON do Quản lý chỉnh (vd mở/tắt tự đăng ký bằng Google).',
   customer_branch_terms:
     'Hạn mức và kỳ hạn công nợ của khách, riêng từng chi nhánh.',
   stock_transfers:
@@ -112,6 +119,8 @@ const TABLE_NOTES: Record<string, string> = {
   products:
     'Hàng hóa — chỉ thông tin DÙNG CHUNG giữa các chi nhánh. Giá bán ở price_book_items, tồn kho/giá vốn/vị trí ở stocks (theo chi nhánh).',
   product_images: 'Ảnh sản phẩm.',
+  product_components:
+    'Thành phần của combo: combo_id → component_id (hàng hóa) với qty nguyên dương. Combo không có tồn/giá vốn riêng, luôn tính từ thành phần.',
   price_books:
     'Bảng giá theo hạng khách (Chung, Lớn, Vừa, VIP và 3 bản VAT). Thiếu giá thì lùi về bảng mặc định.',
   price_book_items:
@@ -151,7 +160,8 @@ const TABLE_NOTES: Record<string, string> = {
 
 /** Mô tả cột quan trọng; khóa dạng `bang.cot`. */
 const COLUMN_NOTES: Record<string, string> = {
-  'products.unit': 'Đơn vị tính (quy cách thường nằm trong tên hàng)',
+  'products.product_type':
+    'Loại hàng: goods = Hàng hóa (mặc định), combo = gói các hàng thành phần (không có tồn/giá vốn riêng)',
   'customers.sales_owner_id':
     'Nhân viên phụ trách (ở KiotViet là "Nhóm khách hàng")',
   'customers.default_price_book_id': 'Bảng giá tự áp khi đặt hàng',

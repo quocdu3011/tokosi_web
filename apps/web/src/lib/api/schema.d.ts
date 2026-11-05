@@ -286,6 +286,67 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/auth/google': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Đăng nhập bằng Google (qua Supabase)
+     * @description Gửi access token Supabase sau khi đăng nhập Google. Đã có tài khoản → 200 như `/auth/login` (cookie refresh + access token). Chưa có tài khoản: nếu Quản lý cho phép tự đăng ký và tên miền email được phép → 202 `signup_required` kèm `signupToken` (chưa tạo gì); ngược lại 403 `SIGNUP_DISABLED`.
+     */
+    post: operations['GoogleAuthController_login'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/google/signup': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Hoàn tất đăng ký tài khoản từ Google
+     * @description Tạo tài khoản nội bộ (tên đăng nhập + mật khẩu + họ tên + SĐT) và đăng nhập luôn. Tài khoản mới có vai trò `pending`: KHÔNG có quyền nào và không có chi nhánh cho tới khi Quản lý cấp. Mỗi tài khoản Google đăng ký được một lần.
+     */
+    post: operations['GoogleAuthController_signup'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/settings/auth': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Cài đặt tự đăng ký bằng Google */
+    get: operations['AuthSettingsController_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Bật/tắt tự đăng ký bằng Google và đặt tên miền email được phép
+     * @description Mặc định tắt. Bật mà chưa có tên miền nào → 400. Ghi nhật ký giá trị trước và sau.
+     */
+    patch: operations['AuthSettingsController_update'];
+    trace?: never;
+  };
   '/api/v1/categories': {
     parameters: {
       query?: never;
@@ -346,7 +407,7 @@ export interface paths {
     put?: never;
     /**
      * Tạo hàng hóa
-     * @description Chỉ chứa thông tin dùng chung hai chi nhánh. Giá bán đặt qua lưới giá; tồn tối thiểu/tối đa và vị trí đặt qua PUT /products/:id/branches/:branchId; ảnh tải qua POST /products/:id/images (gọi sau khi có id).
+     * @description Chỉ chứa thông tin dùng chung hai chi nhánh. Tồn tối thiểu/tối đa và vị trí đặt qua PUT /products/:id/branches/:branchId; ảnh tải qua POST /products/:id/images (gọi sau khi có id).
      */
     post: operations['ProductsController_create'];
     delete?: never;
@@ -402,7 +463,7 @@ export interface paths {
     };
     /**
      * Chi tiết theo từng chi nhánh người dùng được phép
-     * @description Tồn, giá vốn (theo quyền), tồn tối thiểu/tối đa, vị trí kho và giá của cả 7 bảng giá.
+     * @description Tồn, giá vốn (theo quyền), tồn tối thiểu/tối đa, vị trí kho.
      */
     get: operations['ProductsController_branches'];
     put?: never;
@@ -511,107 +572,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/price-books': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Danh sách 7 bảng giá */
-    get: operations['PricingController_list'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/price-books/grid': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Lưới giá: mỗi dòng một sản phẩm, mỗi cột một bảng giá, theo MỘT chi nhánh
-     * @description Chi nhánh lấy từ tham số branchId hoặc header X-Branch-Id. Ô chưa có giá là null (khi bán sẽ lùi về Bảng giá chung của CÙNG chi nhánh).
-     */
-    get: operations['PricingController_grid'];
-    /**
-     * Lưu nhiều ô giá cùng lúc (chỉ gửi các ô thay đổi)
-     * @description Giá là số nguyên đồng; price = null xóa giá ô đó. Tối đa 500 ô; tất cả hoặc không gì cả.
-     */
-    put: operations['PricingController_saveGrid'];
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/price-books/bulk-adjust': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Tăng/giảm giá hàng loạt (có chế độ xem trước)
-     * @description dryRun bắt buộc: true = chỉ xem trước. Chỉ áp dụng cho ô ĐÃ có giá; giá mới âm thì bỏ qua; luôn làm tròn ra số nguyên đồng.
-     */
-    post: operations['PricingController_bulkAdjust'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/price-books/copy-branch': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Sao chép giá từ chi nhánh này sang chi nhánh kia
-     * @description Dùng để khởi tạo giá chi nhánh mới. overwrite=false (mặc định) chỉ chép ô đích chưa có giá.
-     */
-    post: operations['PricingController_copyBranch'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/price-books/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /**
-     * Đổi tên / bật tắt bảng giá
-     * @description Không tắt được Bảng giá chung.
-     */
-    patch: operations['PricingController_update'];
-    trace?: never;
-  };
   '/api/v1/imports/{type}/template': {
     parameters: {
       query?: never;
@@ -639,7 +599,7 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Tải file Excel lên để nhập (type: products | price-books)
+     * Tải file Excel lên để nhập (type: products)
      * @description Mặc định chỉ KIỂM TRA (dryRun=true), không ghi gì; gửi dryRun=false để ghi thật. Xử lý ngay trong yêu cầu nên kết quả (status completed hoặc failed) có sẵn trong phản hồi; vẫn xem lại được qua GET /imports/:id. Tất cả hoặc không gì cả: có dòng lỗi thì không ghi gì. Chạy lại cùng file không tạo trùng (cập nhật theo mã hàng).
      */
     post: operations['ImportsController_run'];
@@ -779,7 +739,15 @@ export interface components {
       /** @example Quản lý */
       fullName: string;
       /** @enum {string} */
-      role: 'manager' | 'assistant' | 'accountant' | 'warehouse' | 'driver' | 'sales' | 'marketing';
+      role:
+        | 'manager'
+        | 'assistant'
+        | 'accountant'
+        | 'warehouse'
+        | 'driver'
+        | 'sales'
+        | 'marketing'
+        | 'pending';
       /** @description true → chỉ gọi được /auth/me, /auth/change-password, /auth/logout cho tới khi đổi mật khẩu */
       mustChangePassword: boolean;
       /** @description Quyền hiện tại của vai trò (Quản lý chỉnh được). Frontend ẩn/khóa chức năng theo danh sách này. */
@@ -818,7 +786,15 @@ export interface components {
       /** @example Nguyễn Văn A */
       fullName: string;
       /** @enum {string} */
-      role: 'manager' | 'assistant' | 'accountant' | 'warehouse' | 'driver' | 'sales' | 'marketing';
+      role:
+        | 'manager'
+        | 'assistant'
+        | 'accountant'
+        | 'warehouse'
+        | 'driver'
+        | 'sales'
+        | 'marketing'
+        | 'pending';
       phone: Record<string, never> | null;
       isActive: boolean;
       /** @description true = phải đổi mật khẩu ở lần đăng nhập kế tiếp */
@@ -872,7 +848,15 @@ export interface components {
       /** @example Nguyễn Văn A */
       fullName: string;
       /** @enum {string} */
-      role: 'manager' | 'assistant' | 'accountant' | 'warehouse' | 'driver' | 'sales' | 'marketing';
+      role:
+        | 'manager'
+        | 'assistant'
+        | 'accountant'
+        | 'warehouse'
+        | 'driver'
+        | 'sales'
+        | 'marketing'
+        | 'pending';
       phone: Record<string, never> | null;
       isActive: boolean;
       /** @description true = phải đổi mật khẩu ở lần đăng nhập kế tiếp */
@@ -912,6 +896,40 @@ export interface components {
       /** @description Chi nhánh mặc định mới. Bỏ qua = giữ nếu vẫn còn được gán, ngược lại bỏ */
       defaultBranchId?: Record<string, never> | null;
     };
+    GoogleLoginDto: {
+      /** @description Access token (JWT) Supabase nhận được sau khi đăng nhập Google (`session.access_token`) */
+      accessToken: string;
+    };
+    GoogleSignupDto: {
+      /** @description `signupToken` nhận từ `POST /auth/google` */
+      signupToken: string;
+      /**
+       * @description Chữ thường không dấu, số, `.` `_` `-`; 3–32 ký tự
+       * @example nguyenvana
+       */
+      username: string;
+      /** @description 10–128 ký tự, không chứa tên đăng nhập */
+      password: string;
+      /** @example Nguyễn Văn A */
+      fullName: string;
+      /** @example 0901234567 */
+      phone: string;
+    };
+    AuthSettingsDto: {
+      /** @description Cho phép người lạ tự đăng ký bằng Google */
+      googleSignupEnabled: boolean;
+      /**
+       * @description Tên miền email được tự đăng ký; bật mà để rỗng là không hợp lệ
+       * @example [
+       *       "congty.vn"
+       *     ]
+       */
+      googleSignupDomains: string[];
+    };
+    UpdateAuthSettingsDto: {
+      googleSignupEnabled?: boolean;
+      googleSignupDomains?: string[];
+    };
     CategoryNodeDto: {
       id: string;
       /** @example NHÀ BẾP */
@@ -935,6 +953,17 @@ export interface components {
       /** @description Nhóm cha mới; null = chuyển ra nhóm gốc */
       parentId?: string | null;
     };
+    ProductComponentDto: {
+      productId: string;
+      /** @example DAO01 */
+      code: string;
+      name: string;
+      /**
+       * @description Số lượng trong MỘT combo
+       * @example 2
+       */
+      qty: number;
+    };
     ProductImageDto: {
       id: string;
       /** @example https://files.example.vn/products/…/a.jpg */
@@ -949,15 +978,20 @@ export interface components {
       categoryId: string | null;
       /** @example ĐIỆN GIA DỤNG > Quạt điện */
       categoryPath: string | null;
-      /** @example Cái */
-      unit: string;
-      /** @description Chi nhánh mà các trường giá/tồn/vị trí bên dưới tính cho (= chi nhánh làm việc, header X-Branch-Id) */
-      branchId: string;
       /**
-       * @description Giá Bảng giá chung TẠI chi nhánh này (số nguyên đồng); null nếu chưa có giá
-       * @example 33500
+       * @description `goods` = Hàng hóa, `combo` = gói nhiều hàng thành phần. Combo không có tồn/giá vốn riêng: onHand, available, costPrice, lastPurchasePrice luôn tính từ thành phần; reserved luôn "0"; minStock/maxStock/location luôn null
+       * @enum {string}
        */
-      basePrice: string | null;
+      productType: 'goods' | 'combo';
+      /**
+       * @description Hàng thành phần của combo, dạng `MSP/SL,MSP/SL`; chuỗi rỗng với hàng hóa
+       * @example DAO01/2,KEO03/1
+       */
+      components: string;
+      /** @description Chi tiết hàng thành phần (rỗng với hàng hóa) */
+      componentItems: components['schemas']['ProductComponentDto'][];
+      /** @description Chi nhánh mà các trường tồn/giá vốn/vị trí bên dưới tính cho (= chi nhánh làm việc, header X-Branch-Id) */
+      branchId: string;
       /**
        * @description Giá vốn bình quân của chi nhánh này. VẮNG MẶT nếu thiếu quyền product.cost.view
        * @example 21800.5000
@@ -977,10 +1011,8 @@ export interface components {
       maxStock: string | null;
       location: string | null;
       description: string | null;
-      weightG: string | null;
       images: components['schemas']['ProductImageDto'][];
       isActive: boolean;
-      isSellable: boolean;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -1000,8 +1032,13 @@ export interface components {
       id: string;
       code: string;
       name: string;
-      unit: string;
-      basePrice: string | null;
+      /** @enum {string} */
+      productType: 'goods' | 'combo';
+      /**
+       * @description Với combo: thành phần để thêm vào đơn (chọn combo = thêm từng thành phần × SL); hàng hóa: rỗng
+       * @example DAO01/2,KEO03/1
+       */
+      components: string;
       available: string;
       imageUrl: string | null;
     };
@@ -1016,38 +1053,36 @@ export interface components {
       /** @description Nhóm hàng (GET /categories) */
       categoryId?: string;
       /**
-       * @default Cái
-       * @example Cái
+       * @default goods
+       * @enum {string}
        */
-      unit: string;
-      description?: string;
+      productType: 'goods' | 'combo';
       /**
-       * @description Trọng lượng gram
-       * @example 850
+       * @description Bắt buộc (ít nhất 1 thành phần) khi productType = combo, dạng `MSP/SL,MSP/SL`: mã hàng hóa (không phải combo), số lượng nguyên dương, mã không lặp. Không được gửi với hàng hóa
+       * @example DAO01/2,KEO03/1
        */
-      weightG?: string;
-      /** @default true */
-      isSellable: boolean;
+      components?: string;
+      description?: string;
     };
     UpdateProductDto: {
       /** @description Chỉ đổi được khi hàng chưa có giao dịch nào */
       code?: string;
       name?: string;
       categoryId?: string | null;
-      unit?: string;
+      /**
+       * @description Chỉ đổi được khi hàng chưa có giao dịch và (khi đổi sang combo) chưa là thành phần của combo nào
+       * @enum {string}
+       */
+      productType?: 'goods' | 'combo';
+      /**
+       * @description Thay toàn bộ hàng thành phần của combo (`MSP/SL,MSP/SL`). Đổi sang combo thì bắt buộc gửi kèm
+       * @example DAO01/2,KEO03/1
+       */
+      components?: string;
       /** @description Người chỉ có quyền "Sửa mô tả, ảnh hàng hóa" (product.content.edit) chỉ được sửa trường này */
       description?: string | null;
-      weightG?: string | null;
       /** @description false = ngưng kinh doanh */
       isActive?: boolean;
-      isSellable?: boolean;
-    };
-    ProductBranchPriceDto: {
-      priceBookId: string;
-      /** @example LON */
-      priceBookCode: string;
-      /** @example 33000 */
-      price: string | null;
     };
     ProductBranchDto: {
       branchId: string;
@@ -1064,8 +1099,6 @@ export interface components {
       minStock: string | null;
       maxStock: string | null;
       location: string | null;
-      /** @description Giá của cả 7 bảng giá TẠI chi nhánh này (null = chưa có giá) */
-      prices: components['schemas']['ProductBranchPriceDto'][];
     };
     SetProductBranchSettingsDto: {
       /**
@@ -1105,129 +1138,6 @@ export interface components {
       /** @description Id của TẤT CẢ ảnh hiện có của hàng theo thứ tự mới; ảnh đầu là ảnh đại diện */
       imageIds: string[];
     };
-    PriceBookDto: {
-      id: string;
-      /** @example CHUNG */
-      code: string;
-      /** @example Bảng giá chung */
-      name: string;
-      withVat: boolean;
-      /** @description Bảng giá chung: dùng khi bảng khác thiếu giá */
-      isDefault: boolean;
-      isActive: boolean;
-    };
-    GridBookDto: {
-      id: string;
-      code: string;
-      name: string;
-    };
-    GridRowDto: {
-      productId: string;
-      code: string;
-      name: string;
-      /** @description Giá vốn của chi nhánh. VẮNG MẶT nếu thiếu product.cost.view */
-      costPrice?: string;
-      /** @description Khóa = priceBookId, giá trị = giá bán (số nguyên đồng) hoặc null nếu chưa có giá */
-      prices: {
-        [key: string]: string | null;
-      };
-    };
-    GridMetaDto: {
-      page: number;
-      limit: number;
-      total: number;
-      totalPages: number;
-    };
-    GridDto: {
-      branchId: string;
-      books: components['schemas']['GridBookDto'][];
-      data: components['schemas']['GridRowDto'][];
-      meta: components['schemas']['GridMetaDto'];
-    };
-    GridChangeDto: {
-      productId: string;
-      priceBookId: string;
-      /**
-       * @description Giá mới (số nguyên đồng); null = xóa giá, lùi về bảng chung
-       * @example 33000
-       */
-      price: string | null;
-    };
-    SaveGridDto: {
-      /** @description Chi nhánh được sửa giá */
-      branchId: string;
-      /** @description Tối đa 500 ô mỗi lần */
-      changes: components['schemas']['GridChangeDto'][];
-    };
-    SaveGridResultDto: {
-      /** @description Số ô thực sự thay đổi (bỏ qua ô giữ nguyên giá) */
-      updated: number;
-    };
-    BulkAdjustDto: {
-      branchId: string;
-      priceBookId: string;
-      /** @description Chỉ điều chỉnh hàng của nhóm này (gồm nhóm con) */
-      categoryId?: string;
-      /**
-       * @description percent = theo %, amount = cộng/trừ số tiền cố định mỗi ô
-       * @enum {string}
-       */
-      mode: 'percent' | 'amount';
-      /**
-       * @description Số có dấu: dương = tăng, âm = giảm. Ví dụ 5 với percent = tăng 5%
-       * @example 5
-       */
-      value: string;
-      /**
-       * @description Làm tròn đến bội số này (số nguyên >= 1, nửa lên). Giá bán luôn là số nguyên đồng
-       * @default 1
-       * @example 100
-       */
-      roundTo: string;
-      /** @description true = chỉ xem trước, KHÔNG lưu; false = lưu thật. Bắt buộc gửi rõ để không lưu nhầm */
-      dryRun: boolean;
-    };
-    BulkAdjustPreviewDto: {
-      productId: string;
-      code: string;
-      /** @example 33000 */
-      oldPrice: string;
-      /** @example 34700 */
-      newPrice: string;
-    };
-    BulkAdjustResultDto: {
-      dryRun: boolean;
-      /** @description Số ô đổi giá */
-      affected: number;
-      /** @description Số ô bỏ qua vì giá mới âm */
-      skipped: number;
-      /** @description Số ô giá không đổi sau khi làm tròn */
-      unchanged: number;
-      /** @description Tối đa 200 dòng đầu */
-      preview: components['schemas']['BulkAdjustPreviewDto'][];
-    };
-    CopyBranchDto: {
-      fromBranchId: string;
-      toBranchId: string;
-      /** @description Chỉ chép bảng giá này; bỏ trống = mọi bảng giá */
-      priceBookId?: string;
-      /**
-       * @description false = chỉ chép ô chi nhánh đích CHƯA có giá; true = ghi đè ô đã có
-       * @default false
-       */
-      overwrite: boolean;
-    };
-    CopyBranchResultDto: {
-      /** @description Số ô được chép / cập nhật */
-      copied: number;
-      /** @description Số ô bỏ qua (đã có giá hoặc giá giống nhau) */
-      skipped: number;
-    };
-    UpdatePriceBookDto: {
-      name?: string;
-      /** @description false = tắt bảng giá. Không tắt được Bảng giá chung */
-      isActive?: boolean;
-    };
     ImportErrorDto: {
       /** @description Số dòng trong file Excel (dòng 1 là tiêu đề) */
       row: number;
@@ -1239,7 +1149,7 @@ export interface components {
     ImportJobDto: {
       id: string;
       /** @enum {string} */
-      type: 'products' | 'price-books' | 'customers' | 'suppliers';
+      type: 'products' | 'customers' | 'suppliers';
       /**
        * @description Hiện nhập xử lý ngay trong yêu cầu nên chỉ gặp completed hoặc failed. failed = có dòng lỗi hoặc lỗi hệ thống, KHÔNG ghi gì
        * @enum {string}
@@ -1250,7 +1160,7 @@ export interface components {
       fileName: string | null;
       /** @description Số dòng dữ liệu trong file */
       total: number;
-      /** @description Sẽ tạo / đã tạo (hàng hóa mới; với price-books là số ô giá mới). Bằng 0 khi có lỗi */
+      /** @description Sẽ tạo / đã tạo (hàng hóa mới). Bằng 0 khi có lỗi */
       created: number;
       /** @description Sẽ sửa / đã sửa, chỉ tính bản ghi có thay đổi thật nên chạy lại cùng file cho kết quả 0 */
       updated: number;
@@ -1601,8 +1511,16 @@ export interface operations {
       query?: {
         /** @description Tìm không dấu theo mã / tên đăng nhập / họ tên / SĐT */
         q?: string;
+        /** @description `pending` = tài khoản tự đăng ký bằng Google, chờ cấp quyền */
         role?:
-          'manager' | 'assistant' | 'accountant' | 'warehouse' | 'driver' | 'sales' | 'marketing';
+          | 'manager'
+          | 'assistant'
+          | 'accountant'
+          | 'warehouse'
+          | 'driver'
+          | 'sales'
+          | 'marketing'
+          | 'pending';
         /** @description Lọc theo trạng thái hoạt động */
         isActive?: boolean;
         page?: number;
@@ -1822,6 +1740,94 @@ export interface operations {
       };
     };
   };
+  GoogleAuthController_login: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['GoogleLoginDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SessionResponseDto'];
+        };
+      };
+    };
+  };
+  GoogleAuthController_signup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['GoogleSignupDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SessionResponseDto'];
+        };
+      };
+    };
+  };
+  AuthSettingsController_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuthSettingsDto'];
+        };
+      };
+    };
+  };
+  AuthSettingsController_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateAuthSettingsDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuthSettingsDto'];
+        };
+      };
+    };
+  };
   CategoriesController_tree: {
     parameters: {
       query?: never;
@@ -1948,6 +1954,8 @@ export interface operations {
         /** @description Lọc theo nhóm hàng, GỒM cả hàng của các nhóm con */
         categoryId?: string;
         isActive?: boolean;
+        /** @description Lọc theo loại hàng */
+        productType?: 'goods' | 'combo';
         /** @description true = chỉ hàng còn tồn tại chi nhánh làm việc */
         inStock?: boolean;
         /** @description xlsx = tải file Excel theo đúng bộ lọc hiện tại (bỏ qua page/limit, tối đa 10.000 dòng) */
@@ -2276,163 +2284,6 @@ export interface operations {
       };
     };
   };
-  PricingController_list: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['PriceBookDto'][];
-        };
-      };
-    };
-  };
-  PricingController_grid: {
-    parameters: {
-      query?: {
-        /** @description Chi nhánh của lưới giá; bỏ trống = chi nhánh làm việc (X-Branch-Id). Phải là chi nhánh người dùng được phép */
-        branchId?: string;
-        /** @description Tìm không dấu theo mã và tên */
-        q?: string;
-        /** @description Gồm cả hàng của các nhóm con */
-        categoryId?: string;
-        page?: number;
-        limit?: number;
-        /** @description xlsx = tải Excel theo bộ lọc (bỏ qua page/limit) */
-        format?: 'xlsx';
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['GridDto'];
-        };
-      };
-    };
-  };
-  PricingController_saveGrid: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['SaveGridDto'];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['SaveGridResultDto'];
-        };
-      };
-    };
-  };
-  PricingController_bulkAdjust: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['BulkAdjustDto'];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BulkAdjustResultDto'];
-        };
-      };
-    };
-  };
-  PricingController_copyBranch: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CopyBranchDto'];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CopyBranchResultDto'];
-        };
-      };
-    };
-  };
-  PricingController_update: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdatePriceBookDto'];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['PriceBookDto'];
-        };
-      };
-      /** @description Không tìm thấy bảng giá */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description DUPLICATE_NAME */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
   ImportsController_template: {
     parameters: {
       query?: never;
@@ -2457,7 +2308,7 @@ export interface operations {
       query?: {
         /** @description true (mặc định) = chỉ kiểm tra, không ghi gì. Phải gửi dryRun=false mới ghi thật */
         dryRun?: boolean;
-        /** @description Chi nhánh cho giá bán, tồn tối thiểu/tối đa, vị trí kho. Bắt buộc nếu file có các cột đó */
+        /** @description Chi nhánh cho tồn tối thiểu/tối đa, vị trí kho. Bắt buộc nếu file có các cột đó */
         branchId?: string;
       };
       header?: never;

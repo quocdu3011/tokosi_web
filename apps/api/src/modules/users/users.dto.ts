@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ROLES, type Role } from '@kiot/shared';
+import { ROLES, USER_ROLES, type Role, type UserRole } from '@kiot/shared';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -24,7 +24,7 @@ export class UserDto {
   @ApiProperty({ example: 'NV0002' }) code!: string;
   @ApiProperty({ example: 'ketoan01' }) username!: string;
   @ApiProperty({ example: 'Nguyễn Văn A' }) fullName!: string;
-  @ApiProperty({ enum: ROLES }) role!: Role;
+  @ApiProperty({ enum: USER_ROLES }) role!: UserRole;
   @ApiProperty({ nullable: true }) phone!: string | null;
   @ApiProperty() isActive!: boolean;
   @ApiProperty({
@@ -60,10 +60,13 @@ export class ListUsersQueryDto {
   @MaxLength(100)
   q?: string;
 
-  @ApiPropertyOptional({ enum: ROLES })
+  @ApiPropertyOptional({
+    enum: USER_ROLES,
+    description: '`pending` = tài khoản tự đăng ký bằng Google, chờ cấp quyền',
+  })
   @IsOptional()
-  @IsIn(ROLES)
-  role?: Role;
+  @IsIn(USER_ROLES)
+  role?: UserRole;
 
   @ApiPropertyOptional({ description: 'Lọc theo trạng thái hoạt động' })
   @IsOptional()

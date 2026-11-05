@@ -1,19 +1,19 @@
+import { parseComponents, type ProductType } from '@kiot/shared';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { normalizeHeader, type ParsedSheet } from '../../common/excel.js';
 import type { Tx } from '../../db/database.module.js';
 import {
   categories,
-  priceBookItems,
-  priceBooks,
+  productComponents,
   productImages,
   products,
   stocks,
 } from '../../db/schema/index.js';
+import { loadComponents } from '../catalog/combo.js';
 import { PRODUCT_CODE_PATTERN } from '../catalog/products.dto.js';
 import {
   asFlag,
   asNonNegDecimal,
-  asNonNegInt,
   asText,
   chunk,
   hasColumn,
@@ -27,12 +27,10 @@ import {
 const COL = {
   code: ['ma hang'],
   name: ['ten hang'],
-  unit: ['don vi tinh', 'dvt'],
+  type: ['loai hang'],
+  components: ['hang thanh phan'],
   category: ['nhom hang(3 cap)', 'nhom hang'],
-  price: ['gia ban'],
   active: ['dang kinh doanh'],
-  sellable: ['duoc ban truc tiep'],
-  weight: ['trong luong'],
   description: ['mo ta'],
   location: ['vi tri'],
   min: ['ton nho nhat'],
@@ -49,12 +47,10 @@ interface ParsedRow {
   row: number;
   code: string;
   name: string;
-  unit?: string;
+  type?: ProductType;
+  components?: Array<{ code: string; qty: number }>;
   categoryPath?: string[];
-  price?: number; // chỉ khi có giá (> 0)
   active?: boolean;
-  sellable?: boolean;
-  weight?: string | null;
   description?: string;
   location?: string;
   min?: string;
@@ -63,7 +59,7 @@ interface ParsedRow {
 }
 
 export interface ProductImportOptions {
-  /** Chi nhánh cho giá bán, tồn tối thiểu/tối đa, vị trí. Bắt buộc nếu file có các cột đó. */
+  /** Chi nhánh cho tồn tối thiểu/tối đa, vị trí. Bắt buộc nếu file có các cột đó. */
   branchId?: string;
   userId: string;
 }
@@ -89,17 +85,16 @@ export async function importProducts(
       errors.push({ row: 1, field, message: `Thiếu cột bắt buộc "${field}"` });
     }
   }
-  const hasPrice = hasColumn(headers, COL.price);
   const hasStockCols =
     hasColumn(headers, COL.location) ||
     hasColumn(headers, COL.min) ||
     hasColumn(headers, COL.max);
-  if ((hasPrice || hasStockCols) && !opts.branchId) {
+  if (hasStockCols && !opts.branchId) {
     errors.push({
       row: 1,
       field: 'branchId',
       message:
-        'File có cột giá bán / tồn tối thiểu / tồn tối đa / vị trí nên cần chọn chi nhánh (branchId)',
+        'File có cột tồn tối thiểu / tồn tối đa / vị trí nên cần chọn chi nhánh (branchId)',
     });
   }
   if (errors.length > 0) return { created: 0, updated: 0, errors };
@@ -130,9 +125,29 @@ export async function importProducts(
       else seen.set(key, row);
     }
 
-    const unit = asText(pick(values, COL.unit));
-    if (unit && unit.length > 30)
-      err('Đơn vị tính', 'Đơn vị tính dài quá 30 ký tự');
+    // Loại hàng: "Hàng hóa" | "Combo" (KiotViet ghi "Combo - Đóng gói"); trống = suy ra từ cột Hàng thành phần
+    let type: ProductType | undefined;
+    const typeRaw = asText(pick(values, COL.type));
+    if (typeRaw) {
+      const t = normalizeHeader(typeRaw);
+      if (t.startsWith('combo')) type = 'combo';
+      else if (t === 'hang hoa') type = 'goods';
+      else err('Loại hàng', 'Chỉ nhận "Hàng hóa" hoặc "Combo"');
+    }
+    let components: Array<{ code: string; qty: number }> | undefined;
+    const compRaw = asText(pick(values, COL.components));
+    if (compRaw) {
+      const c = parseComponents(compRaw);
+      if (!c.ok) err('Hàng thành phần', c.error);
+      else {
+        components = c.items;
+        if (type === undefined) type = 'combo';
+        else if (type === 'goods')
+          err('Hàng thành phần', 'Hàng hóa không có hàng thành phần');
+      }
+    }
+    if (type === 'combo' && !components && !compRaw)
+      err('Hàng thành phần', 'Combo phải có ít nhất một hàng thành phần');
 
     let categoryPath: string[] | undefined;
     const categoryRaw = asText(pick(values, COL.category));
@@ -150,23 +165,8 @@ export async function importProducts(
       }
     }
 
-    let price: number | undefined;
-    const priceRaw = asNonNegInt(pick(values, COL.price));
-    if (priceRaw === undefined)
-      err('Giá bán', 'Giá bán phải là số nguyên đồng, không âm');
-    else if (priceRaw !== null && priceRaw > 0) price = priceRaw; // 0 hoặc trống = chưa có giá
-
     const active = asFlag(pick(values, COL.active));
     if (active === undefined) err('Đang kinh doanh', 'Chỉ nhận 1/0');
-    const sellable = asFlag(pick(values, COL.sellable));
-    if (sellable === undefined) err('Được bán trực tiếp', 'Chỉ nhận 1/0');
-
-    let weight: string | null | undefined;
-    if (hasColumn(headers, COL.weight)) {
-      const w = asNonNegDecimal(pick(values, COL.weight), 2);
-      if (w === undefined) err('Trọng lượng', 'Trọng lượng không hợp lệ');
-      else weight = w === null || Number(w) === 0 ? null : w;
-    }
 
     const min = asNonNegDecimal(pick(values, COL.min), 3);
     if (min === undefined) err('Tồn nhỏ nhất', 'Số lượng không hợp lệ');
@@ -174,6 +174,12 @@ export async function importProducts(
     if (max === undefined) err('Tồn lớn nhất', 'Số lượng không hợp lệ');
     if (min && max && Number(min) > Number(max))
       err('Tồn nhỏ nhất', 'Tồn nhỏ nhất không được lớn hơn tồn lớn nhất');
+    const location = asText(pick(values, COL.location));
+    if (type === 'combo' && (min || max || location))
+      err(
+        'Loại hàng',
+        'Combo không có tồn tối thiểu/tối đa/vị trí riêng; hãy để trống cho hàng thành phần',
+      );
 
     const images: string[] = [];
     const imagesRaw = imgHeader ? asText(values[imgHeader]) : null;
@@ -195,14 +201,12 @@ export async function importProducts(
         row,
         code,
         name,
-        unit: unit ?? undefined,
+        type,
+        components,
         categoryPath,
-        price,
         active: active ?? undefined,
-        sellable: sellable ?? undefined,
-        weight,
         description: asText(pick(values, COL.description)) ?? undefined,
-        location: asText(pick(values, COL.location)) ?? undefined,
+        location: location ?? undefined,
         min: min ?? undefined,
         max: max ?? undefined,
         images,
@@ -256,6 +260,53 @@ export async function importProducts(
       });
     }
   }
+  // Loại hàng của hàng đã có không đổi qua Excel (đổi trên giao diện, có kiểm tra giao dịch)
+  const typeOfRow = new Map<string, ProductType>(); // loại hàng sau khi nhập, theo mã (chữ thường)
+  for (const r of parsed) {
+    const cur = existing.get(r.code.toLowerCase());
+    if (cur && r.type !== undefined && r.type !== cur.productType) {
+      errors.push({
+        row: r.row,
+        field: 'Loại hàng',
+        message:
+          'Không đổi được loại hàng bằng nhập Excel; hãy sửa trực tiếp trên hàng hóa đó',
+      });
+    }
+    typeOfRow.set(r.code.toLowerCase(), r.type ?? cur?.productType ?? 'goods');
+  }
+  // Hàng thành phần phải là hàng hóa đã có (trong file hoặc CSDL), không phải combo
+  const outsideCodes = new Set<string>();
+  for (const r of parsed)
+    for (const c of r.components ?? [])
+      if (!typeOfRow.has(c.code.toLowerCase()))
+        outsideCodes.add(c.code.toLowerCase());
+  const outsideType = new Map<string, ProductType>();
+  for (const part of chunk([...outsideCodes], 1000)) {
+    const rows = await tx
+      .select({ code: products.code, productType: products.productType })
+      .from(products)
+      .where(
+        and(
+          isNull(products.deletedAt),
+          sql`lower(${products.code}) = any(${pgArrayLiteral(part)}::text[])`,
+        ),
+      );
+    for (const x of rows) outsideType.set(x.code.toLowerCase(), x.productType);
+  }
+  for (const r of parsed) {
+    for (const c of r.components ?? []) {
+      const key = c.code.toLowerCase();
+      const t = typeOfRow.get(key) ?? outsideType.get(key);
+      const problem =
+        t === undefined
+          ? `Không tìm thấy hàng thành phần "${c.code}"`
+          : t === 'combo'
+            ? `Thành phần "${c.code}" là combo; thành phần phải là hàng hóa`
+            : null;
+      if (problem)
+        errors.push({ row: r.row, field: 'Hàng thành phần', message: problem });
+    }
+  }
   if (errors.length > 0) return { created: 0, updated: 0, errors };
 
   // ---------- 4) tạo hàng mới, sửa hàng cũ (chỉ ghi khi có thay đổi)
@@ -271,12 +322,10 @@ export async function importProducts(
         part.map((r) => ({
           code: r.code,
           name: r.name,
-          unit: r.unit ?? 'Cái',
+          productType: r.type ?? ('goods' as const),
           categoryId: categoryOf(r.categoryPath) ?? null,
           description: r.description ?? null,
-          weightG: r.weight ?? null,
           isActive: r.active ?? true,
-          isSellable: r.sellable ?? true,
           createdBy: opts.userId,
         })),
       )
@@ -291,20 +340,12 @@ export async function importProducts(
     if (!cur) continue; // hàng vừa tạo ở trên
     const patch: Partial<typeof products.$inferInsert> = {};
     if (cur.name !== r.name) patch.name = r.name;
-    if (r.unit !== undefined && cur.unit !== r.unit) patch.unit = r.unit;
     const cat = categoryOf(r.categoryPath);
     if (cat !== undefined && cur.categoryId !== cat) patch.categoryId = cat;
     if (r.description !== undefined && cur.description !== r.description)
       patch.description = r.description;
-    if (
-      r.weight !== undefined &&
-      Number(cur.weightG ?? 0) !== Number(r.weight ?? 0)
-    )
-      patch.weightG = r.weight;
     if (r.active !== undefined && cur.isActive !== r.active)
       patch.isActive = r.active;
-    if (r.sellable !== undefined && cur.isSellable !== r.sellable)
-      patch.isSellable = r.sellable;
     if (Object.keys(patch).length > 0) {
       await tx
         .update(products)
@@ -314,67 +355,65 @@ export async function importProducts(
     }
   }
 
-  // ---------- 5) giá bán (Bảng giá chung của chi nhánh) — luôn theo thứ tự id để không bế tắc
-  if (opts.branchId && hasPrice) {
-    const [book] = await tx
-      .select({ id: priceBooks.id })
-      .from(priceBooks)
-      .where(eq(priceBooks.isDefault, true));
-    const rows = parsed
-      .filter((r) => r.price !== undefined)
-      .map((r) => ({
-        code: r.code.toLowerCase(),
-        productId: idOf(r.code),
-        price: r.price!,
-      }))
-      .sort((a, b) => a.productId.localeCompare(b.productId));
-    const old = new Map<string, number>();
-    for (const part of chunk(rows, 1000)) {
-      const found = await tx
-        .select()
-        .from(priceBookItems)
-        .where(
-          and(
-            eq(priceBookItems.priceBookId, book!.id),
-            eq(priceBookItems.branchId, opts.branchId),
-            inArray(
-              priceBookItems.productId,
-              part.map((x) => x.productId),
-            ),
+  // ---------- 4b) hàng thành phần của combo (thay khi khác bản hiện có)
+  const comboRows = parsed.filter((r) => r.components);
+  if (comboRows.length > 0) {
+    const current = await loadComponents(
+      tx,
+      comboRows.map((r) => idOf(r.code)),
+    );
+    const comboIdByCode = new Map<string, string>();
+    for (const part of chunk(
+      [
+        ...new Set(
+          comboRows.flatMap((r) =>
+            r.components!.map((c) => c.code.toLowerCase()),
           ),
+        ),
+      ],
+      1000,
+    )) {
+      const found = await tx
+        .select({ id: products.id, code: products.code })
+        .from(products)
+        .where(
+          sql`lower(${products.code}) = any(${pgArrayLiteral(part)}::text[])`,
         );
-      for (const f of found) old.set(f.productId, Number(f.price));
+      for (const f of found) comboIdByCode.set(f.code.toLowerCase(), f.id);
     }
-    const diff = rows.filter((x) => old.get(x.productId) !== x.price);
-    for (const part of chunk(diff, BATCH)) {
+    for (const r of comboRows) {
+      const comboId = idOf(r.code);
+      const want = r.components!.map((c) => ({
+        productId: comboIdByCode.get(c.code.toLowerCase())!,
+        qty: c.qty,
+      }));
+      const have = (current.get(comboId) ?? []).map((c) => ({
+        productId: c.productId,
+        qty: c.qty,
+      }));
+      const same =
+        want.length === have.length &&
+        want.every(
+          (w, i) =>
+            have[i]!.productId === w.productId && have[i]!.qty === w.qty,
+        );
+      if (same) continue;
       await tx
-        .insert(priceBookItems)
-        .values(
-          part.map((x) => ({
-            priceBookId: book!.id,
-            branchId: opts.branchId!,
-            productId: x.productId,
-            price: String(x.price),
-            updatedBy: opts.userId,
-          })),
-        )
-        .onConflictDoUpdate({
-          target: [
-            priceBookItems.priceBookId,
-            priceBookItems.branchId,
-            priceBookItems.productId,
-          ],
-          set: {
-            price: sql`excluded.price`,
-            updatedBy: opts.userId,
-            updatedAt: new Date(),
-          },
-        });
+        .delete(productComponents)
+        .where(eq(productComponents.comboId, comboId));
+      await tx.insert(productComponents).values(
+        want.map((w, i) => ({
+          comboId,
+          componentId: w.productId,
+          qty: w.qty,
+          sortOrder: i,
+        })),
+      );
+      changed.add(r.code.toLowerCase());
     }
-    for (const x of diff) changed.add(x.code);
   }
 
-  // ---------- 6) tồn tối thiểu / tối đa / vị trí (ô trống = không đổi)
+  // ---------- 5) tồn tối thiểu / tối đa / vị trí (ô trống = không đổi)
   if (opts.branchId && hasStockCols) {
     const rows = parsed
       .filter(
@@ -434,7 +473,7 @@ export async function importProducts(
     for (const { r } of diff) changed.add(r.code.toLowerCase());
   }
 
-  // ---------- 7) ảnh: thêm URL ngoài chưa có (storage_key = null), không xóa ảnh hiện có
+  // ---------- 6) ảnh: thêm URL ngoài chưa có (storage_key = null), không xóa ảnh hiện có
   const withImages = parsed.filter((r) => r.images.length > 0);
   if (withImages.length > 0) {
     const ids = withImages.map((r) => idOf(r.code));

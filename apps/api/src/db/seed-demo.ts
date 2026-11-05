@@ -25,7 +25,6 @@ try {
     `Hàng hóa mẫu     +${r.products}${r.products === 0 ? ' (đã có)' : ''}`,
   );
   console.log(`Tồn đầu          +${r.openingMovements} dòng`);
-  console.log(`Ô giá            +${r.priceCells}`);
 } finally {
   await pool.end();
 }

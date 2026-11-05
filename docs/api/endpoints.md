@@ -23,21 +23,25 @@ Ký hiệu: `?` = tùy chọn · `[]` = mảng · tiền/giá/số lượng là 
 
 > **Trạng thái: đã triển khai** (có trong Swagger `/api/docs` và `openapi.json`) — `/health`, `/auth/*`, `/branches`, `/users…`, `/roles…`, `/permissions/catalog`.
 
-| Method | Đường dẫn                   | Mô tả                                                              | Quyền                   | Mốc |
-| ------ | --------------------------- | ------------------------------------------------------------------ | ----------------------- | --- |
-| GET    | `/health`                   | Kiểm tra sống                                                      | công khai               | ✔   |
-| POST   | `/auth/login`               | Đăng nhập                                                          | công khai               | ✔   |
-| POST   | `/auth/refresh`             | Lấy access token mới (dùng cookie `refresh_token`)                 | công khai (cần cookie)  | ✔   |
-| POST   | `/auth/logout`              | Đăng xuất: thu hồi phiên hiện tại, xóa cookie                      | công khai (dùng cookie) | ✔   |
-| GET    | `/auth/me`                  | Thông tin người dùng + quyền + chi nhánh hiện tại                  | đã đăng nhập            | ✔   |
-| POST   | `/auth/change-password`     | Đổi mật khẩu (thu hồi mọi phiên cũ, cấp phiên mới)                 | đã đăng nhập            | ✔   |
-| GET    | `/branches`                 | Chi nhánh người dùng được phép làm việc (Quản lý: tất cả)          | đã đăng nhập            | ✔   |
-| GET    | `/users`                    | Danh sách người dùng (`q`, `role`, `isActive`, `page`, `limit`)    | `user.manage`           | ✔   |
-| GET    | `/users/:id`                | Chi tiết một người dùng                                            | `user.manage`           | ✔   |
-| POST   | `/users`                    | Tạo người dùng                                                     | `user.manage`           | ✔   |
-| PATCH  | `/users/:id`                | Sửa thông tin / vai trò / khóa-mở tài khoản                        | `user.manage`           | ✔   |
-| POST   | `/users/:id/reset-password` | Đặt lại mật khẩu (bắt đổi ở lần đăng nhập kế tiếp)                 | `user.manage`           | ✔   |
-| PUT    | `/users/:id/branches`       | Gán chi nhánh `{ branchIds, defaultBranchId? }` (thay thế toàn bộ) | `user.manage`           | ✔   |
+| Method | Đường dẫn                   | Mô tả                                                                            | Quyền                         | Mốc |
+| ------ | --------------------------- | -------------------------------------------------------------------------------- | ----------------------------- | --- |
+| GET    | `/health`                   | Kiểm tra sống                                                                    | công khai                     | ✔   |
+| POST   | `/auth/login`               | Đăng nhập                                                                        | công khai                     | ✔   |
+| POST   | `/auth/refresh`             | Lấy access token mới (dùng cookie `refresh_token`)                               | công khai (cần cookie)        | ✔   |
+| POST   | `/auth/logout`              | Đăng xuất: thu hồi phiên hiện tại, xóa cookie                                    | công khai (dùng cookie)       | ✔   |
+| GET    | `/auth/me`                  | Thông tin người dùng + quyền + chi nhánh hiện tại                                | đã đăng nhập                  | ✔   |
+| POST   | `/auth/change-password`     | Đổi mật khẩu (thu hồi mọi phiên cũ, cấp phiên mới)                               | đã đăng nhập                  | ✔   |
+| POST   | `/auth/google`              | Đăng nhập bằng Google (token Supabase): 200 phiên, hoặc 202 cần hoàn tất đăng ký | công khai                     | ✔   |
+| POST   | `/auth/google/signup`       | Hoàn tất tự đăng ký từ Google (tên đăng nhập, mật khẩu, họ tên, SĐT)             | công khai (cần `signupToken`) | ✔   |
+| GET    | `/settings/auth`            | Cài đặt tự đăng ký bằng Google                                                   | `user.manage`                 | ✔   |
+| PATCH  | `/settings/auth`            | Bật/tắt tự đăng ký, đặt tên miền email được phép                                 | `user.manage`                 | ✔   |
+| GET    | `/branches`                 | Chi nhánh người dùng được phép làm việc (Quản lý: tất cả)                        | đã đăng nhập                  | ✔   |
+| GET    | `/users`                    | Danh sách người dùng (`q`, `role`, `isActive`, `page`, `limit`)                  | `user.manage`                 | ✔   |
+| GET    | `/users/:id`                | Chi tiết một người dùng                                                          | `user.manage`                 | ✔   |
+| POST   | `/users`                    | Tạo người dùng                                                                   | `user.manage`                 | ✔   |
+| PATCH  | `/users/:id`                | Sửa thông tin / vai trò / khóa-mở tài khoản                                      | `user.manage`                 | ✔   |
+| POST   | `/users/:id/reset-password` | Đặt lại mật khẩu (bắt đổi ở lần đăng nhập kế tiếp)                               | `user.manage`                 | ✔   |
+| PUT    | `/users/:id/branches`       | Gán chi nhánh `{ branchIds, defaultBranchId? }` (thay thế toàn bộ)               | `user.manage`                 | ✔   |
 
 **POST `/auth/login`**
 
@@ -104,6 +108,29 @@ Ký hiệu: `?` = tùy chọn · `[]` = mảng · tiền/giá/số lượng là 
 
 **Tài khoản bị bắt đổi mật khẩu (`mustChangePassword = true`)** — gặp ở tài khoản Quản lý khởi tạo và tài khoản vừa được đặt lại mật khẩu. Mọi endpoint khác ngoài `/auth/me`, `/auth/change-password`, `/auth/logout` trả `403 PASSWORD_CHANGE_REQUIRED`. Frontend: sau khi đăng nhập, nếu `user.mustChangePassword` là true thì chuyển thẳng sang màn hình đổi mật khẩu.
 
+**Đăng nhập bằng Google (Supabase)**
+
+Luồng: web gọi `supabase.auth.signInWithOAuth({ provider: 'google' })` (PKCE) → lấy `session.access_token` của Supabase → gửi cho API. Google/Supabase chỉ chứng minh danh tính; **vai trò và quyền vẫn do hệ thống quyết định**.
+
+**POST `/auth/google`** body `{ "accessToken": "<token Supabase>" }`
+
+- Đã có tài khoản gắn với Google này → `200` giống `/auth/login` (`accessToken`, `expiresIn`, `user`; cookie refresh). Tài khoản bị khóa → `401 UNAUTHENTICATED`.
+- Chưa có tài khoản: nếu Quản lý đang **bật** tự đăng ký và tên miền email nằm trong danh sách → `202 { "status": "signup_required", "signupToken": "…", "email": "…", "suggestedName": "…" }`. **Chưa tạo gì.** Frontend hiện form hồ sơ (điền sẵn `suggestedName`).
+- Ngược lại (tắt, hoặc tên miền không được phép) → `403 SIGNUP_DISABLED` ("liên hệ Quản lý").
+- Token Supabase sai/hết hạn/không phải Google/email chưa xác minh → `401 UNAUTHENTICATED`. Chưa cấu hình `SUPABASE_URL` → `503 GOOGLE_NOT_CONFIGURED`.
+
+**POST `/auth/google/signup`** body `{ signupToken, username, password, fullName, phone }`
+
+- `signupToken` sống **15 phút**, chỉ dùng cho endpoint này (không phải access token). Hết hạn/sai → `401 SIGNUP_TOKEN_INVALID` → cho người dùng đăng nhập Google lại.
+- Quy tắc như tạo người dùng: tên đăng nhập `[a-z0-9._-]{3,32}`; mật khẩu 10–128 ký tự, không chứa tên đăng nhập; SĐT Việt Nam hợp lệ. Sai → `400 VALIDATION_ERROR` (`details[].field`), token **vẫn dùng lại được**.
+- Thành công → `201` + phiên đăng nhập như `/auth/login`. Tài khoản mới có **`role: "pending"`**, `permissions: []`, `branches: []`.
+- Lỗi: `409 DUPLICATE_USERNAME`, `409 GOOGLE_ALREADY_REGISTERED` (Google này đã đăng ký, hãy đăng nhập), `403 SIGNUP_DISABLED` (công tắc vừa bị tắt), `429 SIGNUP_LIMIT` (đang có quá nhiều tài khoản chờ cấp quyền, tối đa 50).
+- Tài khoản này vẫn đăng nhập bằng tên đăng nhập + mật khẩu được.
+
+**Vai trò `pending` ("Chờ cấp quyền")**: không có quyền nào; mọi endpoint nghiệp vụ trả `403 FORBIDDEN`; chỉ dùng được `/auth/me`, `/auth/change-password`, `/auth/logout`. Frontend: nếu `user.role === "pending"` thì chỉ hiện màn "Tài khoản đang chờ Quản lý cấp quyền". Quản lý gán chi nhánh (`PUT /users/:id/branches`) rồi đổi vai trò (`PATCH /users/:id`) — có hiệu lực ngay. `GET /users?role=pending` liệt kê người đang chờ. `pending` không có trong `/roles…` (không cấu hình được) và không gán được khi tạo/sửa người dùng.
+
+**GET/PATCH `/settings/auth`** (chỉ Quản lý) — `{ "googleSignupEnabled": false, "googleSignupDomains": ["congty.vn"] }`. Mặc định **tắt**. Bật mà `googleSignupDomains` rỗng → `400`. Tên miền được chuẩn hóa chữ thường. Mọi thay đổi ghi nhật ký (`settings.auth_update`).
+
 **GET `/branches`** → `[ { "id": "…", "code": "SG", "name": "Chi nhánh Sài Gòn", "isDefault": true } ]` — chỉ các chi nhánh người dùng được phép (đã sắp theo mã).
 
 **Quản lý người dùng (`/users…`, chỉ Quản lý — quyền `user.manage` không cấp được cho vai trò khác)**
@@ -153,8 +180,8 @@ Ký hiệu: `?` = tùy chọn · `[]` = mảng · tiền/giá/số lượng là 
 
 ## 2. Hàng hóa
 
-> **Trạng thái: đã triển khai** mục 2.1–2.3 (Swagger `/api/docs`, `openapi.json`). Còn lại của phân hệ: `POST /pricing/quote` (mục 2.4, làm cùng Đơn hàng).
-> **Quy ước chung của mục này:** mọi endpoint cần đăng nhập và quyền nêu ở cột "Quyền". Số lượng là chuỗi thập phân tối đa 3 chữ số (`"515.000"`); giá bán là chuỗi số nguyên đồng (`"33500"`); giá vốn là chuỗi 4 chữ số thập phân (`"21800.5000"`).
+> **Trạng thái: đã triển khai** mục 2.1–2.2 (Swagger `/api/docs`, `openapi.json`). **Không có giá bán trong hệ thống** (quyết định 05/11/2026): giá bán được quy ước chung ở phần mô tả sản phẩm; không có bảng giá, lưới giá hay báo giá.
+> **Quy ước chung của mục này:** mọi endpoint cần đăng nhập và quyền nêu ở cột "Quyền". Số lượng là chuỗi thập phân tối đa 3 chữ số (`"515.000"`); giá vốn là chuỗi 4 chữ số thập phân (`"21800.5000"`).
 
 ### 2.1 Nhóm hàng
 
@@ -202,7 +229,7 @@ Ký hiệu: `?` = tùy chọn · `[]` = mảng · tiền/giá/số lượng là 
 | GET    | `/products/:id/branches`           | Chi tiết theo từng chi nhánh người dùng được phép: giá 7 bảng, tồn, vị trí | `product.view`                             |
 | PUT    | `/products/:id/branches/:branchId` | Đặt tồn tối thiểu/tối đa và vị trí kho của một chi nhánh                   | `product.edit`                             |
 
-Bộ lọc `GET /products`: `q` (tìm không dấu theo mã và tên), `categoryId` (**gồm cả nhóm con**), `isActive`, `inStock` (`true` = còn tồn **tại chi nhánh làm việc**), `sort` (`code`, `name`, `onHand`, `createdAt`; thêm `-` để giảm dần; cột lạ bị bỏ qua), `page`, `limit` (tối đa 100).
+Bộ lọc `GET /products`: `q` (tìm không dấu theo mã và tên), `categoryId` (**gồm cả nhóm con**), `isActive`, `productType` (`goods` | `combo`), `inStock` (`true` = còn tồn **tại chi nhánh làm việc**; với combo là số combo ghép được), `sort` (`code`, `name`, `onHand`, `createdAt`; thêm `-` để giảm dần; cột lạ bị bỏ qua), `page`, `limit` (tối đa 100).
 
 ```json
 // Đối tượng Product
@@ -212,9 +239,10 @@ Bộ lọc `GET /products`: `q` (tìm không dấu theo mã và tên), `category
   "name": "Quạt kẹp bàn Super MST-A1",
   "categoryId": "…",
   "categoryPath": "ĐIỆN GIA DỤNG > Quạt điện",
-  "unit": "Cái",
+  "productType": "goods", // "goods" = Hàng hóa (mặc định) | "combo"
+  "components": "", // combo: hàng thành phần dạng "MSP/SL,MSP/SL" (vd "DAO01/2,KEO03/1"); hàng hóa: ""
+  "componentItems": [], // combo: [{ "productId": "…", "code": "DAO01", "name": "…", "qty": 2 }]
   "branchId": "…", // chi nhánh mà các trường giá/tồn/vị trí dưới đây tính cho (= X-Branch-Id)
-  "basePrice": "33500", // giá Bảng giá chung TẠI chi nhánh này; null nếu chưa có giá
   "costPrice": "21800.5000", // giá vốn bình quân CỦA chi nhánh này; VẮNG MẶT nếu thiếu quyền product.cost.view
   "lastPurchasePrice": "21500.0000", // giá nhập cuối của chi nhánh này; như trên
   "onHand": "515.000",
@@ -225,10 +253,8 @@ Bộ lọc `GET /products`: `q` (tìm không dấu theo mã và tên), `category
   "maxStock": "2000.000",
   "location": "11",
   "description": null,
-  "weightG": null,
   "images": [{ "id": "…", "url": "https://files…/products/<id>/<uuid>.jpg", "sortOrder": 0 }],
   "isActive": true,
-  "isSellable": true,
   "createdAt": "2026-11-03T01:30:11.087Z",
   "updatedAt": "…"
 }
@@ -240,21 +266,33 @@ Bộ lọc `GET /products`: `q` (tìm không dấu theo mã và tên), `category
   "code": "QKBSP",
   "name": "…",
   "categoryId": "…",
-  "unit": "Cái",
-  "description": null,
-  "weightG": "850",
-  "isSellable": true
+  "productType": "goods", // mặc định "goods"; "combo" thì bắt buộc có components
+  "components": "DAO01/2,KEO03/1", // chỉ với combo
+  "description": null
 }
-// Body chỉ chứa thông tin DÙNG CHUNG cho cả hai chi nhánh. Giá bán đặt qua lưới giá (mục 2.3);
+// Body chỉ chứa thông tin DÙNG CHUNG cho cả hai chi nhánh.
 // tồn tối thiểu/tối đa và vị trí kho đặt riêng từng chi nhánh qua PUT /products/:id/branches/:branchId.
 // Lỗi: 409 DUPLICATE_CODE (field code)
 ```
 
-**Phân biệt dữ liệu dùng chung và theo chi nhánh:** mã, tên, nhóm, đơn vị, ảnh, mô tả dùng chung; **giá bán, tồn kho, giá vốn, giá nhập cuối, tồn tối thiểu/tối đa, vị trí kho riêng từng chi nhánh**. Các trường theo chi nhánh trong response của `GET /products…` luôn tính cho chi nhánh làm việc (`X-Branch-Id`; người có nhiều chi nhánh mà không gửi → `400 BRANCH_REQUIRED`); muốn xem cả hai chi nhánh dùng `GET /products/:id/branches`.
+**Phân biệt dữ liệu dùng chung và theo chi nhánh:** mã, tên, nhóm, loại hàng, hàng thành phần, ảnh, mô tả dùng chung; **tồn kho, giá vốn, giá nhập cuối, tồn tối thiểu/tối đa, vị trí kho riêng từng chi nhánh**. Các trường theo chi nhánh trong response của `GET /products…` luôn tính cho chi nhánh làm việc (`X-Branch-Id`; người có nhiều chi nhánh mà không gửi → `400 BRANCH_REQUIRED`); muốn xem cả hai chi nhánh dùng `GET /products/:id/branches`.
 
 **Mã hàng:** chữ, số, `-`, `_`, `.`; 1–30 ký tự; không dấu cách; **không trùng kể cả khác hoa thường** (`409 DUPLICATE_CODE`). Chỉ đổi được khi hàng **chưa có giao dịch nào** (không có dòng tồn kho, đơn, hóa đơn, phiếu nhập/trả, chuyển kho) → ngược lại `400 INVALID_STATE`.
 
 **Người chỉ có `product.content.edit`** (vd Marketing) chỉ sửa được `description` và ảnh. Gửi trường khác → `403 FORBIDDEN` với `details.fields` liệt kê các trường bị từ chối. Frontend nên khóa các ô khác khi người dùng không có `product.edit`.
+
+#### Loại hàng: Hàng hóa và Combo
+
+- `productType`: **`goods`** (Hàng hóa, mặc định) hoặc **`combo`**. Combo là gói nhiều hàng hóa thành phần, **chỉ để chọn nhanh** khi lập đơn (đơn mua, sau này cả đơn bán): chọn combo thì giao diện tự thêm từng hàng thành phần × số lượng vào đơn (dùng `components` / `componentItems` từ `GET /products/lookup`). Chứng từ, tồn kho, sổ cái, báo cáo **chỉ có hàng thành phần, không bao giờ có dòng combo**.
+- **Hàng thành phần** gửi/nhận dạng chuỗi **`MSP/SL,MSP/SL`** (vd `DAO01/2,KEO03/1`): mã hàng (không phân biệt hoa thường; trả về đúng mã trong CSDL), số lượng **nguyên dương** trong MỘT combo. Quy tắc: combo phải có **ít nhất 1** thành phần; thành phần phải là **hàng hóa** (không lồng combo); mã không lặp; hàng hóa **không** được có `components`. Lỗi → `400 VALIDATION_ERROR` (`field = components`). `PATCH` với `components` **thay toàn bộ** thành phần; không gửi thì giữ nguyên.
+- **Số liệu của combo luôn tính từ thành phần tại chi nhánh làm việc** (combo không có dòng tồn riêng):
+  - `onHand` = số combo ghép được = min(⌊tồn thành phần ÷ SL trong combo⌋); `available` tính tương tự trên tồn khả dụng (đã trừ phần giữ cho đơn nháp), không âm; `reserved` luôn `"0.000"`.
+  - `costPrice` (giá gốc) = **tổng (giá vốn thành phần × SL)**; `lastPurchasePrice` = tổng giá nhập cuối thành phần (null nếu có thành phần chưa có giá nhập). Cả hai vắng mặt nếu thiếu `product.cost.view`.
+  - `minStock`, `maxStock`, `location` luôn `null`; `PUT /products/:id/branches/:branchId` và `GET /products/:id/stock-card` với combo → `400 INVALID_STATE` (đặt/xem ở hàng thành phần).
+  - Combo không có giá bán riêng trong hệ thống (giá quy ước ở mô tả).
+- **Đổi `productType`** chỉ khi hàng **chưa có giao dịch** và (khi đổi sang combo) **chưa là thành phần của combo nào** → ngược lại `400 INVALID_STATE`. Đổi sang combo bắt buộc gửi kèm `components`; đổi về hàng hóa thì thành phần bị bỏ.
+- Mọi thay đổi tồn kho đều từ chối combo (`400 INVALID_STATE`): không thể nhập/xuất/chuyển kho trực tiếp cho combo.
+- Thống kê, báo cáo, tồn kho **chỉ tính hàng thành phần**; combo không được cộng thêm vào bất cứ tổng nào.
 
 #### Thêm hàng hóa kèm ảnh trên web (2 bước)
 
@@ -285,11 +323,7 @@ Màn hình chỉ cần một nút Lưu và gọi lần lượt hai API này. N�
     "lastPurchasePrice": null, // vắng mặt nếu thiếu product.cost.view
     "minStock": null,
     "maxStock": null,
-    "location": null,
-    "prices": [
-      { "priceBookId": "…", "priceBookCode": "CHUNG", "price": "34500" },
-      { "priceBookId": "…", "priceBookCode": "LON", "price": null }
-    ]
+    "location": null
   }
 ]
 
@@ -305,8 +339,8 @@ Màn hình chỉ cần một nút Lưu và gọi lần lượt hai API này. N�
     "id": "…",
     "code": "QKBSP",
     "name": "Quạt kẹp bàn Super MST-A1",
-    "unit": "Cái",
-    "basePrice": "33500",
+    "productType": "goods",
+    "components": "", // combo: "DAO01/2,KEO03/1" → thêm từng thành phần × SL vào đơn
     "available": "475.000",
     "imageUrl": "https://…/a.jpg"
   }
@@ -347,125 +381,9 @@ Màn hình chỉ cần một nút Lưu và gọi lần lượt hai API này. N�
 
 **Xuất Excel:** `GET /products?format=xlsx` (kèm các bộ lọc, bỏ qua `page/limit`, tối đa 10.000 dòng). Tiêu đề cột trùng file KiotViet nên nhập lại được; cột `Giá vốn`, `Giá nhập cuối` chỉ có khi có quyền xem giá vốn.
 
-### 2.3 Thiết lập giá
+### 2.3 Giá bán
 
-Có **7 bảng giá**: Chung (mặc định), Lớn, Vừa, VIP, và 3 bản VAT. Mỗi sản phẩm có thể chưa có giá ở một bảng; khi bán, bảng nào thiếu giá thì **lùi về Bảng giá chung của cùng chi nhánh**.
-
-| Method | Đường dẫn                  | Mô tả                                                                           | Quyền          |
-| ------ | -------------------------- | ------------------------------------------------------------------------------- | -------------- |
-| GET    | `/price-books`             | Danh sách bảng giá                                                              | `product.view` |
-| PATCH  | `/price-books/:id`         | Đổi tên / bật tắt `{ name?, isActive? }`                                        | `price.edit`   |
-| GET    | `/price-books/grid`        | **Lưới giá**: mỗi dòng = 1 sản phẩm, mỗi cột = 1 bảng giá; `?format=xlsx` Excel | `product.view` |
-| PUT    | `/price-books/grid`        | Lưu nhiều ô giá cùng lúc                                                        | `price.edit`   |
-| POST   | `/price-books/bulk-adjust` | Tăng/giảm giá hàng loạt (có chế độ xem trước)                                   | `price.edit`   |
-| POST   | `/price-books/copy-branch` | Sao chép giá từ chi nhánh này sang chi nhánh kia                                | `price.edit`   |
-
-- Không tắt được Bảng giá chung (`400 INVALID_STATE`); đổi tên trùng → `409 DUPLICATE_NAME`. Bảng giá bị tắt không còn là cột của lưới.
-- **Giá bán là số nguyên đồng, không âm.** Giá lẻ (`"33000.5"`), âm hay không phải số → `400 VALIDATION_ERROR`.
-- Mọi thao tác ghi giá đều theo **MỘT chi nhánh** và người gọi phải được phép làm việc ở chi nhánh đó (`403 BRANCH_FORBIDDEN`). Giá chi nhánh này **không bao giờ** lọt sang chi nhánh kia.
-
-```json
-// GET /price-books
-[
-  {
-    "id": "…",
-    "code": "CHUNG",
-    "name": "Bảng giá chung",
-    "withVat": false,
-    "isDefault": true,
-    "isActive": true
-  }
-]
-```
-
-```json
-// GET /price-books/grid?branchId=…&q=&categoryId=&page=1&limit=50
-// branchId bỏ trống = chi nhánh làm việc (X-Branch-Id). limit tối đa 200.
-{
-  "branchId": "…",
-  "books": [
-    { "id": "…", "code": "CHUNG", "name": "Bảng giá chung" },
-    { "id": "…", "code": "LON", "name": "Lớn" }
-  ],
-  "data": [
-    {
-      "productId": "…",
-      "code": "QKBSP",
-      "name": "Quạt kẹp bàn…",
-      "costPrice": "21800.5000", // vắng mặt nếu thiếu product.cost.view
-      "prices": {
-        "<priceBookId CHUNG>": "33500",
-        "<priceBookId LON>": "33000",
-        "<priceBookId VIP>": null
-      }
-    }
-  ],
-  "meta": { "page": 1, "limit": 50, "total": 2787, "totalPages": 56 }
-}
-```
-
-```json
-// PUT /price-books/grid  (chỉ gửi các ô thay đổi; tối đa 500 ô; price = null xóa giá ô đó → lùi về bảng chung)
-{ "branchId": "…", "changes": [{ "productId": "…", "priceBookId": "…", "price": "33000" }] }
-// 200: { "updated": 1 }   — chỉ tính ô THỰC SỰ đổi. Một ô lỗi (hoặc cặp sản phẩm+bảng giá bị gửi trùng) → 400 và KHÔNG lưu ô nào.
-```
-
-```json
-// POST /price-books/bulk-adjust
-{
-  "branchId": "…",          // chi nhánh được điều chỉnh
-  "priceBookId": "…",
-  "categoryId": "…",        // tùy chọn: chỉ hàng của nhóm này (gồm nhóm con)
-  "mode": "percent",        // "percent" | "amount"
-  "value": "5",             // có dấu: 5 = tăng 5%; "-3.5" = giảm 3,5%; với amount là số tiền cộng/trừ mỗi ô
-  "roundTo": "100",         // tùy chọn, mặc định "1": làm tròn nửa lên đến bội số này (số nguyên >= 1)
-  "dryRun": true            // BẮT BUỘC gửi rõ. true = chỉ xem trước, KHÔNG lưu; false = lưu thật
-}
-// 200:
-{
-  "dryRun": true, "affected": 54, "skipped": 0, "unchanged": 6,
-  "preview": [{ "productId": "…", "code": "QKBSP", "oldPrice": "33500", "newPrice": "35200" }]   // tối đa 200 dòng đầu
-}
-```
-
-- Chỉ áp dụng cho ô **đã có giá**. `skipped` = số ô bị bỏ vì giá mới âm; `unchanged` = số ô giá không đổi sau khi làm tròn. Giá luôn ra số nguyên đồng.
-- Ví dụ: 33.500 tăng 5% làm tròn 100 → 35.175 → **35.200**.
-
-```json
-// POST /price-books/copy-branch
-{ "fromBranchId": "…", "toBranchId": "…", "priceBookId": "…", "overwrite": false }
-// priceBookId bỏ trống = mọi bảng giá. overwrite=false (mặc định): chỉ chép các ô chi nhánh đích CHƯA có giá.
-// overwrite=true: ghi đè ô khác giá. 200: { "copied": 1840, "skipped": 120 }. Hai chi nhánh phải khác nhau và người gọi phải có quyền ở cả hai.
-```
-
-**Giá theo chi nhánh:** 7 hạng giá dùng chung cho hai chi nhánh, nhưng **số tiền của từng ô giá là riêng từng chi nhánh**. Màn hình lưới giá cần chọn chi nhánh (tab/ô chọn). Khi bán, giá tra theo chi nhánh của đơn → hạng giá của khách → nếu thiếu thì lùi về Bảng giá chung **của cùng chi nhánh** (không lấy giá chi nhánh kia).
-
-**Xuất Excel:** `GET /price-books/grid?format=xlsx` — một cột mỗi bảng giá (tiêu đề là tên bảng giá). Nhập lại bằng `POST /imports/price-books` (mục 9).
-
-### 2.4 Báo giá cho màn hình tạo đơn
-
-| Method | Đường dẫn        | Mô tả                                                              | Quyền     | Mốc |
-| ------ | ---------------- | ------------------------------------------------------------------ | --------- | --- |
-| POST   | `/pricing/quote` | Tính giá niêm yết, tồn và cảnh báo cho các dòng hàng của một khách | đăng nhập | W3  |
-
-> **Chưa triển khai** (cần module Khách hàng; làm cùng Đơn hàng).
-
-Dùng khi người dùng chọn khách / thêm hàng để **hiển thị đúng giá và tồn tức thì**. Đây chỉ là báo giá; khi lưu đơn server tính lại. **Giá, tồn và công nợ tính theo chi nhánh làm việc (`X-Branch-Id`)** — công nợ và hạn mức là của khách tại chi nhánh đó.
-
-```json
-// request
-{ "customerId": "…", "priceBookId": "…?", "items": [{ "productId": "…", "qty": "100" }] }
-
-// response
-{
-  "priceBookId": "…",                 // bảng giá thực tế được áp dụng
-  "lines": [
-    { "productId": "…", "listPrice": "33500", "priceSource": "book",   // "book" | "base" (đã lùi về bảng chung)
-      "onHand": "515", "available": "475", "enoughStock": true }
-  ],
-  "customer": { "balance": "12500000", "creditLimit": "50000000", "overLimit": false }
-}
-```
+**Đã bỏ** (05/11/2026): hệ thống không lưu giá bán, không có bảng giá (Chung/Lớn/Vừa/VIP/VAT), lưới giá, tăng/giảm hàng loạt, sao chép giá giữa chi nhánh hay báo giá. Giá bán được quy ước chung ở phần mô tả sản phẩm. Các endpoint `/price-books/*`, `/pricing/quote` và quyền `price.edit` không còn. Giá trên dòng đơn hàng/hóa đơn (đơn giá, giảm giá, thành tiền) vẫn được lưu để làm sổ sách và tính lãi gộp, nhưng do **người lập đơn nhập**.
 
 ---
 
@@ -632,7 +550,7 @@ Sau khi lưu server cộng tồn, tính lại **giá vốn bình quân** và ghi
 | POST   | `/customers/:id/receipts`                           | **Thu nợ nhanh** (**Idempotency-Key**)             | `cash.create`   | W6  |
 | GET    | `/customers/:id/statement?from&to&format=xlsx\|pdf` | Biên bản đối chiếu công nợ                         | `customer.view` | W6  |
 
-Bộ lọc `GET /customers`: `q`, `type`, `salesOwnerId`, `priceBookId`, `hasDebt` (`true` = đang nợ), `isActive`; sort: `code`, `name`, `balance`, `lastTransactionAt`.
+Bộ lọc `GET /customers`: `q`, `type`, `salesOwnerId`, `hasDebt` (`true` = đang nợ), `isActive`; sort: `code`, `name`, `balance`, `lastTransactionAt`.
 
 ```json
 // Customer
@@ -645,7 +563,6 @@ Bộ lọc `GET /customers`: `q`, `type`, `salesOwnerId`, `priceBookId`, `hasDeb
   "address": "12 Đường Ví Dụ, Quận 1, TP.HCM",
   "facebook": null,
   "salesOwner": { "id": "…", "fullName": "Trần Văn B" }, // nhân viên phụ trách
-  "defaultPriceBookId": "…",
   "isInternalBranch": false, // true = khách hàng hệ thống đại diện một chi nhánh (chuyển kho nội bộ)
   "terms": [
     // hạn mức & kỳ hạn công nợ RIÊNG từng chi nhánh; không có dòng = không giới hạn
@@ -730,10 +647,9 @@ Quy ước: `phone` được chuẩn hóa về dạng `0xxxxxxxxx` và **không 
 // POST /orders   (cùng body cho PATCH)
 {
   "customerId": "…",
-  "priceBookId": "…?", // bỏ qua = bảng giá mặc định của khách
   "sellerId": "…?", // người bán (NVKD); mặc định = người đang đăng nhập
   "items": [
-    { "productId": "…", "qty": "2000", "discountPerUnit": "0", "isGift": false, "note": null }
+    { "productId": "…", "qty": "2000", "unitPrice": "12600", "discountPerUnit": "0", "isGift": false, "note": null }
   ],
   "discount": "0", // giảm giá cả đơn (số tiền)
   "deposit": { "accountId": "…", "method": "bank", "amount": "5000000" }, // đặt cọc, tùy chọn
@@ -742,7 +658,7 @@ Quy ước: `phone` được chuẩn hóa về dạng `0xxxxxxxxx` và **không 
 }
 ```
 
-Không gửi `listPrice`/`unitPrice`/`lineTotal`: server tự tính. Tùy chọn `listPrice` chỉ dùng cho `isGift=true`/hàng được phép sửa giá (cần quyền `price.override`).
+Đơn giá (`unitPrice`) do người lập đơn nhập (số nguyên đồng, không có bảng giá nên server không tự điền); không gửi `lineTotal`: server tự tính. Dòng chỉ chứa **hàng hóa** — nếu chọn Combo thì giao diện tách thành từng hàng thành phần × số lượng trước khi gửi.
 
 ```json
 // Order (response)
@@ -750,12 +666,11 @@ Không gửi `listPrice`/`unitPrice`/`lineTotal`: server tự tính. Tùy chọn
   "id": "…", "code": "DH022295", "status": "draft",
   "branch": { "id": "…", "code": "SG", "name": "Chi nhánh Sài Gòn" }, // chi nhánh của đơn = X-Branch-Id lúc tạo; không đổi được
   "customer": { "id": "…", "code": "KH000002", "name": "Cửa hàng Ví Dụ 2", "phone": "…" },
-  "priceBook": { "id": "…", "name": "Lớn" },
   "seller": { "id": "…", "fullName": "…" },
   "orderedAt": "…",
   "items": [{
-    "id": "…", "productId": "…", "code": "T888LL", "name": "Lược lăn tinh dầu dưỡng tóc T888", "unit": "Cái",
-    "qty": "2000", "listPrice": "12600", "discountPerUnit": "0", "unitPrice": "12600",
+    "id": "…", "productId": "…", "code": "T888LL", "name": "Lược lăn tinh dầu dưỡng tóc T888",
+    "qty": "2000", "discountPerUnit": "0", "unitPrice": "12600",
     "lineTotal": "25200000", "isGift": false, "note": null,
     "available": "3000"
   }],
@@ -811,7 +726,6 @@ Không gửi `listPrice`/`unitPrice`/`lineTotal`: server tự tính. Tùy chọn
     "phone": "…",
     "address": "…"
   },
-  "priceBook": { "id": "…", "name": "Lớn" },
   "seller": { "id": "…", "fullName": "…" },
   "invoicedAt": "2026-11-03T07:11:16.170Z",
   "items": [
@@ -819,9 +733,7 @@ Không gửi `listPrice`/`unitPrice`/`lineTotal`: server tự tính. Tùy chọn
       "productId": "…",
       "code": "QKBSP",
       "name": "Quạt kẹp bàn Super MST-A1",
-      "unit": "Cái",
       "qty": "515",
-      "listPrice": "33500",
       "discountPerUnit": "500",
       "unitPrice": "33000",
       "lineTotal": "16995000",
@@ -1011,13 +923,13 @@ Cấu trúc chung cho dạng JSON: `{ "params": {…}, "columns": [{ "key": "…
 
 ## 9. Nhập dữ liệu từ Excel
 
-> **Trạng thái:** đã triển khai cho `products` và `price-books`; `customers`, `suppliers` trả `400 IMPORT_TYPE_NOT_SUPPORTED` (sẽ làm cùng phân hệ của chúng). Chỉ người có quyền `import.run` (mặc định chỉ Quản lý).
+> **Trạng thái:** đã triển khai cho `products`; `customers`, `suppliers` trả `400 IMPORT_TYPE_NOT_SUPPORTED` (sẽ làm cùng phân hệ của chúng). Chỉ người có quyền `import.run` (mặc định chỉ Quản lý).
 
 Dùng cho import hàng loạt (chuyển dữ liệu từ KiotViet và nhập tay bằng file). **Xử lý ngay trong yêu cầu** (vài nghìn dòng), kết quả có sẵn trong phản hồi; vẫn xem lại được bằng `GET /imports/:id`.
 
 | Method | Đường dẫn                 | Mô tả                                                                                          | Quyền        |
 | ------ | ------------------------- | ---------------------------------------------------------------------------------------------- | ------------ |
-| POST   | `/imports/:type`          | Tải file lên (`multipart/form-data`, field `file`, ≤ 10 MB). `type`: `products`, `price-books` | `import.run` |
+| POST   | `/imports/:type`          | Tải file lên (`multipart/form-data`, field `file`, ≤ 10 MB). `type`: `products` | `import.run` |
 | GET    | `/imports/:id`            | Kết quả và lỗi từng dòng của một lần nhập                                                      | `import.run` |
 | GET    | `/imports/:type/template` | Tải file Excel mẫu                                                                             | `import.run` |
 
@@ -1055,16 +967,15 @@ Tham số query của `POST`: `dryRun` (**mặc định `true`**: chỉ kiểm t
 | Cột                                      | Ghi chú                                                                                                                                             |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Mã hàng`, `Tên hàng`                    | **Bắt buộc**. Mã theo quy tắc ở mục 2.2; không trùng trong file                                                                                     |
-| `Đơn vị tính`                            | Mặc định "Cái"                                                                                                                                      |
+| `Loại hàng`                              | `Hàng hóa` (mặc định) hoặc `Combo` (KiotViet ghi `Combo - Đóng gói` cũng nhận). Trống mà có `Hàng thành phần` → coi là combo. Không đổi được loại của hàng đã có qua Excel |
+| `Hàng thành phần`                        | Của combo, dạng `MSP/SL,MSP/SL`. Thành phần là hàng hóa trong file (dù đứng sau) hoặc đã có trong hệ thống; chạy lại cùng file không đổi gì, đổi số lượng thì cập nhật |
 | `Nhóm hàng(3 Cấp)`                       | Dạng `NHÀ BẾP>>Dao kéo`, tối đa 3 cấp; **tự tạo nhóm còn thiếu**                                                                                    |
-| `Giá bán`                                | Số nguyên đồng → ghi vào **Bảng giá chung của chi nhánh `branchId`**. Trống hoặc 0 = chưa có giá                                                    |
+| `Giá bán`, `Tồn kho`, `Giá vốn` và cột khác | **Bị bỏ qua**: hệ thống không có giá bán; số dư đầu kỳ do công cụ chuyển dữ liệu riêng xử lý |
 | `Tồn nhỏ nhất`, `Tồn lớn nhất`, `Vị trí` | Ghi cho chi nhánh `branchId`                                                                                                                        |
-| `Đang kinh doanh`, `Được bán trực tiếp`  | `1`/`0`                                                                                                                                             |
-| `Trọng lượng`, `Mô tả`                   |                                                                                                                                                     |
+| `Đang kinh doanh`                        | `1`/`0`                                                                                                                                             |
+| `Mô tả`                                  |                                                                                                                                                     |
 | `Hình ảnh (url1,url2...)`                | Nhiều địa chỉ `http(s)` cách nhau dấu phẩy → **giữ nguyên URL gốc** (không tải về kho file); thêm ảnh chưa có, không xóa ảnh hiện có; tối đa 10 ảnh |
-| `Tồn kho`, `Giá vốn` và cột khác         | **Bị bỏ qua**: số dư đầu kỳ do công cụ chuyển dữ liệu riêng xử lý                                                                                   |
 
-**`price-books`** — cột `Mã hàng` + **mỗi cột một bảng giá** (tiêu đề là _tên_ hoặc _mã_ bảng giá: `Bảng giá chung`, `Lớn`, `LON_VAT`…). **Bắt buộc `branchId`** (giá riêng từng chi nhánh). Giá là số nguyên đồng; ô trống hoặc `0` = giữ nguyên; mã hàng không tồn tại là lỗi. `created` = số ô giá mới, `updated` = số ô đổi giá. Cột khác (tên hàng, tồn kho, giá vốn…) bị bỏ qua. File xuất từ `GET /price-books/grid?format=xlsx` nhập lại được.
 
 - Nên cho người dùng chạy `dryRun=true` trước, xem lỗi rồi mới chạy thật (`dryRun=false`).
 - Import số dư đầu kỳ (tồn, nợ, quỹ) **không** mở cho giao diện; backend chạy bằng công cụ riêng khi chuyển đổi.

@@ -36,7 +36,6 @@ try {
   const labels: Record<string, string> = {
     branches: 'Chi nhánh',
     branchPartners: 'Khách/NCC nội bộ',
-    priceBooks: 'Bảng giá',
     cashAccounts: 'Quỹ',
     cashCategories: 'Danh mục thu chi',
     codeSequences: 'Bộ đếm mã chứng từ',

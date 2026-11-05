@@ -1,9 +1,10 @@
 import { pgEnum } from 'drizzle-orm/pg-core';
+import { PRODUCT_TYPES } from '@kiot/shared';
 
 /**
  * Vai trò theo cơ cấu thực tế của công ty:
  * manager = Quản lý · assistant = Trợ lý · accountant = Kế toán · warehouse = Kho ·
- * driver = Lái xe · sales = Sale · marketing = Marketing.
+ * driver = Lái xe · sales = Sale · marketing = Marketing · pending = chờ cấp quyền (tự đăng ký bằng Google).
  */
 export const userRole = pgEnum('user_role', [
   'manager',
@@ -13,6 +14,7 @@ export const userRole = pgEnum('user_role', [
   'driver',
   'sales',
   'marketing',
+  'pending',
 ]);
 export const customerType = pgEnum('customer_type', ['individual', 'company']);
 export const supplierKind = pgEnum('supplier_kind', [
@@ -89,3 +91,6 @@ export const transferStatus = pgEnum('transfer_status', [
 
 /** Ai ứng tiền trả phí vận chuyển của phiếu chuyển kho. */
 export const shippingPayer = pgEnum('shipping_payer', ['sender', 'receiver']);
+
+/** Loại hàng: goods = Hàng hóa (mặc định), combo = gói nhiều hàng hóa thành phần (không có tồn/giá vốn riêng). */
+export const productType = pgEnum('product_type', PRODUCT_TYPES);

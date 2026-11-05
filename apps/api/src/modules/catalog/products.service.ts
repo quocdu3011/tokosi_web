@@ -14,6 +14,11 @@ import {
   type SQL,
 } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
+import {
+  formatComponents,
+  parseComponents,
+  type ProductType,
+} from '@kiot/shared';
 import { dec } from '../../common/costing.js';
 import {
   writeSheet,
@@ -34,8 +39,7 @@ import {
   invoiceItems,
   orderItems,
   orders,
-  priceBookItems,
-  priceBooks,
+  productComponents,
   productImages,
   products,
   purchaseReturnItems,
@@ -45,6 +49,13 @@ import {
   stocks,
 } from '../../db/schema/index.js';
 import { productSearchExpr } from '../../db/schema/_search.js';
+import {
+  comboFigures,
+  effectiveOnHandSql,
+  loadComponents,
+  type ComboComponent,
+  type ComboFigures,
+} from './combo.js';
 import { AuditService } from '../audit/audit.service.js';
 import { PermissionsService } from '../authorization/permissions.service.js';
 import { BranchAccessService } from '../branches/branch-access.service.js';
@@ -64,7 +75,6 @@ import {
 
 /** Tối đa số dòng khi xuất Excel. */
 export const EXPORT_MAX_ROWS = 10_000;
-const NIL_UUID = '00000000-0000-0000-0000-000000000000';
 const VN_OFFSET = '+07:00';
 
 type ProductRow = typeof products.$inferSelect;
@@ -78,7 +88,6 @@ interface JoinedRow {
   minStock: string | null;
   maxStock: string | null;
   location: string | null;
-  basePrice: string | null;
   reserved: string | null;
 }
 
@@ -106,21 +115,22 @@ export class ProductsService {
       user.role,
       'product.cost.view',
     );
-    const defaultBookId = await this.defaultBookId(this.db);
     const categoryIds = q.categoryId
       ? await categoryWithDescendants(this.db, q.categoryId)
       : undefined;
 
+    const onHandExpr = effectiveOnHandSql(branchId);
     const conditions: Array<SQL | undefined> = [
       isNull(products.deletedAt),
       searchWhere(productSearchExpr(products), q.q),
       q.isActive === undefined ? undefined : eq(products.isActive, q.isActive),
+      q.productType ? eq(products.productType, q.productType) : undefined,
       categoryIds ? inArray(products.categoryId, categoryIds) : undefined,
       q.inStock === undefined
         ? undefined
         : q.inStock
-          ? gt(sql`coalesce(${stocks.onHand}, 0)`, sql`0`)
-          : sql`coalesce(${stocks.onHand}, 0) <= 0`,
+          ? gt(onHandExpr, sql`0`)
+          : sql`${onHandExpr} <= 0`,
     ];
     const where = and(...conditions);
 
@@ -139,7 +149,7 @@ export class ProductsService {
       sort?.field === 'name'
         ? products.name
         : sort?.field === 'onHand'
-          ? sql`coalesce(${stocks.onHand}, 0)`
+          ? onHandExpr
           : sort?.field === 'createdAt'
             ? products.createdAt
             : products.code;
@@ -149,7 +159,7 @@ export class ProductsService {
         ? { page: 1, limit: EXPORT_MAX_ROWS, offset: 0 }
         : pageParams(q);
 
-    const rows = await this.joinedQuery(this.db, branchId, defaultBookId)
+    const rows = await this.joinedQuery(this.db, branchId)
       .where(where)
       .orderBy(direction(sortColumn), asc(products.id))
       .limit(limit)
@@ -178,8 +188,8 @@ export class ProductsService {
       { header: 'Mã hàng', width: 16 },
       { header: 'Tên hàng', width: 38 },
       { header: 'Nhóm hàng(3 Cấp)', width: 30 },
-      { header: 'Đơn vị tính', width: 12 },
-      { header: 'Giá bán', width: 14 },
+      { header: 'Loại hàng', width: 12 },
+      { header: 'Hàng thành phần', width: 30 },
       ...(withCost
         ? [
             { header: 'Giá vốn', width: 14 },
@@ -191,28 +201,24 @@ export class ProductsService {
       { header: 'Tồn nhỏ nhất', width: 14 },
       { header: 'Tồn lớn nhất', width: 14 },
       { header: 'Vị trí', width: 12 },
-      { header: 'Trọng lượng', width: 14 },
       { header: 'Mô tả', width: 30 },
       { header: 'Đang kinh doanh', width: 16 },
-      { header: 'Được bán trực tiếp', width: 18 },
       { header: 'Hình ảnh (url1,url2...)', width: 40 },
     ];
     const rows = data.map((p): CellValue[] => [
       p.code,
       p.name,
       p.categoryPath ? p.categoryPath.replaceAll(' > ', '>>') : null,
-      p.unit,
-      num(p.basePrice),
+      p.productType === 'combo' ? 'Combo' : 'Hàng hóa',
+      p.components || null,
       ...(withCost ? [num(p.costPrice), num(p.lastPurchasePrice)] : []),
       num(p.onHand),
       num(p.reserved),
       num(p.minStock),
       num(p.maxStock),
       p.location,
-      num(p.weightG),
       p.description,
       p.isActive ? 1 : 0,
-      p.isSellable ? 1 : 0,
       p.images.map((i) => i.url).join(',') || null,
     ]);
     return writeSheet('Hàng hóa', columns, rows);
@@ -228,14 +234,12 @@ export class ProductsService {
 
   /** Tìm nhanh cho ô chọn hàng: tối đa 20 dòng, chỉ hàng đang kinh doanh và được bán. */
   async lookup(branchId: string, q?: string): Promise<ProductLookupDto[]> {
-    const defaultBookId = await this.defaultBookId(this.db);
     const needle = (q ?? '').trim();
-    const rows = await this.joinedQuery(this.db, branchId, defaultBookId)
+    const rows = await this.joinedQuery(this.db, branchId)
       .where(
         and(
           isNull(products.deletedAt),
           eq(products.isActive, true),
-          eq(products.isSellable, true),
           searchWhere(productSearchExpr(products), q),
         ),
       )
@@ -248,15 +252,24 @@ export class ProductsService {
       )
       .limit(20);
     const images = await this.imagesOf(rows.map((r) => r.p.id));
+    const comboIds = rows
+      .filter((r) => r.p.productType === 'combo')
+      .map((r) => r.p.id);
+    const [figures, comps] = await Promise.all([
+      comboFigures(this.db, branchId, comboIds),
+      loadComponents(this.db, comboIds),
+    ]);
     return rows.map((r) => {
       const onHand = dec(r.onHand ?? '0');
       return {
         id: r.p.id,
         code: r.p.code,
         name: r.p.name,
-        unit: r.p.unit,
-        basePrice: r.basePrice === null ? null : dec(r.basePrice).toFixed(),
-        available: onHand.minus(dec(r.reserved ?? '0')).toFixed(3),
+        productType: r.p.productType,
+        components: componentsText(comps.get(r.p.id)),
+        available:
+          figures.get(r.p.id)?.available ??
+          onHand.minus(dec(r.reserved ?? '0')).toFixed(3),
         imageUrl: images.get(r.p.id)?.[0]?.url ?? null,
       };
     });
@@ -270,6 +283,8 @@ export class ProductsService {
     input: CreateProductDto,
   ): Promise<ProductDto> {
     if (input.categoryId) await this.assertCategory(this.db, input.categoryId);
+    const productType: ProductType = input.productType ?? 'goods';
+    const entries = this.parseComponentInput(productType, input.components);
     const id = await this.db
       .transaction(async (tx) => {
         const [row] = await tx
@@ -278,18 +293,17 @@ export class ProductsService {
             code: input.code,
             name: input.name.trim(),
             categoryId: input.categoryId ?? null,
-            unit: input.unit?.trim() || 'Cái',
+            productType,
             description: input.description ?? null,
-            weightG: input.weightG ?? null,
-            isSellable: input.isSellable ?? true,
             createdBy: user.id,
           })
           .returning();
+        const resolved = await this.replaceComponents(tx, row!.id, entries);
         await this.auditLog.record(tx, {
           action: 'product.create',
           entityType: 'product',
           entityId: row!.id,
-          after: auditView(row!),
+          after: auditView(row!, resolved),
         });
         return row!.id;
       })
@@ -342,30 +356,62 @@ export class ProductsService {
             );
           }
         }
+        const nextType: ProductType = input.productType ?? before.productType;
+        const typeChanged = nextType !== before.productType;
+        if (typeChanged) {
+          if (await this.hasTransactions(tx, id)) {
+            throw new AppError(
+              400,
+              'INVALID_STATE',
+              'Hàng đã có giao dịch nên không đổi được loại hàng',
+            );
+          }
+          if (await this.isComponentOfCombo(tx, id)) {
+            throw new AppError(
+              400,
+              'INVALID_STATE',
+              'Hàng đang là thành phần của một combo nên không đổi được loại hàng',
+            );
+          }
+        }
+        const beforeComps = componentsText(
+          (await loadComponents(tx, [id])).get(id),
+        );
+        // Đổi sang combo: bắt buộc gửi thành phần; combo giữ nguyên loại: thành phần là tùy chọn
+        const entries =
+          input.components === undefined &&
+          !(typeChanged && nextType === 'combo')
+            ? undefined
+            : this.parseComponentInput(nextType, input.components);
         const patch: Partial<typeof products.$inferInsert> = {
           updatedAt: new Date(),
         };
+        if (typeChanged) patch.productType = nextType;
         if (input.code !== undefined) patch.code = input.code;
         if (input.name !== undefined) patch.name = input.name.trim();
         if (input.categoryId !== undefined) patch.categoryId = input.categoryId;
-        if (input.unit !== undefined) patch.unit = input.unit.trim();
         if (input.description !== undefined)
           patch.description = input.description;
-        if (input.weightG !== undefined) patch.weightG = input.weightG;
         if (input.isActive !== undefined) patch.isActive = input.isActive;
-        if (input.isSellable !== undefined) patch.isSellable = input.isSellable;
 
         const [after] = await tx
           .update(products)
           .set(patch)
           .where(eq(products.id, id))
           .returning();
+        // Đổi combo → hàng hóa thì bỏ thành phần
+        const afterComps =
+          nextType === 'goods'
+            ? await this.replaceComponents(tx, id, [])
+            : entries
+              ? await this.replaceComponents(tx, id, entries)
+              : beforeComps;
         await this.auditLog.record(tx, {
           action: 'product.update',
           entityType: 'product',
           entityId: id,
-          before: auditView(before),
-          after: auditView(after!),
+          before: auditView(before, beforeComps),
+          after: auditView(after!, afterComps),
         });
       })
       .catch(rethrowDuplicateCode);
@@ -376,7 +422,8 @@ export class ProductsService {
 
   /** Chi tiết hàng ở từng chi nhánh người dùng được phép: tồn, giá vốn (theo quyền), min/max, vị trí, giá 7 bảng giá. */
   async branchesOf(user: AuthUser, id: string): Promise<ProductBranchDto[]> {
-    await this.findOrThrow(this.db, id);
+    const product = await this.findOrThrow(this.db, id);
+    const isCombo = product.productType === 'combo';
     const canSeeCost = await this.permissions.has(
       user.role,
       'product.cost.view',
@@ -384,22 +431,19 @@ export class ProductsService {
     const allowed = await this.branchAccess.listAllowed(user);
     if (allowed.length === 0) return [];
     const ids = allowed.map((b) => b.id);
+    const figuresBy = new Map<string, ComboFigures>();
+    if (isCombo) {
+      for (const b of allowed) {
+        const f = (await comboFigures(this.db, b.id, [id])).get(id);
+        if (f) figuresBy.set(b.id, f);
+      }
+    }
 
-    const [stockRows, priceRows, bookRows, reservedRows] = await Promise.all([
+    const [stockRows, reservedRows] = await Promise.all([
       this.db
         .select()
         .from(stocks)
         .where(and(eq(stocks.productId, id), inArray(stocks.branchId, ids))),
-      this.db
-        .select()
-        .from(priceBookItems)
-        .where(
-          and(
-            eq(priceBookItems.productId, id),
-            inArray(priceBookItems.branchId, ids),
-          ),
-        ),
-      this.db.select().from(priceBooks).orderBy(priceBooks.sortOrder),
       this.db
         .select({
           branchId: orders.branchId,
@@ -423,30 +467,23 @@ export class ProductsService {
       const s = stockBy.get(b.id);
       const onHand = dec(s?.onHand ?? '0');
       const reserved = dec(reservedBy.get(b.id) ?? '0');
+      const fig = figuresBy.get(b.id);
       const dto: ProductBranchDto = {
         branchId: b.id,
         branchCode: b.code,
         branchName: b.name,
-        onHand: onHand.toFixed(3),
-        reserved: reserved.toFixed(3),
-        available: onHand.minus(reserved).toFixed(3),
-        minStock: s?.minStock ?? null,
-        maxStock: s?.maxStock ?? null,
-        location: s?.location ?? null,
-        prices: bookRows.map((book) => {
-          const row = priceRows.find(
-            (p) => p.branchId === b.id && p.priceBookId === book.id,
-          );
-          return {
-            priceBookId: book.id,
-            priceBookCode: book.code,
-            price: row ? dec(row.price).toFixed() : null,
-          };
-        }),
+        onHand: fig ? fig.onHand : onHand.toFixed(3),
+        reserved: isCombo ? '0.000' : reserved.toFixed(3),
+        available: fig ? fig.available : onHand.minus(reserved).toFixed(3),
+        minStock: isCombo ? null : (s?.minStock ?? null),
+        maxStock: isCombo ? null : (s?.maxStock ?? null),
+        location: isCombo ? null : (s?.location ?? null),
       };
       if (canSeeCost) {
-        dto.costPrice = s?.costPrice ?? '0.0000';
-        dto.lastPurchasePrice = s?.lastPurchasePrice ?? null;
+        dto.costPrice = fig ? fig.costPrice : (s?.costPrice ?? '0.0000');
+        dto.lastPurchasePrice = fig
+          ? fig.lastPurchasePrice
+          : (s?.lastPurchasePrice ?? null);
       }
       return dto;
     });
@@ -463,7 +500,14 @@ export class ProductsService {
     input: SetProductBranchSettingsDto,
   ): Promise<ProductBranchDto> {
     await this.branchAccess.assertAccess(user, branchId);
-    await this.findOrThrow(this.db, id);
+    const product = await this.findOrThrow(this.db, id);
+    if (product.productType === 'combo') {
+      throw new AppError(
+        400,
+        'INVALID_STATE',
+        'Combo không có tồn tối thiểu/tối đa/vị trí riêng; hãy đặt cho hàng thành phần',
+      );
+    }
     const [branch] = await this.db
       .select({ id: branches.id })
       .from(branches)
@@ -553,7 +597,14 @@ export class ProductsService {
     id: string,
     q: StockCardQueryDto,
   ): Promise<StockCardDto> {
-    await this.findOrThrow(this.db, id);
+    const product = await this.findOrThrow(this.db, id);
+    if (product.productType === 'combo') {
+      throw new AppError(
+        400,
+        'INVALID_STATE',
+        'Combo không có thẻ kho; hãy xem thẻ kho của từng hàng thành phần',
+      );
+    }
     const canSeeCost = await this.permissions.has(
       user.role,
       'product.cost.view',
@@ -625,12 +676,8 @@ export class ProductsService {
 
   // ------------------------------------------------------------------ nội bộ
 
-  /** Truy vấn nền: hàng + tồn + giá Bảng giá chung + số đang giữ, tất cả theo MỘT chi nhánh. */
-  private joinedQuery(
-    db: DbOrTx,
-    branchId: string,
-    defaultBookId: string | null,
-  ) {
+  /** Truy vấn nền: hàng + tồn + số đang giữ, tất cả theo MỘT chi nhánh. */
+  private joinedQuery(db: DbOrTx, branchId: string) {
     const reserved = db
       .select({
         productId: orderItems.productId,
@@ -650,21 +697,12 @@ export class ProductsService {
         minStock: stocks.minStock,
         maxStock: stocks.maxStock,
         location: stocks.location,
-        basePrice: priceBookItems.price,
         reserved: reserved.qty,
       })
       .from(products)
       .leftJoin(
         stocks,
         and(eq(stocks.productId, products.id), eq(stocks.branchId, branchId)),
-      )
-      .leftJoin(
-        priceBookItems,
-        and(
-          eq(priceBookItems.productId, products.id),
-          eq(priceBookItems.branchId, branchId),
-          eq(priceBookItems.priceBookId, defaultBookId ?? NIL_UUID),
-        ),
       )
       .leftJoin(reserved, eq(reserved.productId, products.id))
       .$dynamic();
@@ -676,8 +714,7 @@ export class ProductsService {
     id: string,
     canSeeCost: boolean,
   ): Promise<ProductDto> {
-    const defaultBookId = await this.defaultBookId(db);
-    const rows = await this.joinedQuery(db, branchId, defaultBookId).where(
+    const rows = await this.joinedQuery(db, branchId).where(
       and(eq(products.id, id), isNull(products.deletedAt)),
     );
     if (rows.length === 0) {
@@ -691,11 +728,19 @@ export class ProductsService {
     branchId: string,
     canSeeCost: boolean,
   ): Promise<ProductDto[]> {
-    const [images, paths] = await Promise.all([
+    const comboIds = rows
+      .filter((r) => r.p.productType === 'combo')
+      .map((r) => r.p.id);
+    const [images, paths, figures, comps] = await Promise.all([
       this.imagesOf(rows.map((r) => r.p.id)),
       this.categoryPaths(),
+      comboFigures(this.db, branchId, comboIds),
+      loadComponents(this.db, comboIds),
     ]);
     return rows.map((r) => {
+      const fig = figures.get(r.p.id);
+      const isCombo = r.p.productType === 'combo';
+      const items = comps.get(r.p.id) ?? [];
       const onHand = dec(r.onHand ?? '0');
       const reserved = dec(r.reserved ?? '0');
       const dto: ProductDto = {
@@ -706,27 +751,33 @@ export class ProductsService {
         categoryPath: r.p.categoryId
           ? (paths.get(r.p.categoryId) ?? null)
           : null,
-        unit: r.p.unit,
+        productType: r.p.productType,
+        components: componentsText(items),
+        componentItems: items.map((c) => ({
+          productId: c.productId,
+          code: c.code,
+          name: c.name,
+          qty: c.qty,
+        })),
         branchId,
-        basePrice: r.basePrice === null ? null : dec(r.basePrice).toFixed(),
-        onHand: onHand.toFixed(3),
-        reserved: reserved.toFixed(3),
-        available: onHand.minus(reserved).toFixed(3),
+        onHand: fig ? fig.onHand : onHand.toFixed(3),
+        reserved: isCombo ? '0.000' : reserved.toFixed(3),
+        available: fig ? fig.available : onHand.minus(reserved).toFixed(3),
         onOrder: '0',
-        minStock: r.minStock,
-        maxStock: r.maxStock,
-        location: r.location,
+        minStock: isCombo ? null : r.minStock,
+        maxStock: isCombo ? null : r.maxStock,
+        location: isCombo ? null : r.location,
         description: r.p.description,
-        weightG: r.p.weightG,
         images: images.get(r.p.id) ?? [],
         isActive: r.p.isActive,
-        isSellable: r.p.isSellable,
         createdAt: r.p.createdAt.toISOString(),
         updatedAt: r.p.updatedAt.toISOString(),
       };
       if (canSeeCost) {
-        dto.costPrice = r.costPrice ?? '0.0000';
-        dto.lastPurchasePrice = r.lastPurchasePrice;
+        dto.costPrice = fig ? fig.costPrice : (r.costPrice ?? '0.0000');
+        dto.lastPurchasePrice = fig
+          ? fig.lastPurchasePrice
+          : r.lastPurchasePrice;
       }
       return dto;
     });
@@ -748,14 +799,6 @@ export class ProductsService {
       map.set(r.productId, list);
     }
     return map;
-  }
-
-  private async defaultBookId(db: DbOrTx): Promise<string | null> {
-    const [book] = await db
-      .select({ id: priceBooks.id })
-      .from(priceBooks)
-      .where(eq(priceBooks.isDefault, true));
-    return book?.id ?? null;
   }
 
   /** "ĐIỆN GIA DỤNG > Quạt điện" cho từng nhóm. */
@@ -790,6 +833,105 @@ export class ProductsService {
         { field: 'categoryId', message: 'Nhóm hàng không tồn tại' },
       ]);
     }
+  }
+
+  /**
+   * Đọc chuỗi `MSP/SL,MSP/SL` theo loại hàng: combo bắt buộc có ít nhất 1 thành phần; hàng hóa không được có.
+   */
+  private parseComponentInput(
+    type: ProductType,
+    text: string | undefined,
+  ): Array<{ code: string; qty: number }> {
+    const fail = (message: string): never => {
+      throw new AppError(400, 'VALIDATION_ERROR', message, [
+        { field: 'components', message },
+      ]);
+    };
+    const parsed = parseComponents(text ?? '');
+    if (!parsed.ok) return fail(parsed.error);
+    if (type === 'goods') {
+      if (parsed.items.length > 0)
+        fail('Hàng hóa không có hàng thành phần (chỉ Combo mới có)');
+      return [];
+    }
+    if (parsed.items.length === 0)
+      fail('Combo phải có ít nhất một hàng thành phần');
+    return parsed.items;
+  }
+
+  /**
+   * Thay toàn bộ thành phần của một hàng bằng `entries` (mã → hàng hóa chưa xóa, loại `goods`, không phân biệt
+   * hoa thường). Trả chuỗi `MSP/SL,MSP/SL` theo mã chuẩn của CSDL.
+   */
+  private async replaceComponents(
+    tx: DbOrTx,
+    comboId: string,
+    entries: Array<{ code: string; qty: number }>,
+  ): Promise<string> {
+    await tx
+      .delete(productComponents)
+      .where(eq(productComponents.comboId, comboId));
+    if (entries.length === 0) return '';
+    const found = await tx
+      .select({
+        id: products.id,
+        code: products.code,
+        productType: products.productType,
+      })
+      .from(products)
+      .where(
+        and(
+          isNull(products.deletedAt),
+          inArray(
+            sql`lower(${products.code})`,
+            entries.map((e) => e.code.toLowerCase()),
+          ),
+        ),
+      );
+    const byCode = new Map(found.map((f) => [f.code.toLowerCase(), f]));
+    const missing = entries
+      .filter((e) => !byCode.has(e.code.toLowerCase()))
+      .map((e) => e.code);
+    const nested = entries
+      .filter((e) => byCode.get(e.code.toLowerCase())?.productType === 'combo')
+      .map((e) => e.code);
+    const problem =
+      missing.length > 0
+        ? `Không tìm thấy hàng thành phần: ${missing.join(', ')}`
+        : nested.length > 0
+          ? `Thành phần phải là hàng hóa, không được là combo: ${nested.join(', ')}`
+          : null;
+    if (problem) {
+      throw new AppError(400, 'VALIDATION_ERROR', problem, [
+        { field: 'components', message: problem },
+      ]);
+    }
+    await tx.insert(productComponents).values(
+      entries.map((e, i) => ({
+        comboId,
+        componentId: byCode.get(e.code.toLowerCase())!.id,
+        qty: e.qty,
+        sortOrder: i,
+      })),
+    );
+    return formatComponents(
+      entries.map((e) => ({
+        code: byCode.get(e.code.toLowerCase())!.code,
+        qty: e.qty,
+      })),
+    );
+  }
+
+  private async isComponentOfCombo(
+    db: DbOrTx,
+    productId: string,
+  ): Promise<boolean> {
+    const rows = await db
+      .select({ one: sql`1` })
+      .from(productComponents)
+      .where(eq(productComponents.componentId, productId))
+      .limit(1);
+    return rows.length > 0;
   }
 
   private async findOrThrow(db: DbOrTx, id: string): Promise<ProductRow> {
@@ -851,17 +993,23 @@ export class ProductsService {
 }
 
 /** Các trường an toàn để ghi nhật ký. */
-function auditView(p: ProductRow) {
+function auditView(p: ProductRow, components: string) {
   return {
     code: p.code,
     name: p.name,
     categoryId: p.categoryId,
-    unit: p.unit,
+    productType: p.productType,
+    components,
     description: p.description,
-    weightG: p.weightG,
     isActive: p.isActive,
-    isSellable: p.isSellable,
   };
+}
+
+/** Chuỗi `MSP/SL,MSP/SL` của một combo (rỗng nếu không có thành phần). */
+function componentsText(items: ComboComponent[] | undefined): string {
+  return formatComponents(
+    (items ?? []).map((c) => ({ code: c.code, qty: c.qty })),
+  );
 }
 
 function rethrowDuplicateCode(e: unknown): never {

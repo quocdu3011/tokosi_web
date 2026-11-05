@@ -50,6 +50,14 @@ export class TokenService {
     token: string,
     now: Date = new Date(),
   ): Promise<string> {
+    return (await this.verifyAccessTokenClaims(token, now)).userId;
+  }
+
+  /** Như `verifyAccessToken` nhưng trả thêm thời điểm cấp token (`issuedAt`, giây UNIX) để so với lần đổi mật khẩu. */
+  async verifyAccessTokenClaims(
+    token: string,
+    now: Date = new Date(),
+  ): Promise<{ userId: string; issuedAt: number }> {
     try {
       const { payload } = await jwtVerify(token, this.key, {
         algorithms: ['HS256'],
@@ -60,7 +68,7 @@ export class TokenService {
       if (typeof payload.sub !== 'string' || payload.sub === '') {
         throw new AppError(401, 'UNAUTHENTICATED', 'Token không hợp lệ');
       }
-      return payload.sub;
+      return { userId: payload.sub, issuedAt: payload.iat ?? 0 };
     } catch (error) {
       if (error instanceof AppError) throw error;
       if (error instanceof errors.JWTExpired) {

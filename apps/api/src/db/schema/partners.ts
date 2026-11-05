@@ -10,7 +10,6 @@ import {
 import { customerType, supplierKind } from './enums.js';
 import { money, pk, softDelete, timestamps, tstz } from './_helpers.js';
 import { partySearchExpr, trgmIndex } from './_search.js';
-import { priceBooks } from './catalog.js';
 import { branches, users } from './system.js';
 
 /**
@@ -30,7 +29,6 @@ export const customers = pgTable(
     address: text(),
     facebook: text(),
     salesOwnerId: uuid().references(() => users.id),
-    defaultPriceBookId: uuid().references(() => priceBooks.id),
     linkedBranchId: uuid()
       .unique('customers_linked_branch_unique')
       .references(() => branches.id),
@@ -43,7 +41,6 @@ export const customers = pgTable(
   (t) => [
     trgmIndex('customers_search_trgm', partySearchExpr(t)),
     index('customers_sales_owner_idx').on(t.salesOwnerId),
-    index('customers_price_book_idx').on(t.defaultPriceBookId),
   ],
 );
 

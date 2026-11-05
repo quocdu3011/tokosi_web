@@ -1,5 +1,6 @@
 import {
   DeleteObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -18,6 +19,13 @@ export abstract class FileStorage {
   abstract delete(key: string): Promise<void>;
   /** URL công khai của file (cho thẻ <img>). */
   abstract publicUrl(key: string): string;
+  /** Liệt kê mọi file có khóa bắt đầu bằng `prefix` (dùng để dọn file mồ côi). */
+  abstract list(prefix: string): Promise<StoredFile[]>;
+}
+
+export interface StoredFile {
+  key: string;
+  lastModified: Date;
 }
 
 export class S3FileStorage extends FileStorage {
@@ -71,6 +79,26 @@ export class S3FileStorage extends FileStorage {
   publicUrl(key: string): string {
     return `${this.config.publicBaseUrl}/${key}`;
   }
+
+  async list(prefix: string): Promise<StoredFile[]> {
+    const out: StoredFile[] = [];
+    let token: string | undefined;
+    do {
+      const page = await this.client.send(
+        new ListObjectsV2Command({
+          Bucket: this.config.bucket,
+          Prefix: prefix,
+          ContinuationToken: token,
+        }),
+      );
+      for (const o of page.Contents ?? []) {
+        if (o.Key)
+          out.push({ key: o.Key, lastModified: o.LastModified ?? new Date() });
+      }
+      token = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (token);
+    return out;
+  }
 }
 
 /** Dùng khi chưa cấu hình kho file (dev/test): mọi thao tác ghi báo 503 rõ ràng. */
@@ -83,6 +111,9 @@ export class UnconfiguredFileStorage extends FileStorage {
   }
   publicUrl(): string {
     throw this.error();
+  }
+  list(): Promise<StoredFile[]> {
+    return Promise.reject(this.error());
   }
   private error(): AppError {
     return new AppError(

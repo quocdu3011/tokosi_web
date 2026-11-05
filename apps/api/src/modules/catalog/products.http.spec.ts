@@ -6,8 +6,6 @@ import {
   customers,
   orderItems,
   orders,
-  priceBookItems,
-  priceBooks,
   products,
   stocks,
 } from '../../db/schema/index.js';
@@ -18,7 +16,6 @@ import { CatalogModule } from './catalog.module.js';
 describe('Hàng hóa qua HTTP', () => {
   let t: Awaited<ReturnType<typeof createHttpTestApp>>;
   let inv: InventoryService;
-  let bookId: string;
   let catBep: string;
   let catDao: string;
   const ids: Record<string, string> = {};
@@ -31,12 +28,6 @@ describe('Hàng hóa qua HTTP', () => {
     await t.makeUser('kho1', 'warehouse', [t.sg, t.hn]);
     await t.makeUser('ketoan1', 'accountant', [t.sg, t.hn]);
     await t.makeUser('mkt1', 'marketing', [t.sg]);
-
-    const [chung] = await t.db
-      .select()
-      .from(priceBooks)
-      .where(eq(priceBooks.isDefault, true));
-    bookId = chung!.id;
 
     const [bep] = await t.db
       .insert(categories)
@@ -85,21 +76,6 @@ describe('Hàng hóa qua HTTP', () => {
         refType: 'adjustment',
       },
     ]);
-    // Giá Bảng giá chung: mỗi chi nhánh một giá
-    await t.db.insert(priceBookItems).values([
-      {
-        priceBookId: bookId,
-        branchId: t.sg,
-        productId: ids.QKBSP!,
-        price: '33500',
-      },
-      {
-        priceBookId: bookId,
-        branchId: t.hn,
-        productId: ids.QKBSP!,
-        price: '34500',
-      },
-    ]);
     // Một đơn nháp giữ 40 cái QKBSP tại Sài Gòn
     const [cust] = await t.db
       .insert(customers)
@@ -111,7 +87,6 @@ describe('Hàng hóa qua HTTP', () => {
         code: 'DH-T1',
         branchId: t.sg,
         customerId: cust!.id,
-        priceBookId: bookId,
         orderedAt: new Date(),
       })
       .returning();
@@ -145,7 +120,6 @@ describe('Hàng hóa qua HTTP', () => {
     expect(a).toMatchObject({
       code: 'QKBSP',
       branchId: t.sg,
-      basePrice: '33500',
       onHand: '515.000',
       reserved: '40.000',
       available: '475.000',
@@ -157,7 +131,6 @@ describe('Hàng hóa qua HTTP', () => {
     const b = (await hn.get(`/products/${ids.QKBSP}`).expect(200)).body;
     expect(b).toMatchObject({
       branchId: t.hn,
-      basePrice: '34500',
       onHand: '40.000',
       reserved: '0.000',
       available: '40.000',
@@ -170,7 +143,6 @@ describe('Hàng hóa qua HTTP', () => {
     const res = await sale.get(`/products/${ids.QKBSP}`).expect(200);
     expect(res.body).not.toHaveProperty('costPrice');
     expect(res.body).not.toHaveProperty('lastPurchasePrice');
-    expect(res.body.basePrice).toBe('33500');
     const list = await sale.get('/products').expect(200);
     for (const p of list.body.data) {
       expect(p).not.toHaveProperty('costPrice');
@@ -264,15 +236,14 @@ describe('Hàng hóa qua HTTP', () => {
     const one = (await api.get('/products/lookup?q=dao01').expect(200)).body;
     expect(one[0]).toMatchObject({
       code: 'DAO01',
-      unit: 'Cái',
-      basePrice: null,
+      productType: 'goods',
+      components: '',
       available: '0.000',
       imageUrl: null,
     });
     const q = (await api.get('/products/lookup?q=quat').expect(200)).body[0];
     expect(q).toMatchObject({
       code: 'QKBSP',
-      basePrice: '33500',
       available: '475.000',
     });
   });
@@ -291,11 +262,10 @@ describe('Hàng hóa qua HTTP', () => {
     expect(created.body).toMatchObject({
       code: 'NEW01',
       name: 'Hàng mới',
-      unit: 'Cái',
+      productType: 'goods',
+      components: '',
       isActive: true,
-      isSellable: true,
       onHand: '0.000',
-      basePrice: null,
     });
     ids.NEW01 = created.body.id;
   });
@@ -334,7 +304,7 @@ describe('Hàng hóa qua HTTP', () => {
     ).toHaveLength(0);
   });
 
-  it('sửa tên/nhóm/đơn vị; ngưng bán; nhật ký ghi trước/sau và requestId', async () => {
+  it('sửa tên/nhóm; ngưng bán; nhật ký ghi trước/sau và requestId', async () => {
     const api = await t.as('quanly', t.sg);
     const res = await api
       .patch(`/products/${ids.NEW01}`)
@@ -342,13 +312,11 @@ describe('Hàng hóa qua HTTP', () => {
       .send({
         name: 'Hàng mới đổi tên',
         categoryId: catBep,
-        unit: 'Hộp',
         isActive: false,
       })
       .expect(200);
     expect(res.body).toMatchObject({
       name: 'Hàng mới đổi tên',
-      unit: 'Hộp',
       isActive: false,
       categoryPath: 'NHÀ BẾP',
     });
@@ -436,9 +404,7 @@ describe('Hàng hóa qua HTTP', () => {
       )
         .get(`/products/${ids.QKBSP}/branches`)
         .expect(200)
-    ).body as Array<
-      Record<string, unknown> & { branchCode: string; prices: unknown[] }
-    >;
+    ).body as Array<Record<string, unknown> & { branchCode: string }>;
     expect(all.map((b) => b.branchCode)).toEqual(['HN', 'SG']);
     const sg = all.find((b) => b.branchCode === 'SG')!;
     expect(sg).toMatchObject({
@@ -447,12 +413,6 @@ describe('Hàng hóa qua HTTP', () => {
       available: '475.000',
       costPrice: '21800.5000',
     });
-    expect(sg.prices).toHaveLength(7);
-    expect(
-      (
-        sg.prices as Array<{ priceBookCode: string; price: string | null }>
-      ).find((p) => p.priceBookCode === 'CHUNG')?.price,
-    ).toBe('33500');
 
     // nhân viên chỉ có Hà Nội chỉ thấy Hà Nội, không có giá vốn
     const hnOnly = (

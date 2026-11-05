@@ -607,3 +607,38 @@ ALTER TABLE "audit_logs" ADD COLUMN "request_id" text;ALTER TABLE "audit_logs" A
 CREATE UNIQUE INDEX "categories_sibling_name_unique" ON "categories" USING btree (coalesce("parent_id", '00000000-0000-0000-0000-000000000000'::uuid),f_search_text("name")) WHERE "categories"."deleted_at" is null;
 -- ===== 0015_hang_hoa_ma_khong_phan_biet_hoa_thuong.sql =====
 CREATE UNIQUE INDEX "products_code_lower_unique" ON "products" USING btree (lower("code"));
+-- ===== 0016_mat_khau_doi_luc.sql =====
+ALTER TABLE "users" ADD COLUMN "password_changed_at" timestamp with time zone;
+-- ===== 0017_dang_nhap_google.sql =====
+ALTER TYPE "public"."user_role" ADD VALUE 'pending';CREATE TABLE "system_settings" (
+	"key" text PRIMARY KEY NOT NULL,
+	"value" jsonb NOT NULL,
+	"updated_by" uuid,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "user_identities" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"user_id" uuid NOT NULL,
+	"provider" text NOT NULL,
+	"provider_subject" text NOT NULL,
+	"email" text NOT NULL,
+	"linked_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE "system_settings" ADD CONSTRAINT "system_settings_updated_by_users_id_fk" FOREIGN KEY ("updated_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;ALTER TABLE "user_identities" ADD CONSTRAINT "user_identities_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;CREATE UNIQUE INDEX "user_identities_provider_subject_unique" ON "user_identities" USING btree ("provider","provider_subject");CREATE INDEX "user_identities_user_idx" ON "user_identities" USING btree ("user_id");
+-- ===== 0018_loai_hang_combo.sql =====
+CREATE TYPE "public"."product_type" AS ENUM('goods', 'combo');CREATE TABLE "product_components" (
+	"combo_id" uuid NOT NULL,
+	"component_id" uuid NOT NULL,
+	"qty" integer NOT NULL,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	CONSTRAINT "product_components_combo_id_component_id_pk" PRIMARY KEY("combo_id","component_id"),
+	CONSTRAINT "product_components_qty_positive" CHECK ("product_components"."qty" > 0),
+	CONSTRAINT "product_components_not_self" CHECK ("product_components"."combo_id" <> "product_components"."component_id")
+);
+ALTER TABLE "product_components" ADD CONSTRAINT "product_components_combo_id_products_id_fk" FOREIGN KEY ("combo_id") REFERENCES "public"."products"("id") ON DELETE cascade ON UPDATE no action;ALTER TABLE "product_components" ADD CONSTRAINT "product_components_component_id_products_id_fk" FOREIGN KEY ("component_id") REFERENCES "public"."products"("id") ON DELETE no action ON UPDATE no action;CREATE INDEX "product_components_component_idx" ON "product_components" USING btree ("component_id");ALTER TABLE "products" DROP COLUMN "unit";ALTER TABLE "products" DROP COLUMN "weight_g";ALTER TABLE "products" DROP COLUMN "is_sellable";ALTER TABLE "invoice_items" DROP COLUMN "unit";ALTER TABLE "products" ADD COLUMN "product_type" "product_type" DEFAULT 'goods' NOT NULL;CREATE INDEX "products_type_idx" ON "products" USING btree ("product_type");
+
+-- ===== 0019_bo_gia_ban.sql =====
+ALTER TABLE "price_book_items" DISABLE ROW LEVEL SECURITY;ALTER TABLE "price_books" DISABLE ROW LEVEL SECURITY;DROP TABLE "price_book_items" CASCADE;DROP TABLE "price_books" CASCADE;ALTER TABLE "customers" DROP CONSTRAINT IF EXISTS "customers_default_price_book_id_price_books_id_fk";
+ALTER TABLE "invoices" DROP CONSTRAINT IF EXISTS "invoices_price_book_id_price_books_id_fk";
+ALTER TABLE "orders" DROP CONSTRAINT IF EXISTS "orders_price_book_id_price_books_id_fk";
+DROP INDEX IF EXISTS "customers_price_book_idx";ALTER TABLE "customers" DROP COLUMN "default_price_book_id";ALTER TABLE "invoices" DROP COLUMN "price_book_id";ALTER TABLE "orders" DROP COLUMN "price_book_id";DELETE FROM "role_permissions" WHERE "permission_code" = 'price.edit';

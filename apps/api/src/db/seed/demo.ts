@@ -1,6 +1,6 @@
 /**
- * Dữ liệu MẪU để phát triển và thử giao diện: nhóm hàng, ~60 hàng, tồn đầu và giá của cả 7 bảng giá × 2 chi nhánh.
- * Hoàn toàn GIẢ và xác định (không ngẫu nhiên): tên, giá, tồn do công thức, KHÔNG lấy từ dữ liệu KiotViet thật.
+ * Dữ liệu MẪU để phát triển và thử giao diện: nhóm hàng, ~60 hàng, 3 combo và tồn đầu của 2 chi nhánh.
+ * Hoàn toàn GIẢ và xác định (không ngẫu nhiên): tên, tồn do công thức, KHÔNG lấy từ dữ liệu KiotViet thật.
  * Chỉ dùng khi dev/test: từ chối chạy khi NODE_ENV=production. Chạy lại an toàn (hàng mẫu mã `DEMO-…` đã có thì bỏ qua).
  */
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
@@ -10,8 +10,7 @@ import type { Database } from '../database.module.js';
 import {
   branches,
   categories,
-  priceBookItems,
-  priceBooks,
+  productComponents,
   products,
 } from '../schema/index.js';
 import { InventoryService } from '../../modules/inventory/inventory.service.js';
@@ -25,60 +24,48 @@ const CATEGORY_TREE: Array<{ name: string; children: string[] }> = [
   { name: 'NHÀ CỬA ĐỜI SỐNG', children: ['Sửa chữa', 'Dọn dẹp'] },
   { name: 'MẸ BÉ', children: ['Bình sữa', 'Đồ chơi'] },
 ];
-const UNITS = ['Cái', 'Bộ', 'Hộp'] as const;
+/** Combo mẫu: mã → hàng thành phần (chỉ số hàng mẫu bắt đầu từ 1, như DEMO-001). */
+const DEMO_COMBOS: Array<{
+  code: string;
+  name: string;
+  parts: Array<[number, number]>;
+}> = [
+  {
+    code: `${'DEMO-'}CB01`,
+    name: 'Combo mẫu 1',
+    parts: [
+      [1, 2],
+      [2, 1],
+    ],
+  },
+  {
+    code: `${'DEMO-'}CB02`,
+    name: 'Combo mẫu 2',
+    parts: [
+      [3, 1],
+      [4, 3],
+      [5, 2],
+    ],
+  },
+  {
+    code: `${'DEMO-'}CB03`,
+    name: 'Combo mẫu 3',
+    parts: [
+      [10, 5],
+      [11, 1],
+    ],
+  },
+];
 const PRODUCT_COUNT = 60;
 
-/** Bảng giá và quy tắc suy ra từ Bảng giá chung (hệ số nhân), theo thứ tự cố định. */
-const TIERS = [
-  { code: 'LON', factor: '0.94', blankEvery: 10 },
-  { code: 'VUA', factor: '0.97', blankEvery: 10 },
-  { code: 'VIP', factor: '0.92', blankEvery: 10 },
-] as const;
-const VAT_TIERS = [
-  { code: 'LON_VAT', from: 'LON', blankEvery: 3 },
-  { code: 'VUA_VAT', from: 'VUA', blankEvery: 3 },
-  { code: 'VIP_VAT', from: 'VIP', blankEvery: 3 },
-] as const;
-/** Giá Sài Gòn cao hơn Hà Nội 3%; giá vốn Sài Gòn cũng cao hơn 3%. */
+/** Giá vốn Sài Gòn cao hơn Hà Nội 3%. */
 const SG_UPLIFT = '1.03';
-const VAT_RATE = '1.10';
 
 export interface DemoSeedReport {
   categories: number;
   products: number;
-  priceCells: number;
+  combos: number;
   openingMovements: number;
-}
-
-/** Làm tròn nửa lên tới bội số 100 đồng. */
-export const roundTo100 = (v: Decimal.Value): Decimal =>
-  new Decimal(v).div(100).toDecimalPlaces(0, Decimal.ROUND_HALF_UP).times(100);
-
-/** Giá của một hàng theo mã bảng giá, chi nhánh; `null` = ô bỏ trống có chủ đích. Thuần túy để test được. */
-export function demoPrices(
-  index: number,
-  hnCost: Decimal.Value,
-  branch: 'HN' | 'SG',
-): Record<string, string | null> {
-  const margin = new Decimal('0.25').plus(
-    new Decimal((index * 11) % 16).div(100),
-  );
-  let chung = roundTo100(
-    new Decimal(hnCost).times(new Decimal(1).plus(margin)),
-  );
-  if (branch === 'SG') chung = roundTo100(chung.times(SG_UPLIFT));
-  const out: Record<string, string | null> = { CHUNG: chung.toFixed(0) };
-  const tierPrice: Record<string, Decimal> = {};
-  TIERS.forEach((t, k) => {
-    const p = roundTo100(chung.times(t.factor));
-    tierPrice[t.code] = p;
-    out[t.code] = (index + k) % t.blankEvery === 0 ? null : p.toFixed(0);
-  });
-  VAT_TIERS.forEach((t, k) => {
-    const p = roundTo100(tierPrice[t.from]!.times(VAT_RATE));
-    out[t.code] = (index + k) % t.blankEvery === 0 ? null : p.toFixed(0);
-  });
-  return out;
 }
 
 /** Giá vốn, tồn đầu mẫu của hàng thứ `index` tại Hà Nội. */
@@ -101,8 +88,8 @@ export async function runDemoSeed(
   const report: DemoSeedReport = {
     categories: 0,
     products: 0,
-    priceCells: 0,
     openingMovements: 0,
+    combos: 0,
   };
   const inventory = new InventoryService(db);
 
@@ -110,13 +97,9 @@ export async function runDemoSeed(
     const branchRows = await tx.select().from(branches);
     const hn = branchRows.find((b) => b.code === 'HN');
     const sg = branchRows.find((b) => b.code === 'SG');
-    const books = await tx.select().from(priceBooks);
-    if (!hn || !sg || books.length === 0) {
-      throw new Error(
-        'Chưa có chi nhánh / bảng giá: chạy `pnpm db:seed` trước',
-      );
+    if (!hn || !sg) {
+      throw new Error('Chưa có chi nhánh: chạy `pnpm db:seed` trước');
     }
-    const bookId = new Map(books.map((b) => [b.code, b.id]));
 
     // nhóm hàng
     const leafIds: string[] = [];
@@ -143,7 +126,10 @@ export async function runDemoSeed(
     const fresh = codes
       .map((code, i) => ({ code, i }))
       .filter(({ code }) => !have.has(code));
-    if (fresh.length === 0) return;
+    if (fresh.length === 0) {
+      await seedCombos(tx, report);
+      return;
+    }
 
     const inserted = await tx
       .insert(products)
@@ -151,10 +137,8 @@ export async function runDemoSeed(
         fresh.map(({ code, i }) => ({
           code,
           name: `Hàng mẫu ${i + 1}`,
-          unit: UNITS[i % UNITS.length]!,
           categoryId: leafIds[i % leafIds.length]!,
           isActive: true,
-          isSellable: true,
         })),
       )
       .returning({ id: products.id, code: products.code });
@@ -197,36 +181,7 @@ export async function runDemoSeed(
       }
     }
 
-    // giá của cả 7 bảng giá × 2 chi nhánh
-    const cells: Array<typeof priceBookItems.$inferInsert> = [];
-    for (const { code, i } of fresh) {
-      for (const [branch, id] of [
-        ['HN', hn.id],
-        ['SG', sg.id],
-      ] as const) {
-        const prices = demoPrices(i, demoStockHn(i).cost, branch);
-        for (const [bookCode, price] of Object.entries(prices)) {
-          if (price === null) continue;
-          cells.push({
-            priceBookId: bookId.get(bookCode)!,
-            branchId: id,
-            productId: idOf.get(code)!,
-            price,
-          });
-        }
-      }
-    }
-    // thứ tự cố định (bảng giá, chi nhánh, sản phẩm) như mọi nơi ghi giá hàng loạt
-    cells.sort(
-      (a, b) =>
-        a.priceBookId.localeCompare(b.priceBookId) ||
-        a.branchId.localeCompare(b.branchId) ||
-        a.productId.localeCompare(b.productId),
-    );
-    for (let k = 0; k < cells.length; k += 500) {
-      await tx.insert(priceBookItems).values(cells.slice(k, k + 500));
-    }
-    report.priceCells = cells.length;
+    await seedCombos(tx, report);
   });
   return report;
 }
@@ -256,4 +211,55 @@ async function ensureCategory(
     .returning({ id: categories.id });
   report.categories++;
   return row!.id;
+}
+
+/**
+ * Combo mẫu gồm vài hàng mẫu. Combo không có tồn riêng (tồn/giá vốn tính từ thành phần). Chỉ tạo combo CHƯA có và chỉ
+ * khi đủ hàng thành phần mẫu.
+ */
+async function seedCombos(
+  tx: Pick<Database, 'select' | 'insert'>,
+  report: DemoSeedReport,
+): Promise<void> {
+  const have = new Set(
+    (
+      await tx
+        .select({ code: products.code })
+        .from(products)
+        .where(
+          inArray(
+            products.code,
+            DEMO_COMBOS.map((c) => c.code),
+          ),
+        )
+    ).map((p) => p.code),
+  );
+  const partCode = (n: number) => `${DEMO_PREFIX}${String(n).padStart(3, '0')}`;
+  const partRows = await tx
+    .select({ id: products.id, code: products.code })
+    .from(products)
+    .where(
+      inArray(
+        products.code,
+        DEMO_COMBOS.flatMap((c) => c.parts.map(([n]) => partCode(n))),
+      ),
+    );
+  const partId = new Map(partRows.map((p) => [p.code, p.id]));
+  for (const combo of DEMO_COMBOS) {
+    if (have.has(combo.code)) continue;
+    if (!combo.parts.every(([n]) => partId.has(partCode(n)))) continue;
+    const [row] = await tx
+      .insert(products)
+      .values({ code: combo.code, name: combo.name, productType: 'combo' })
+      .returning({ id: products.id });
+    await tx.insert(productComponents).values(
+      combo.parts.map(([n, qty], k) => ({
+        comboId: row!.id,
+        componentId: partId.get(partCode(n))!,
+        qty,
+        sortOrder: k,
+      })),
+    );
+    report.combos++;
+  }
 }

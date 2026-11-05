@@ -26,7 +26,9 @@ services:
   # Image này không có shell nên không có container tạo bucket: chạy `pnpm --filter @kiot/api storage:init`.
   # Mã backend chỉ dùng giao thức S3 nên đổi sang máy chủ S3 khác chỉ cần đổi cấu hình (S3_*).
   minio:
-    image: cgr.dev/chainguard/minio:latest
+    # Ghim theo digest (MinIO RELEASE.2026-10-23) để máy dev luôn chạy đúng một bản; muốn nâng cấp: kéo bản `latest` mới,
+    # lấy digest bằng `docker inspect --format '{{index .RepoDigests 0}}' cgr.dev/chainguard/minio:latest` rồi thay vào đây.
+    image: cgr.dev/chainguard/minio@sha256:3c60a2a8c4d33409a9bc7a623a7fcbfb4605adc3d89422d2f53b3f673a6e5597
     container_name: kiot-minio
     restart: unless-stopped
     command: ['server', '/data', '--console-address', ':9001']

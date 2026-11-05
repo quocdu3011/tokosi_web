@@ -2,14 +2,9 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsUUID } from 'class-validator';
 import { QueryBoolean } from '../../common/query.js';
 
-export const IMPORT_TYPES = [
-  'products',
-  'price-books',
-  'customers',
-  'suppliers',
-] as const;
+export const IMPORT_TYPES = ['products', 'customers', 'suppliers'] as const;
 /** Loại đã hỗ trợ; khách hàng và nhà cung cấp sẽ làm cùng phân hệ của chúng. */
-export const SUPPORTED_IMPORT_TYPES = ['products', 'price-books'] as const;
+export const SUPPORTED_IMPORT_TYPES = ['products'] as const;
 export type SupportedImportType = (typeof SUPPORTED_IMPORT_TYPES)[number];
 
 export const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
@@ -37,8 +32,7 @@ export class ImportJobDto {
   @ApiProperty({ nullable: true, type: String }) fileName!: string | null;
   @ApiProperty({ description: 'Số dòng dữ liệu trong file' }) total!: number;
   @ApiProperty({
-    description:
-      'Sẽ tạo / đã tạo (hàng hóa mới; với price-books là số ô giá mới). Bằng 0 khi có lỗi',
+    description: 'Sẽ tạo / đã tạo (hàng hóa mới). Bằng 0 khi có lỗi',
   })
   created!: number;
   @ApiProperty({
@@ -68,7 +62,7 @@ export class ImportQueryDto {
 
   @ApiPropertyOptional({
     description:
-      'Chi nhánh cho giá bán, tồn tối thiểu/tối đa, vị trí kho. Bắt buộc nếu file có các cột đó',
+      'Chi nhánh cho tồn tối thiểu/tối đa, vị trí kho. Bắt buộc nếu file có các cột đó',
   })
   @IsOptional()
   @IsUUID()

@@ -17,6 +17,13 @@ export interface AppConfig {
   loginWindowSeconds: number;
   /** Kho lưu file (ảnh hàng hóa) chuẩn S3, ví dụ MinIO. `null` = chưa cấu hình (chỉ cho phép khi dev/test). */
   storage: StorageConfig | null;
+  /** Đăng nhập Google qua Supabase. `null` = chưa cấu hình (các endpoint Google trả 503). */
+  supabase: SupabaseConfig | null;
+}
+
+export interface SupabaseConfig {
+  /** Địa chỉ project, vd https://abcd.supabase.co (không có dấu `/` cuối). */
+  url: string;
 }
 
 export interface StorageConfig {
@@ -88,7 +95,25 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       900,
     ),
     storage,
+    supabase: loadSupabaseConfig(env),
   };
+}
+
+/** Chỉ nhận https (hoặc http://localhost khi dev); sai định dạng thì ném lỗi ngay khi khởi động. */
+function loadSupabaseConfig(env: NodeJS.ProcessEnv): SupabaseConfig | null {
+  const raw = (env.SUPABASE_URL ?? '').trim();
+  if (raw === '') return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error(`SUPABASE_URL không phải địa chỉ hợp lệ ("${raw}")`);
+  }
+  const local = ['localhost', '127.0.0.1'].includes(parsed.hostname);
+  if (parsed.protocol !== 'https:' && !(local && parsed.protocol === 'http:')) {
+    throw new Error('SUPABASE_URL phải dùng https');
+  }
+  return { url: parsed.origin };
 }
 
 const STORAGE_VARS = [
