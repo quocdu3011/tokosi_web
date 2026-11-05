@@ -1,7 +1,17 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
-import type { CategoryNode, Product, ProductList } from '@/lib/api/types';
+import type {
+  CategoryNode,
+  CreateProductInput,
+  Product,
+  ProductBranch,
+  ProductBranchSettings,
+  ProductList,
+  ProductLookup,
+  StockCard,
+  UpdateProductInput,
+} from '@/lib/api/types';
 import { useBranchStore } from '@/lib/branch';
 
 /** Truy vấn hàng hóa (`/products`, `/categories`, quyền `product.view`) — docs/api/endpoints.md mục 2. */
@@ -47,6 +57,11 @@ export const productKeys = {
   list: (branchId: string | null, p: ProductListParams) =>
     ['products', 'list', branchId, p] as const,
   categories: ['categories'] as const,
+  detail: (branchId: string | null, id: string) => ['products', 'detail', branchId, id] as const,
+  branches: (id: string) => ['products', 'branches', id] as const,
+  stockCard: (branchId: string | null, id: string, from: string, to: string) =>
+    ['products', 'stock-card', branchId, id, from, to] as const,
+  lookup: (branchId: string | null, q: string) => ['products', 'lookup', branchId, q] as const,
 };
 
 export function useProductList(params: ProductListParams) {
@@ -76,4 +91,92 @@ export function flattenCategories(
     { id: n.id, name: n.name, depth },
     ...flattenCategories(n.children as CategoryNode[], depth + 1),
   ]);
+}
+
+/** Chi tiết một hàng (tồn, giá vốn tính cho chi nhánh làm việc). Tắt khi `id` là `null` (đang tạo mới). */
+export function useProduct(id: string | null) {
+  const branchId = useBranchStore((s) => s.branchId);
+  return useQuery({
+    queryKey: productKeys.detail(branchId, id ?? ''),
+    enabled: id !== null,
+    queryFn: ({ signal }) => api.get<Product>(`/products/${id}`, { signal }),
+  });
+}
+
+/** Thay đổi hàng hóa ảnh hưởng danh sách, chi tiết, thẻ kho… → làm mới mọi truy vấn `products`. */
+function useInvalidateProducts() {
+  const qc = useQueryClient();
+  return () => qc.invalidateQueries({ queryKey: productKeys.all });
+}
+
+export function useCreateProduct() {
+  const invalidate = useInvalidateProducts();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateProductInput) => api.post<Product>('/products', input),
+    onSuccess: () => {
+      // Tạo hàng có thể kèm nhóm mới/đổi số đếm của nhóm.
+      void qc.invalidateQueries({ queryKey: productKeys.categories });
+      return invalidate();
+    },
+  });
+}
+
+export function useUpdateProduct() {
+  const invalidate = useInvalidateProducts();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: UpdateProductInput }) =>
+      api.patch<Product>(`/products/${id}`, patch),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: productKeys.categories });
+      return invalidate();
+    },
+  });
+}
+
+/** Tồn và thiết lập từng chi nhánh người dùng được phép (không phụ thuộc chi nhánh làm việc). */
+export function useProductBranches(id: string | null) {
+  return useQuery({
+    queryKey: productKeys.branches(id ?? ''),
+    enabled: id !== null,
+    queryFn: ({ signal }) => api.get<ProductBranch[]>(`/products/${id}/branches`, { signal }),
+  });
+}
+
+export function useSaveProductBranch() {
+  const invalidate = useInvalidateProducts();
+  return useMutation({
+    mutationFn: (args: { id: string; branchId: string; settings: ProductBranchSettings }) =>
+      api.put<ProductBranch>(`/products/${args.id}/branches/${args.branchId}`, args.settings),
+    onSuccess: invalidate,
+  });
+}
+
+/** Thẻ kho tại chi nhánh làm việc; `from`/`to` dạng `YYYY-MM-DD` (giờ Việt Nam). Combo không có thẻ kho. */
+export function useStockCard(
+  id: string | null,
+  range: { from: string; to: string },
+  enabled = true,
+) {
+  const branchId = useBranchStore((s) => s.branchId);
+  return useQuery({
+    queryKey: productKeys.stockCard(branchId, id ?? '', range.from, range.to),
+    enabled: id !== null && enabled,
+    queryFn: ({ signal }) =>
+      api.get<StockCard>(`/products/${id}/stock-card`, { query: range, signal }),
+  });
+}
+
+/** Tìm nhanh để chọn hàng thành phần (tối đa 20 dòng). Chỉ gọi khi đã gõ ít nhất 1 ký tự. */
+export function useProductLookup(q: string) {
+  const branchId = useBranchStore((s) => s.branchId);
+  const term = q.trim();
+  return useQuery({
+    queryKey: productKeys.lookup(branchId, term),
+    enabled: term.length > 0,
+    queryFn: ({ signal }) =>
+      api.get<ProductLookup[]>('/products/lookup', { query: { q: term }, signal }),
+    staleTime: 30_000,
+  });
 }
