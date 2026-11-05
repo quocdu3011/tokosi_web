@@ -6,7 +6,7 @@ import type { ImportJob } from '@/lib/api/types';
  */
 
 /** Loại dữ liệu API đang hỗ trợ (`customers`, `suppliers` còn trả `IMPORT_TYPE_NOT_SUPPORTED`). */
-export type ImportType = 'products' | 'price-books';
+export type ImportType = 'products';
 
 /**
  * - `overwrite` (Import đè): cùng khóa (mã) thì ghi thông tin trong file lên bản ghi cũ; ô trống hoặc
@@ -20,7 +20,7 @@ export interface ImportTypeConfig {
   label: string;
   /** Tên file mẫu khi tải về. */
   templateFilename: string;
-  /** File có cột theo chi nhánh (giá bán, vị trí, tồn tối thiểu/tối đa) → bắt buộc gửi `branchId`. */
+  /** File có cột theo chi nhánh (vị trí, tồn tối thiểu/tối đa) → bắt buộc gửi `branchId`. */
   needsBranch: boolean;
   /** Mô tả khóa so khớp, hiện ở phần giải thích chế độ. */
   keyLabel: string;
@@ -35,13 +35,6 @@ export const IMPORT_TYPES: Record<ImportType, ImportTypeConfig> = {
   products: {
     label: 'hàng hóa',
     templateFilename: 'mau-nhap-hang-hoa.xlsx',
-    needsBranch: true,
-    keyLabel: 'Mã hàng',
-    addModeSupported: false,
-  },
-  'price-books': {
-    label: 'bảng giá',
-    templateFilename: 'mau-nhap-bang-gia.xlsx',
     needsBranch: true,
     keyLabel: 'Mã hàng',
     addModeSupported: false,

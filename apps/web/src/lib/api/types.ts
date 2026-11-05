@@ -50,16 +50,6 @@ export type Product = Schemas['ProductDto'];
 export type ProductList = Schemas['ProductListDto'];
 export type CategoryNode = Schemas['CategoryNodeDto'];
 
-/** Thiết lập giá (docs/api/endpoints.md mục 2.3). */
-export type PriceBook = Schemas['PriceBookDto'];
-export type PriceGrid = Schemas['GridDto'];
-export type PriceGridRow = Schemas['GridRowDto'];
-export type SaveGridResult = Schemas['SaveGridResultDto'];
-export type BulkAdjustInput = Schemas['BulkAdjustDto'];
-export type BulkAdjustResult = Schemas['BulkAdjustResultDto'];
-export type CopyBranchInput = Schemas['CopyBranchDto'];
-export type CopyBranchResult = Schemas['CopyBranchResultDto'];
-
 /** Nhập dữ liệu từ Excel (docs/api/endpoints.md mục 9). */
 export type ImportJob = Schemas['ImportJobDto'];
 export type ImportRowError = Schemas['ImportErrorDto'];

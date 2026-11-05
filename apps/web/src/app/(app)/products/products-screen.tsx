@@ -45,8 +45,6 @@ const SERVER_SORT_IDS: readonly string[] = ['code', 'name', 'onHand'];
 
 /** Các cột còn lại API chưa hỗ trợ `sort` → chỉ sắp xếp được trong trang đang xem. */
 const PAGE_SORT: Record<string, (p: Product) => SortValue> = {
-  unit: (p) => p.unit,
-  basePrice: (p) => decimalSortValue(p.basePrice),
   costPrice: (p) => decimalSortValue(p.costPrice),
   reserved: (p) => decimalSortValue(p.reserved),
   available: (p) => decimalSortValue(p.available),
@@ -62,8 +60,6 @@ const SORT_HINTS: Record<string, string> = Object.fromEntries(
 const DEFAULT_WIDTHS = {
   code: 120,
   name: 320,
-  unit: 80,
-  basePrice: 140,
   costPrice: 140,
   onHand: 110,
   reserved: 110,
@@ -74,8 +70,6 @@ const DEFAULT_WIDTHS = {
 const COLUMN_LABELS: Record<string, string> = {
   code: 'mã hàng',
   name: 'tên hàng',
-  unit: 'đơn vị tính',
-  basePrice: 'giá bán',
   costPrice: 'giá vốn',
   onHand: 'tồn kho',
   reserved: 'khách đặt',
@@ -84,7 +78,7 @@ const COLUMN_LABELS: Record<string, string> = {
   status: 'trạng thái',
 };
 
-/** Danh sách hàng hóa theo chi nhánh làm việc (giá bán, tồn kho riêng từng chi nhánh). */
+/** Danh sách hàng hóa theo chi nhánh làm việc (tồn kho, giá vốn riêng từng chi nhánh). */
 export function ProductsScreen() {
   const me = useAuthStore((s) => s.user);
   const canSeeCost = can(me, 'product.cost.view');
@@ -136,18 +130,6 @@ export function ProductsScreen() {
             )}
           </div>
         ),
-      },
-      { id: 'unit', header: 'ĐVT', cell: ({ row }) => row.original.unit },
-      {
-        id: 'basePrice',
-        header: () => <span className="num">Giá bán</span>,
-        // `null` = chưa có giá ở Bảng giá chung của chi nhánh này.
-        cell: ({ row }) =>
-          row.original.basePrice === null ? (
-            <span className="num muted">Chưa có giá</span>
-          ) : (
-            <span className="num">{formatMoney(row.original.basePrice)}</span>
-          ),
       },
     ];
     // Giá vốn chỉ có khi đủ quyền `product.cost.view` (field vắng mặt hoàn toàn nếu thiếu quyền).
@@ -204,7 +186,6 @@ export function ProductsScreen() {
             ) : (
               <Badge variant="destructive">Ngừng kinh doanh</Badge>
             )}
-            {!row.original.isSellable && <Badge variant="secondary">Không bán</Badge>}
           </div>
         ),
       },
@@ -223,8 +204,6 @@ export function ProductsScreen() {
       { header: 'Mã hàng', value: (p) => p.code },
       { header: 'Tên hàng', value: (p) => p.name },
       { header: 'Nhóm hàng', value: (p) => p.categoryPath ?? '' },
-      { header: 'ĐVT', value: (p) => p.unit },
-      { header: 'Giá bán (₫)', value: (p) => formatDecimal(p.basePrice), numeric: true },
     ];
     if (canSeeCost) {
       cols.push({
@@ -240,10 +219,7 @@ export function ProductsScreen() {
       { header: 'Vị trí', value: (p) => p.location ?? '' },
       {
         header: 'Trạng thái',
-        value: (p) =>
-          [p.isActive ? 'Đang kinh doanh' : 'Ngừng kinh doanh', p.isSellable ? '' : 'Không bán']
-            .filter(Boolean)
-            .join(', '),
+        value: (p) => (p.isActive ? 'Đang kinh doanh' : 'Ngừng kinh doanh'),
       },
     );
     return cols;

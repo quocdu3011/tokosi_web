@@ -3,7 +3,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type { ImportJob } from '@/lib/api/types';
 import { isModeSupported, type ImportMode, type ImportType } from '@/lib/imports';
-import { priceKeys } from '@/lib/queries/price-books';
 import { productKeys } from '@/lib/queries/products';
 
 /** Nhập Excel (`/imports/:type`, quyền `import.run`) — docs/api/endpoints.md mục 9. */
@@ -14,7 +13,7 @@ export interface RunImportArgs {
   file: File;
   /** `true` = chỉ kiểm tra, không ghi gì (mặc định của API); `false` mới ghi thật. */
   dryRun: boolean;
-  /** Chi nhánh cho giá bán / tồn tối thiểu-tối đa / vị trí. */
+  /** Chi nhánh cho tồn tối thiểu-tối đa / vị trí. */
   branchId: string | null;
 }
 
@@ -37,7 +36,7 @@ export function downloadImportTemplate(type: ImportType) {
 
 /**
  * Nhập thật xong thì làm mới mọi thứ có thể đã đổi: danh sách hàng hóa, nhóm hàng (nhập tự tạo nhóm
- * còn thiếu) và lưới giá. Chạy kiểm tra (`dryRun`) không ghi gì nên không làm mới.
+ * còn thiếu). Chạy kiểm tra (`dryRun`) không ghi gì nên không làm mới.
  */
 export function useRunImport() {
   const qc = useQueryClient();
@@ -47,7 +46,6 @@ export function useRunImport() {
       if (job.dryRun || job.status !== 'completed') return;
       void qc.invalidateQueries({ queryKey: productKeys.all });
       void qc.invalidateQueries({ queryKey: productKeys.categories });
-      void qc.invalidateQueries({ queryKey: priceKeys.all });
     },
   });
 }
