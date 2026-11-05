@@ -15,7 +15,7 @@ function DropdownMenuTrigger(props: React.ComponentProps<typeof DropdownMenuPrim
 
 function DropdownMenuContent({
   className,
-  sideOffset = 4,
+  sideOffset = 6,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
   return (
@@ -23,10 +23,7 @@ function DropdownMenuContent({
       <DropdownMenuPrimitive.Content
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
-        className={cn(
-          'bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 z-50 min-w-[8rem] overflow-x-hidden overflow-y-auto rounded-md border p-1 shadow-md',
-          className,
-        )}
+        className={cn('popover menu-content', className)}
         {...props}
       />
     </DropdownMenuPrimitive.Portal>
@@ -44,10 +41,7 @@ function DropdownMenuItem({
     <DropdownMenuPrimitive.Item
       data-slot="dropdown-menu-item"
       data-variant={variant}
-      className={cn(
-        "focus:bg-accent focus:text-accent-foreground data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 [&_svg:not([class*='text-'])]:text-muted-foreground relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        className,
-      )}
+      className={cn('menu-item', variant === 'destructive' && 'menu-item-danger', className)}
       {...props}
     />
   );
@@ -57,24 +51,14 @@ function DropdownMenuLabel({
   className,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Label>) {
-  return (
-    <DropdownMenuPrimitive.Label
-      className={cn('px-2 py-1.5 text-sm font-medium', className)}
-      {...props}
-    />
-  );
+  return <DropdownMenuPrimitive.Label className={cn('menu-label', className)} {...props} />;
 }
 
 function DropdownMenuSeparator({
   className,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Separator>) {
-  return (
-    <DropdownMenuPrimitive.Separator
-      className={cn('bg-border -mx-1 my-1 h-px', className)}
-      {...props}
-    />
-  );
+  return <DropdownMenuPrimitive.Separator className={cn('menu-separator', className)} {...props} />;
 }
 
 export {

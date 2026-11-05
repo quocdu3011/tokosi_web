@@ -6,14 +6,12 @@ import { Construction } from 'lucide-react';
  */
 export function ComingSoon({ title }: { title: string }) {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="page">
       <PageHeader title={title} />
-      <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-24 text-center">
-        <Construction className="text-muted-foreground size-10" />
-        <h2 className="text-lg font-semibold">Chức năng đang được xây dựng</h2>
-        <p className="text-muted-foreground max-w-md text-sm">
-          Màn hình này sẽ được bổ sung khi hệ thống sẵn sàng.
-        </p>
+      <div className="empty-state">
+        <Construction aria-hidden="true" />
+        <h2>Chức năng đang được xây dựng</h2>
+        <p>Màn hình này sẽ được bổ sung khi hệ thống sẵn sàng.</p>
       </div>
     </div>
   );
@@ -29,12 +27,12 @@ export function PageHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-3">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        {description ? <p className="text-muted-foreground text-sm">{description}</p> : null}
+    <div className="page-header">
+      <div>
+        <h1 className="page-title">{title}</h1>
+        {description ? <p className="page-sub">{description}</p> : null}
       </div>
-      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="page-actions">{actions}</div> : null}
     </div>
   );
 }

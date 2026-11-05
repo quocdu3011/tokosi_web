@@ -18,15 +18,15 @@ export function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn('grid gap-2', className)}>
+    <div className={cn('field', className)}>
       <Label htmlFor={id}>{label}</Label>
       {children}
       {error ? (
-        <p id={`${id}-error`} className="text-destructive text-sm" role="alert">
+        <p id={`${id}-error`} className="field-error" role="alert">
           {error}
         </p>
       ) : hint ? (
-        <p className="text-muted-foreground text-xs">{hint}</p>
+        <p className="field-hint">{hint}</p>
       ) : null}
     </div>
   );

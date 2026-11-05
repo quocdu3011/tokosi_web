@@ -1,0 +1,102 @@
+/* BỀ MẶT NỔI DÙNG CHUNG – Select, Dropdown (MASTER 5.7 tinh thần; KHÔNG backdrop-filter, MASTER 7.1) */
+
+.popover {
+  z-index: 300;
+  min-width: 8rem;
+  padding: 0;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-modal);
+  transform-origin: var(--radix-popper-transform-origin);
+}
+.popover[data-state='open'] {
+  animation: popoverIn 160ms var(--ease-out);
+}
+.popover[data-state='closed'] {
+  animation: popoverOut 120ms ease-in forwards;
+}
+
+.menu-content {
+  padding: var(--space-sm);
+  min-width: 12rem;
+  max-height: var(--radix-dropdown-menu-content-available-height);
+  overflow: hidden auto;
+}
+
+.menu-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 10px;
+  border-radius: var(--radius-xs);
+  font-size: 13.5px;
+  color: var(--text);
+  outline: none;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 100ms ease;
+}
+.menu-item svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--muted);
+  pointer-events: none;
+}
+.menu-item[data-highlighted] {
+  background: var(--panel-2);
+}
+.menu-item[data-disabled] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.menu-item-danger {
+  color: var(--red);
+}
+.menu-item-danger svg {
+  color: var(--red);
+}
+.menu-item-danger[data-highlighted] {
+  background: rgba(var(--glow-red-rgb), 0.14);
+}
+.menu-label {
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.menu-separator {
+  height: 1px;
+  margin: var(--space-sm) calc(var(--space-sm) * -1);
+  background: var(--border);
+}
+
+@media (pointer: coarse) {
+  .menu-item {
+    min-height: 44px;
+  }
+}
+
+@keyframes popoverIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes popoverOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}

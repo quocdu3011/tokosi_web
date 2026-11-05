@@ -18,11 +18,11 @@ export function Pagination({
   const from = total === 0 ? 0 : (page - 1) * limit + 1;
   const to = Math.min(page * limit, total);
   return (
-    <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-2 text-sm">
+    <div className="pagination-controls">
       <span className="tabular">
         {from}–{to} / {total.toLocaleString('vi-VN')} dòng
       </span>
-      <div className="flex items-center gap-2">
+      <div className="pagination-buttons">
         <Button
           variant="outline"
           size="sm"

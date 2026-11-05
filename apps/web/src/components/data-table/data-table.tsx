@@ -35,7 +35,7 @@ export function DataTable<TData extends RowData>({
   const table = useTable({ features, columns, data, getRowId });
 
   return (
-    <div className="rounded-lg border">
+    <div className="data-table-frame">
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((group) => (
@@ -54,17 +54,14 @@ export function DataTable<TData extends RowData>({
               <TableRow key={`sk-${i}`}>
                 {columns.map((_, j) => (
                   <TableCell key={j}>
-                    <Skeleton className="h-4 w-full max-w-32" />
+                    <Skeleton className="skeleton-line" />
                   </TableCell>
                 ))}
               </TableRow>
             ))
           ) : table.getRowModel().rows.length === 0 ? (
             <TableRow>
-              <TableCell
-                colSpan={columns.length}
-                className="text-muted-foreground h-24 text-center"
-              >
+              <TableCell colSpan={columns.length} className="data-table-empty">
                 {emptyText}
               </TableCell>
             </TableRow>

@@ -1,7 +1,7 @@
 'use client';
 
 import { ROLE_LABELS, ROLES } from '@kiot/shared';
-import { Check, Loader2, Lock, MoreHorizontal, RotateCcw } from 'lucide-react';
+import { Check, Lock, MoreHorizontal, RotateCcw } from 'lucide-react';
 import { Fragment, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -143,7 +143,7 @@ export function RolesScreen() {
   const userCount = (role: RoleCode) => roles.data?.find((r) => r.role === role)?.userCount;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="page">
       <PageHeader
         title="Phân quyền"
         description="Quyền của từng vai trò. Quản lý luôn có đủ quyền. Thay đổi có hiệu lực ngay cho mọi người dùng thuộc vai trò."
@@ -157,7 +157,7 @@ export function RolesScreen() {
               Bỏ thay đổi
             </Button>
             <Button disabled={dirtyRoles.length === 0 || saving} onClick={saveAll}>
-              {saving && <Loader2 className="animate-spin" />}
+              {saving && <span className="spinner" aria-hidden="true" />}
               Lưu thay đổi{dirtyRoles.length ? ` (${dirtyRoles.length})` : ''}
             </Button>
           </>
@@ -165,109 +165,90 @@ export function RolesScreen() {
       />
 
       {loadError ? (
-        <p className="text-destructive text-sm" role="alert">
+        <p className="alert alert-error" role="alert">
           {errorMessage(loadError)}
         </p>
       ) : isLoading || !catalog.data ? (
-        <Skeleton className="h-96 w-full" />
+        <Skeleton className="skeleton-block" />
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full min-w-[900px] text-sm">
-            <thead className="bg-muted/50">
-              <tr>
-                <th className="bg-muted sticky left-0 z-10 w-72 px-3 py-2 text-left font-medium">
-                  Quyền
-                </th>
-                {ROLES.map((role) => (
-                  <th key={role} className="px-2 py-2 text-center font-medium">
-                    <div className="flex items-center justify-center gap-1">
-                      <span
-                        className={cn(
-                          dirtyRoles.includes(role as RoleCode) &&
-                            'text-amber-600 dark:text-amber-400',
+        <div className="data-table-frame">
+          <div className="data-table-scroll">
+            <table className="data-table matrix">
+              <thead>
+                <tr>
+                  <th>Quyền</th>
+                  {ROLES.map((role) => (
+                    <th key={role}>
+                      <div className="matrix-role-head">
+                        <span className={cn(dirtyRoles.includes(role as RoleCode) && 'is-dirty')}>
+                          {ROLE_LABELS[role]}
+                          {dirtyRoles.includes(role as RoleCode) ? ' *' : ''}
+                        </span>
+                        {role !== 'manager' && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`Tùy chọn ${ROLE_LABELS[role]}`}
+                              >
+                                <MoreHorizontal />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setResetRole(role as RoleCode)}>
+                                <RotateCcw /> Khôi phục mặc định
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         )}
-                      >
-                        {ROLE_LABELS[role]}
-                        {dirtyRoles.includes(role as RoleCode) ? ' *' : ''}
-                      </span>
-                      {role !== 'manager' && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="size-6"
-                              aria-label={`Tùy chọn ${ROLE_LABELS[role]}`}
-                            >
-                              <MoreHorizontal />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setResetRole(role as RoleCode)}>
-                              <RotateCcw /> Khôi phục mặc định
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
-                    {userCount(role as RoleCode) !== undefined && (
-                      <div className="text-muted-foreground text-xs font-normal">
-                        {userCount(role as RoleCode)} người
                       </div>
-                    )}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {catalog.data.modules.map((mod) => (
-                <Fragment key={mod.key}>
-                  <tr className="border-t">
-                    <td
-                      colSpan={ROLES.length + 1}
-                      className="bg-muted/30 px-3 py-1.5 text-xs font-semibold uppercase"
-                    >
-                      {mod.label}
-                    </td>
-                  </tr>
-                  {mod.permissions.map((perm) => (
-                    <tr key={perm.code} className="hover:bg-muted/30 border-t">
-                      <td className="bg-background sticky left-0 z-10 px-3 py-2">
-                        <div className="font-medium">{perm.label}</div>
-                        <div className="text-muted-foreground text-xs">
-                          <code>{perm.code}</code>
-                          {perm.description ? ` · ${perm.description}` : ''}
-                        </div>
-                      </td>
-                      {ROLES.map((role) => (
-                        <td key={role} className="px-2 py-2 text-center align-middle">
-                          {role === 'manager' ? (
-                            <Check
-                              className="text-muted-foreground mx-auto size-4"
-                              aria-label="Có quyền"
-                            />
-                          ) : perm.lockedToAdmin ? (
-                            <Lock
-                              className="text-muted-foreground mx-auto size-4"
-                              aria-label="Chỉ Quản lý"
-                            />
-                          ) : (
-                            <GrantCell
-                              perm={perm}
-                              scope={current(role as RoleCode)?.get(perm.code) ?? null}
-                              roleLabel={ROLE_LABELS[role]}
-                              onToggle={(on) => toggle(role as RoleCode, perm.code, on)}
-                              onScope={(s) => changeScope(role as RoleCode, perm.code, s)}
-                            />
-                          )}
-                        </td>
-                      ))}
-                    </tr>
+                      {userCount(role as RoleCode) !== undefined && (
+                        <div className="matrix-count">{userCount(role as RoleCode)} người</div>
+                      )}
+                    </th>
                   ))}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
+                </tr>
+              </thead>
+              <tbody>
+                {catalog.data.modules.map((mod) => (
+                  <Fragment key={mod.key}>
+                    <tr className="matrix-module">
+                      <td colSpan={ROLES.length + 1}>{mod.label}</td>
+                    </tr>
+                    {mod.permissions.map((perm) => (
+                      <tr key={perm.code}>
+                        <td className="matrix-perm">
+                          <div className="cell-title">{perm.label}</div>
+                          <div className="cell-sub">
+                            <code>{perm.code}</code>
+                            {perm.description ? ` · ${perm.description}` : ''}
+                          </div>
+                        </td>
+                        {ROLES.map((role) => (
+                          <td key={role}>
+                            {role === 'manager' ? (
+                              <Check className="matrix-icon" aria-label="Có quyền" />
+                            ) : perm.lockedToAdmin ? (
+                              <Lock className="matrix-icon" aria-label="Chỉ Quản lý" />
+                            ) : (
+                              <GrantCell
+                                perm={perm}
+                                scope={current(role as RoleCode)?.get(perm.code) ?? null}
+                                roleLabel={ROLE_LABELS[role]}
+                                onToggle={(on) => toggle(role as RoleCode, perm.code, on)}
+                                onScope={(s) => changeScope(role as RoleCode, perm.code, s)}
+                              />
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -324,7 +305,7 @@ function GrantCell({
 }) {
   const on = scope !== null;
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="matrix-grant">
       <Checkbox
         checked={on}
         onCheckedChange={(c) => onToggle(c === true)}
@@ -334,7 +315,7 @@ function GrantCell({
         <Select value={scope} onValueChange={(v) => onScope(v as Scope)}>
           <SelectTrigger
             size="sm"
-            className="h-6 px-1.5 text-xs"
+            className="matrix-scope"
             aria-label={`Phạm vi ${perm.label} — ${roleLabel}`}
           >
             <SelectValue />

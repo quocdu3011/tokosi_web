@@ -1,0 +1,266 @@
+/* ==========================================================================
+   TOKENS – Design system TKS Dashboard (MASTER.md mục 4).
+   Dark Obsidian là mặc định (:root); Light đặt qua data-theme="light".
+   Chọn [data-theme="light"] (không chỉ :root) để "buộc sáng" cục bộ cho
+   khung xác thực / 404 (MASTER 5.10) mà không chép lại bảng màu.
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* Nền & bề mặt */
+  --bg: #090d16;
+  --panel: #111827;
+  --panel-2: #1e293b;
+  --panel-3: #334155;
+  --border: #26334d;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-focus: #3b82f6;
+
+  /* Thương hiệu */
+  --primary: #3b82f6;
+  --primary-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  --primary-hover: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  --primary-text: #ffffff;
+  --primary-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.35);
+  --primary-shadow-hover: 0 6px 20px 0 rgba(37, 99, 235, 0.45);
+
+  /* Màu nhấn */
+  --amber: #f59e0b;
+  --green: #10b981;
+  --red: #ef4444;
+  --blue: #3b82f6;
+  --purple: #8b5cf6;
+  --amber-contrast-text: #1b1206;
+  --green-contrast-text: #07150d;
+
+  /* Văn bản */
+  --text: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --muted: #94a3b8;
+  /* Văn bản trực tiếp trên ảnh nền (ngoài panel) */
+  --canvas-text: #ffffff;
+  --canvas-border: rgba(255, 255, 255, 0.3);
+
+  /* Trạng thái bề mặt */
+  --surface-hover: rgba(255, 255, 255, 0.04);
+  --row-divider: rgba(255, 255, 255, 0.05);
+  --overlay-bg: rgba(0, 0, 0, 0.6);
+  --glass-bg: rgba(17, 24, 39, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.08);
+
+  /* Ánh sáng nền */
+  --ambient-1: rgba(59, 130, 246, 0.08);
+  --ambient-2: rgba(16, 185, 129, 0.05);
+  --bg-image: url('/bg-dark.jpg');
+
+  /* Kênh RGB để tạo bóng/glow nhiều độ mờ (MASTER 4.4b) */
+  --shadow-rgb: 0, 0, 0;
+  --primary-rgb: 59, 130, 246;
+  --glow-green-rgb: 16, 185, 129;
+  --glow-red-rgb: 239, 68, 68;
+  --glow-amber-rgb: 245, 158, 11;
+  --accent-blue-12: rgba(59, 130, 246, 0.12);
+  --accent-blue-18: rgba(59, 130, 246, 0.18);
+
+  /* Đổ bóng */
+  --card-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.5), 0 0 1px 1px rgba(255, 255, 255, 0.06);
+  --shadow-modal: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 1px 1px rgba(255, 255, 255, 0.1);
+  --shadow-toast: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-focus-blue: 0 0 0 3px rgba(59, 130, 246, 0.35), 0 0 20px rgba(59, 130, 246, 0.25);
+  --shadow-focus-input: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  --shadow-brand: 0 4px 14px rgba(37, 99, 235, 0.35);
+
+  /* Hộp cảnh báo */
+  --alert-warning-bg: rgba(245, 158, 11, 0.12);
+  --alert-warning-border: rgba(245, 158, 11, 0.3);
+  --alert-error-bg: rgba(239, 68, 68, 0.12);
+  --alert-error-border: rgba(239, 68, 68, 0.3);
+  --alert-success-bg: rgba(16, 185, 129, 0.12);
+  --alert-success-border: rgba(16, 185, 129, 0.3);
+
+  /* Toast */
+  --toast-success-bg: #064e3b;
+  --toast-success-fg: #a7f3d0;
+  --toast-success-border: #059669;
+  --toast-error-bg: #7f1d1d;
+  --toast-error-fg: #fecaca;
+  --toast-error-border: #dc2626;
+
+  /* Nhãn trạng thái */
+  --status-active-bg: rgba(16, 185, 129, 0.12);
+  --status-locked-bg: rgba(239, 68, 68, 0.12);
+  --status-pending-bg: rgba(245, 158, 11, 0.12);
+  --status-inactive-bg: rgba(148, 163, 184, 0.12);
+
+  /* Huy hiệu vai trò */
+  --role-quan-ly-bg: rgba(139, 92, 246, 0.16);
+  --role-quan-ly-fg: #a78bfa;
+  --role-quan-ly-border: rgba(139, 92, 246, 0.3);
+  --role-ke-toan-bg: rgba(16, 185, 129, 0.14);
+  --role-ke-toan-fg: #34d399;
+  --role-ke-toan-border: rgba(16, 185, 129, 0.3);
+  --role-truong-kho-bg: rgba(245, 158, 11, 0.14);
+  --role-truong-kho-fg: #fbbf24;
+  --role-truong-kho-border: rgba(245, 158, 11, 0.3);
+  --role-tro-ly-bg: rgba(59, 130, 246, 0.14);
+  --role-tro-ly-fg: #60a5fa;
+  --role-tro-ly-border: rgba(59, 130, 246, 0.3);
+  --role-lai-xe-bg: rgba(249, 115, 22, 0.14);
+  --role-lai-xe-fg: #fb923c;
+  --role-lai-xe-border: rgba(249, 115, 22, 0.3);
+  --role-nhan-vien-kho-bg: rgba(217, 119, 6, 0.14);
+  --role-nhan-vien-kho-fg: #f59e0b;
+  --role-nhan-vien-kho-border: rgba(217, 119, 6, 0.3);
+  --role-nhan-vien-sale-bg: rgba(6, 182, 212, 0.14);
+  --role-nhan-vien-sale-fg: #22d3ee;
+  --role-nhan-vien-sale-border: rgba(6, 182, 212, 0.3);
+  --role-nhan-vien-marketing-bg: rgba(132, 204, 22, 0.14);
+  --role-nhan-vien-marketing-fg: #a3e635;
+  --role-nhan-vien-marketing-border: rgba(132, 204, 22, 0.3);
+  --role-nhan-vien-mua-hang-bg: rgba(236, 72, 153, 0.14);
+  --role-nhan-vien-mua-hang-fg: #f472b6;
+  --role-nhan-vien-mua-hang-border: rgba(236, 72, 153, 0.3);
+  --role-khach-bg: rgba(148, 163, 184, 0.14);
+  --role-khach-fg: #cbd5e1;
+  --role-khach-border: rgba(148, 163, 184, 0.3);
+
+  /* Phông chữ (gán thực tế bởi next/font ở app/layout.tsx) */
+  --font-display: var(--font-be-vietnam), 'Be Vietnam Pro', sans-serif;
+  --font-body: var(--font-inter), 'Inter', sans-serif;
+  --font-data: var(--font-roboto), 'Roboto', sans-serif;
+
+  /* Khoảng cách (lưới 4/8pt) */
+  --space-xs: 2px;
+  --space-sm: 4px;
+  --space-md: 8px;
+  --space-lg: 12px;
+  --space-xl: 16px;
+  --space-2xl: 24px;
+  --space-3xl: 32px;
+
+  /* Bo góc */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-2xl: 20px;
+  --radius-pill: 9999px;
+
+  /* Chuyển động */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
+  /* Bố cục */
+  --sidebar-w: 240px;
+  --header-h: 56px;
+}
+
+:root[data-theme='light'],
+[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #f8fafc;
+  --panel: #ffffff;
+  --panel-2: #f1f5f9;
+  --panel-3: #e2e8f0;
+  --border: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --border-focus: #2563eb;
+
+  --primary: #2563eb;
+  --primary-gradient: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  --primary-hover: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+  --primary-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.22);
+  --primary-shadow-hover: 0 6px 20px 0 rgba(37, 99, 235, 0.32);
+
+  --amber: #d97706;
+  --green: #059669;
+  --red: #dc2626;
+  --blue: #2563eb;
+  --purple: #7c3aed;
+
+  --text: #0f172a;
+  --text-secondary: #334155;
+  --muted: #64748b;
+  --canvas-text: #000000;
+  --canvas-border: rgba(0, 0, 0, 0.25);
+
+  --surface-hover: rgba(15, 23, 42, 0.04);
+  --row-divider: rgba(15, 23, 42, 0.06);
+  --overlay-bg: rgba(0, 0, 0, 0.45);
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(15, 23, 42, 0.08);
+
+  --ambient-1: rgba(37, 99, 235, 0.04);
+  --ambient-2: rgba(5, 150, 105, 0.03);
+  --bg-image: url('/bg-light.jpg');
+
+  --primary-rgb: 37, 99, 235;
+  --glow-green-rgb: 5, 150, 105;
+  --glow-red-rgb: 220, 38, 38;
+  --glow-amber-rgb: 217, 119, 6;
+  --accent-blue-12: rgba(37, 99, 235, 0.1);
+  --accent-blue-18: rgba(37, 99, 235, 0.15);
+
+  --card-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 4px 10px -4px rgba(0, 0, 0, 0.02),
+    0 0 1px 1px rgba(0, 0, 0, 0.04);
+  --shadow-modal: 0 20px 50px rgba(0, 0, 0, 0.2);
+  --shadow-toast: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-focus-blue:
+    0 8px 20px -6px rgba(37, 99, 235, 0.35), 0 0 0 3px rgba(37, 99, 235, 0.18),
+    0 0 15px rgba(37, 99, 235, 0.15);
+  --shadow-focus-input: 0 0 0 3px rgba(37, 99, 235, 0.2);
+  --shadow-brand: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+  --alert-warning-bg: rgba(217, 119, 6, 0.08);
+  --alert-warning-border: rgba(217, 119, 6, 0.25);
+  --alert-error-bg: rgba(220, 38, 38, 0.08);
+  --alert-error-border: rgba(220, 38, 38, 0.25);
+  --alert-success-bg: rgba(5, 150, 105, 0.08);
+  --alert-success-border: rgba(5, 150, 105, 0.25);
+
+  --toast-success-bg: #d1fae5;
+  --toast-success-fg: #065f46;
+  --toast-success-border: #059669;
+  --toast-error-bg: #fee2e2;
+  --toast-error-fg: #991b1b;
+  --toast-error-border: #dc2626;
+
+  --status-active-bg: rgba(5, 150, 105, 0.1);
+  --status-locked-bg: rgba(220, 38, 38, 0.1);
+  --status-pending-bg: rgba(217, 119, 6, 0.1);
+  --status-inactive-bg: rgba(100, 116, 139, 0.1);
+
+  --role-quan-ly-bg: rgba(109, 40, 217, 0.1);
+  --role-quan-ly-fg: #7c3aed;
+  --role-quan-ly-border: rgba(109, 40, 217, 0.25);
+  --role-ke-toan-bg: rgba(5, 150, 105, 0.1);
+  --role-ke-toan-fg: #059669;
+  --role-ke-toan-border: rgba(5, 150, 105, 0.25);
+  --role-truong-kho-bg: rgba(217, 119, 6, 0.1);
+  --role-truong-kho-fg: #d97706;
+  --role-truong-kho-border: rgba(217, 119, 6, 0.25);
+  --role-tro-ly-bg: rgba(37, 99, 235, 0.1);
+  --role-tro-ly-fg: #2563eb;
+  --role-tro-ly-border: rgba(37, 99, 235, 0.25);
+  --role-lai-xe-bg: rgba(234, 88, 12, 0.1);
+  --role-lai-xe-fg: #ea580c;
+  --role-lai-xe-border: rgba(234, 88, 12, 0.25);
+  --role-nhan-vien-kho-bg: rgba(180, 83, 9, 0.1);
+  --role-nhan-vien-kho-fg: #b45309;
+  --role-nhan-vien-kho-border: rgba(180, 83, 9, 0.25);
+  --role-nhan-vien-sale-bg: rgba(14, 116, 144, 0.1);
+  --role-nhan-vien-sale-fg: #0e7490;
+  --role-nhan-vien-sale-border: rgba(14, 116, 144, 0.25);
+  --role-nhan-vien-marketing-bg: rgba(77, 124, 15, 0.1);
+  --role-nhan-vien-marketing-fg: #4d7c0f;
+  --role-nhan-vien-marketing-border: rgba(77, 124, 15, 0.25);
+  --role-nhan-vien-mua-hang-bg: rgba(190, 24, 93, 0.1);
+  --role-nhan-vien-mua-hang-fg: #be185d;
+  --role-nhan-vien-mua-hang-border: rgba(190, 24, 93, 0.25);
+  --role-khach-bg: rgba(100, 116, 139, 0.1);
+  --role-khach-fg: #475569;
+  --role-khach-border: rgba(100, 116, 139, 0.25);
+}

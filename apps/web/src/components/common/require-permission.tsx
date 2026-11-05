@@ -20,12 +20,10 @@ export function RequirePermission({
 
 export function Forbidden() {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
-      <ShieldX className="text-muted-foreground size-10" />
-      <h2 className="text-lg font-semibold">Bạn không có quyền truy cập trang này</h2>
-      <p className="text-muted-foreground max-w-md text-sm">
-        Liên hệ Quản lý nếu bạn cần dùng chức năng này.
-      </p>
+    <div className="empty-state">
+      <ShieldX aria-hidden="true" />
+      <h2>Bạn không có quyền truy cập trang này</h2>
+      <p>Liên hệ Quản lý nếu bạn cần dùng chức năng này.</p>
     </div>
   );
 }

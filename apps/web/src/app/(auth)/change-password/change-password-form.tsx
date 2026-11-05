@@ -2,7 +2,6 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
@@ -10,10 +9,10 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
+import { AuthCard } from '@/components/common/auth-card';
 import { Field } from '@/components/common/field';
 import { FullPageLoader } from '@/components/common/full-page-loader';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { changePassword, logout } from '@/lib/auth/session';
 import { useAuthStore } from '@/lib/auth/store';
@@ -87,85 +86,82 @@ export function ChangePasswordForm() {
   const describedBy = (name: keyof FormValues) => (errors[name] ? `${name}-error` : undefined);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-xl">Đổi mật khẩu</CardTitle>
-        <CardDescription>
-          {forced
-            ? 'Bạn cần đặt mật khẩu mới trước khi sử dụng hệ thống.'
-            : 'Đổi mật khẩu sẽ đăng xuất tài khoản trên mọi thiết bị khác.'}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={onSubmit} className="grid gap-4" noValidate>
-          {/* Ô ẩn giúp trình quản lý mật khẩu gắn đúng tài khoản */}
-          <input type="text" autoComplete="username" value={user.username} readOnly hidden />
-          <Field
+    <AuthCard
+      title="Đổi mật khẩu"
+      description={
+        forced
+          ? 'Bạn cần đặt mật khẩu mới trước khi sử dụng hệ thống.'
+          : 'Đổi mật khẩu sẽ đăng xuất tài khoản trên mọi thiết bị khác.'
+      }
+    >
+      <form onSubmit={onSubmit} className="auth-form" noValidate>
+        {/* Ô ẩn giúp trình quản lý mật khẩu gắn đúng tài khoản */}
+        <input type="text" autoComplete="username" value={user.username} readOnly hidden />
+        <Field
+          id="currentPassword"
+          label="Mật khẩu hiện tại"
+          error={errors.currentPassword?.message}
+        >
+          <Input
             id="currentPassword"
-            label="Mật khẩu hiện tại"
-            error={errors.currentPassword?.message}
-          >
-            <Input
-              id="currentPassword"
-              type="password"
-              autoComplete="current-password"
-              autoFocus
-              aria-invalid={!!errors.currentPassword}
-              aria-describedby={describedBy('currentPassword')}
-              {...register('currentPassword')}
-            />
-          </Field>
-          <Field
+            type="password"
+            autoComplete="current-password"
+            autoFocus
+            aria-invalid={!!errors.currentPassword}
+            aria-describedby={describedBy('currentPassword')}
+            {...register('currentPassword')}
+          />
+        </Field>
+        <Field
+          id="newPassword"
+          label="Mật khẩu mới"
+          error={errors.newPassword?.message}
+          hint={`Ít nhất ${PASSWORD_MIN} ký tự, không chứa tên đăng nhập.`}
+        >
+          <Input
             id="newPassword"
-            label="Mật khẩu mới"
-            error={errors.newPassword?.message}
-            hint={`Ít nhất ${PASSWORD_MIN} ký tự, không chứa tên đăng nhập.`}
-          >
-            <Input
-              id="newPassword"
-              type="password"
-              autoComplete="new-password"
-              aria-invalid={!!errors.newPassword}
-              aria-describedby={describedBy('newPassword')}
-              {...register('newPassword')}
-            />
-          </Field>
-          <Field
+            type="password"
+            autoComplete="new-password"
+            aria-invalid={!!errors.newPassword}
+            aria-describedby={describedBy('newPassword')}
+            {...register('newPassword')}
+          />
+        </Field>
+        <Field
+          id="confirmPassword"
+          label="Nhập lại mật khẩu mới"
+          error={errors.confirmPassword?.message}
+        >
+          <Input
             id="confirmPassword"
-            label="Nhập lại mật khẩu mới"
-            error={errors.confirmPassword?.message}
+            type="password"
+            autoComplete="new-password"
+            aria-invalid={!!errors.confirmPassword}
+            aria-describedby={describedBy('confirmPassword')}
+            {...register('confirmPassword')}
+          />
+        </Field>
+        <Button type="submit" id="change-password-submit" disabled={isSubmitting} size="lg">
+          {isSubmitting && <span className="spinner" aria-hidden="true" />}
+          Lưu mật khẩu mới
+        </Button>
+        {forced ? (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={async () => {
+              await logout(queryClient).catch(() => undefined);
+              router.replace('/login');
+            }}
           >
-            <Input
-              id="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              aria-invalid={!!errors.confirmPassword}
-              aria-describedby={describedBy('confirmPassword')}
-              {...register('confirmPassword')}
-            />
-          </Field>
-          <Button type="submit" disabled={isSubmitting} className="w-full">
-            {isSubmitting && <Loader2 className="animate-spin" />}
-            Lưu mật khẩu mới
+            Đăng xuất
           </Button>
-          {forced ? (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={async () => {
-                await logout(queryClient).catch(() => undefined);
-                router.replace('/login');
-              }}
-            >
-              Đăng xuất
-            </Button>
-          ) : (
-            <Button type="button" variant="ghost" asChild>
-              <Link href="/">Quay lại</Link>
-            </Button>
-          )}
-        </form>
-      </CardContent>
-    </Card>
+        ) : (
+          <Button type="button" variant="ghost" asChild>
+            <Link href="/">Quay lại</Link>
+          </Button>
+        )}
+      </form>
+    </AuthCard>
   );
 }

@@ -34,10 +34,8 @@ export function TemporaryPasswordDialog({
             dùng phải đổi mật khẩu khi đăng nhập lần đầu.
           </DialogDescription>
         </DialogHeader>
-        <div className="bg-muted flex items-center justify-between gap-2 rounded-md px-3 py-2">
-          <code className="font-mono text-base break-all" data-testid="temporary-password">
-            {value?.password}
-          </code>
+        <div className="secret-box">
+          <code data-testid="temporary-password">{value?.password}</code>
           <Button
             variant="ghost"
             size="icon"

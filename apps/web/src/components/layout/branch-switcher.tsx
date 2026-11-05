@@ -22,13 +22,13 @@ export function BranchSwitcher() {
   const setBranchId = useBranchStore((s) => s.setBranchId);
 
   if (branches.length === 0) {
-    return <span className="text-destructive text-sm">Chưa được gán chi nhánh</span>;
+    return <span className="branch-label is-error">Chưa được gán chi nhánh</span>;
   }
 
   if (branches.length === 1) {
     return (
-      <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
-        <Building2 className="size-4" />
+      <span className="branch-label">
+        <Building2 />
         {branches[0]!.name}
       </span>
     );
@@ -36,8 +36,13 @@ export function BranchSwitcher() {
 
   return (
     <Select value={branchId ?? undefined} onValueChange={setBranchId}>
-      <SelectTrigger size="sm" aria-label="Chi nhánh làm việc" className="min-w-40">
-        <Building2 className="size-4" />
+      <SelectTrigger
+        id="branch-switcher"
+        size="sm"
+        aria-label="Chi nhánh làm việc"
+        className="branch-select"
+      >
+        <Building2 />
         <SelectValue placeholder="Chọn chi nhánh">
           {findBranch(branches, branchId)?.name}
         </SelectValue>
