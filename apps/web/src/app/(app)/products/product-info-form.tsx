@@ -2,6 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRef, useState } from 'react';
+import { LIQUIDATION_STATUSES, LIQUIDATION_STATUS_LABELS } from '@kiot/shared';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -29,7 +30,14 @@ import { flattenCategories, useCreateProduct, useUpdateProduct } from '@/lib/que
 import { ComponentEditor, type EditorRow } from './component-editor';
 
 const NONE = '__none__';
-const FIELDS = ['code', 'name', 'categoryId', 'productType', 'description'] as const;
+const FIELDS = [
+  'code',
+  'name',
+  'categoryId',
+  'productType',
+  'liquidationStatus',
+  'description',
+] as const;
 
 const schema = z.object({
   code: z
@@ -41,6 +49,7 @@ const schema = z.object({
   name: z.string().trim().min(1, 'Nhập tên hàng').max(255, 'Tên hàng quá dài'),
   categoryId: z.string(),
   productType: z.enum(['goods', 'combo']),
+  liquidationStatus: z.enum(LIQUIDATION_STATUSES),
   description: z.string(),
 });
 type FormValues = z.infer<typeof schema>;
@@ -93,6 +102,7 @@ export function ProductInfoForm({
       name: product?.name ?? '',
       categoryId: product?.categoryId ?? NONE,
       productType: product?.productType ?? 'goods',
+      liquidationStatus: product?.liquidationStatus ?? 'normal',
       description: product?.description ?? '',
     },
   });
@@ -127,6 +137,7 @@ export function ProductInfoForm({
           name: v.name,
           categoryId: categoryId ?? undefined,
           productType: v.productType,
+          liquidationStatus: v.liquidationStatus,
           components: isCombo ? serializeComponents(rows) : undefined,
           description: description ?? undefined,
         });
@@ -152,6 +163,8 @@ export function ProductInfoForm({
         if (v.name !== product.name) patch.name = v.name;
         if (categoryId !== product.categoryId) patch.categoryId = categoryId;
         if (v.productType !== product.productType) patch.productType = v.productType;
+        if (v.liquidationStatus !== product.liquidationStatus)
+          patch.liquidationStatus = v.liquidationStatus;
         if (isCombo) {
           const next = serializeComponents(rows);
           if (next !== product.components || v.productType !== product.productType) {
@@ -248,6 +261,32 @@ export function ProductInfoForm({
                 {(Object.keys(TYPE_LABELS) as (keyof typeof TYPE_LABELS)[]).map((t) => (
                   <SelectItem key={t} value={t}>
                     {TYPE_LABELS[t]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
+      </Field>
+
+      <Field
+        id="pf-liquidationStatus"
+        label="Trạng thái thanh lý"
+        error={err('liquidationStatus')}
+        hint="Phân loại để theo dõi hàng cần xả hoặc ưu tiên bán; không ảnh hưởng tồn kho."
+      >
+        <Controller
+          control={control}
+          name="liquidationStatus"
+          render={({ field }) => (
+            <Select value={field.value} onValueChange={field.onChange} disabled={lockCore}>
+              <SelectTrigger id="pf-liquidationStatus" {...aria('liquidationStatus')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {LIQUIDATION_STATUSES.map((st) => (
+                  <SelectItem key={st} value={st}>
+                    {LIQUIDATION_STATUS_LABELS[st]}
                   </SelectItem>
                 ))}
               </SelectContent>

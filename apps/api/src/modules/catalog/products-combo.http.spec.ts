@@ -114,9 +114,6 @@ describe('Combo qua HTTP', () => {
       onHand: '2.000',
       available: '2.000',
       reserved: '0.000',
-      minStock: null,
-      maxStock: null,
-      location: null,
       // 2×1000 + 3×500
       costPrice: '3500.0000',
       // 2×1100 + 3×550
@@ -166,7 +163,6 @@ describe('Combo qua HTTP', () => {
     expect(sg).toMatchObject({
       onHand: '2.000',
       costPrice: '3500.0000',
-      minStock: null,
     });
   });
 
@@ -318,13 +314,8 @@ describe('Combo qua HTTP', () => {
     ).toHaveLength(0);
   });
 
-  it('combo không có tồn tối thiểu/tối đa/vị trí riêng và không có thẻ kho', async () => {
+  it('combo không có thẻ kho', async () => {
     const api = await t.as('quanly', t.sg);
-    const put = await api
-      .put(`/products/${ids.CB1}/branches/${t.sg}`)
-      .send({ minStock: '1' })
-      .expect(400);
-    expect(put.body.code).toBe('INVALID_STATE');
     const card = await api.get(`/products/${ids.CB1}/stock-card`).expect(400);
     expect(card.body.code).toBe('INVALID_STATE');
   });

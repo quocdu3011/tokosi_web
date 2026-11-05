@@ -9,7 +9,12 @@ import {
   MinLength,
   IsBoolean,
 } from 'class-validator';
-import { PRODUCT_TYPES, type ProductType } from '@kiot/shared';
+import {
+  LIQUIDATION_STATUSES,
+  PRODUCT_TYPES,
+  type LiquidationStatus,
+  type ProductType,
+} from '@kiot/shared';
 import { PageQueryDto } from '../../common/pagination.js';
 import { QueryBoolean } from '../../common/query.js';
 
@@ -58,6 +63,12 @@ export class ProductDto {
   })
   productType!: ProductType;
   @ApiProperty({
+    enum: LIQUIDATION_STATUSES,
+    description:
+      'Trạng thái thanh lý: `normal` Thường (mặc định), `clearance` Thanh Lý, `disabled` Tắt Mã, `high_stock` Tồn Cao, `priority_stock` Tồn Ưu Tiên',
+  })
+  liquidationStatus!: LiquidationStatus;
+  @ApiProperty({
     example: 'DAO01/2,KEO03/1',
     description:
       'Hàng thành phần của combo, dạng `MSP/SL,MSP/SL`; chuỗi rỗng với hàng hóa',
@@ -96,9 +107,6 @@ export class ProductDto {
       'Đang đặt nhà cung cấp. Chưa có phân hệ Đặt hàng nhập nên luôn "0"',
   })
   onOrder!: string;
-  @ApiProperty({ nullable: true, type: String }) minStock!: string | null;
-  @ApiProperty({ nullable: true, type: String }) maxStock!: string | null;
-  @ApiProperty({ nullable: true, type: String }) location!: string | null;
   @ApiProperty({ nullable: true, type: String }) description!: string | null;
   @ApiProperty({ type: [ProductImageDto] }) images!: ProductImageDto[];
   @ApiProperty() isActive!: boolean;
@@ -143,6 +151,14 @@ export class ListProductsQueryDto extends PageQueryDto {
   @IsOptional()
   @IsIn(PRODUCT_TYPES)
   productType?: ProductType;
+
+  @ApiPropertyOptional({
+    enum: LIQUIDATION_STATUSES,
+    description: 'Lọc theo trạng thái thanh lý',
+  })
+  @IsOptional()
+  @IsIn(LIQUIDATION_STATUSES)
+  liquidationStatus?: LiquidationStatus;
 
   @ApiPropertyOptional({
     description: 'true = chỉ hàng còn tồn tại chi nhánh làm việc',
@@ -213,6 +229,11 @@ export class CreateProductDto {
   @IsIn(PRODUCT_TYPES)
   productType?: ProductType;
 
+  @ApiPropertyOptional({ enum: LIQUIDATION_STATUSES, default: 'normal' })
+  @IsOptional()
+  @IsIn(LIQUIDATION_STATUSES)
+  liquidationStatus?: LiquidationStatus;
+
   @ApiPropertyOptional({
     example: 'DAO01/2,KEO03/1',
     description:
@@ -262,6 +283,11 @@ export class UpdateProductDto {
   @IsIn(PRODUCT_TYPES)
   productType?: ProductType;
 
+  @ApiPropertyOptional({ enum: LIQUIDATION_STATUSES })
+  @IsOptional()
+  @IsIn(LIQUIDATION_STATUSES)
+  liquidationStatus?: LiquidationStatus;
+
   @ApiPropertyOptional({
     example: 'DAO01/2,KEO03/1',
     description:
@@ -304,36 +330,6 @@ export class ProductBranchDto {
     description: 'Vắng mặt nếu thiếu product.cost.view',
   })
   lastPurchasePrice?: string | null;
-  @ApiProperty({ nullable: true, type: String }) minStock!: string | null;
-  @ApiProperty({ nullable: true, type: String }) maxStock!: string | null;
-  @ApiProperty({ nullable: true, type: String }) location!: string | null;
-}
-
-export class SetProductBranchSettingsDto {
-  @ApiPropertyOptional({
-    nullable: true,
-    type: String,
-    example: '10',
-    description: 'Tồn tối thiểu (>= 0); null = bỏ. Phải <= tồn tối đa',
-  })
-  @IsOptional()
-  @Matches(QTY_PATTERN, { message: 'Tồn tối thiểu không hợp lệ' })
-  minStock?: string | null;
-
-  @ApiPropertyOptional({ nullable: true, type: String, example: '2000' })
-  @IsOptional()
-  @Matches(QTY_PATTERN, { message: 'Tồn tối đa không hợp lệ' })
-  maxStock?: string | null;
-
-  @ApiPropertyOptional({
-    nullable: true,
-    type: String,
-    description: 'Vị trí kho; null hoặc rỗng = bỏ',
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  location?: string | null;
 }
 
 export class StockCardQueryDto {

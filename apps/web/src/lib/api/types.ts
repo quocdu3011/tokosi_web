@@ -52,7 +52,6 @@ export type CategoryNode = Schemas['CategoryNodeDto'];
 export type CreateProductInput = Schemas['CreateProductDto'];
 export type UpdateProductInput = Schemas['UpdateProductDto'];
 export type ProductBranch = Schemas['ProductBranchDto'];
-export type ProductBranchSettings = Schemas['SetProductBranchSettingsDto'];
 export type ProductImage = Schemas['ProductImageDto'];
 export type ProductLookup = Schemas['ProductLookupDto'];
 export type CreateCategoryInput = Schemas['CreateCategoryDto'];

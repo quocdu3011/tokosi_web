@@ -227,9 +227,8 @@ Luồng: web gọi `supabase.auth.signInWithOAuth({ provider: 'google' })` (PKCE
 | DELETE | `/products/:id/images/:imageId`    | Xóa một ảnh → `204`                                                        | `product.edit` hoặc `product.content.edit` |
 | GET    | `/products/:id/stock-card?from&to` | **Thẻ kho**: lịch sử nhập–xuất tại chi nhánh làm việc                      | `product.view` (+ `X-Branch-Id`)           |
 | GET    | `/products/:id/branches`           | Chi tiết theo từng chi nhánh người dùng được phép: giá 7 bảng, tồn, vị trí | `product.view`                             |
-| PUT    | `/products/:id/branches/:branchId` | Đặt tồn tối thiểu/tối đa và vị trí kho của một chi nhánh                   | `product.edit`                             |
 
-Bộ lọc `GET /products`: `q` (tìm không dấu theo mã và tên), `categoryId` (**gồm cả nhóm con**), `isActive`, `productType` (`goods` | `combo`), `inStock` (`true` = còn tồn **tại chi nhánh làm việc**; với combo là số combo ghép được), `sort` (`code`, `name`, `onHand`, `createdAt`; thêm `-` để giảm dần; cột lạ bị bỏ qua), `page`, `limit` (tối đa 100).
+Bộ lọc `GET /products`: `q` (tìm không dấu theo mã và tên), `categoryId` (**gồm cả nhóm con**), `isActive`, `liquidationStatus`, `productType` (`goods` | `combo`), `inStock` (`true` = còn tồn **tại chi nhánh làm việc**; với combo là số combo ghép được), `sort` (`code`, `name`, `onHand`, `createdAt`; thêm `-` để giảm dần; cột lạ bị bỏ qua), `page`, `limit` (tối đa 100).
 
 ```json
 // Đối tượng Product
@@ -240,6 +239,7 @@ Bộ lọc `GET /products`: `q` (tìm không dấu theo mã và tên), `category
   "categoryId": "…",
   "categoryPath": "ĐIỆN GIA DỤNG > Quạt điện",
   "productType": "goods", // "goods" = Hàng hóa (mặc định) | "combo"
+  "liquidationStatus": "normal", // normal=Thường (mặc định) | clearance=Thanh Lý | disabled=Tắt Mã | high_stock=Tồn Cao | priority_stock=Tồn Ưu Tiên
   "components": "", // combo: hàng thành phần dạng "MSP/SL,MSP/SL" (vd "DAO01/2,KEO03/1"); hàng hóa: ""
   "componentItems": [], // combo: [{ "productId": "…", "code": "DAO01", "name": "…", "qty": 2 }]
   "branchId": "…", // chi nhánh mà các trường giá/tồn/vị trí dưới đây tính cho (= X-Branch-Id)
@@ -249,9 +249,6 @@ Bộ lọc `GET /products`: `q` (tìm không dấu theo mã và tên), `category
   "reserved": "40.000", // đang giữ cho các đơn đặt hàng chưa chốt (phiếu tạm) tại chi nhánh này
   "available": "475.000", // onHand − reserved
   "onOrder": "0", // đang đặt nhà cung cấp; CHƯA có phân hệ Đặt hàng nhập nên luôn "0"
-  "minStock": null,
-  "maxStock": "2000.000",
-  "location": "11",
   "description": null,
   "images": [{ "id": "…", "url": "https://files…/products/<id>/<uuid>.jpg", "sortOrder": 0 }],
   "isActive": true,
@@ -267,11 +264,11 @@ Bộ lọc `GET /products`: `q` (tìm không dấu theo mã và tên), `category
   "name": "…",
   "categoryId": "…",
   "productType": "goods", // mặc định "goods"; "combo" thì bắt buộc có components
+  "liquidationStatus": "normal", // tùy chọn, mặc định "normal"
   "components": "DAO01/2,KEO03/1", // chỉ với combo
   "description": null
 }
-// Body chỉ chứa thông tin DÙNG CHUNG cho cả hai chi nhánh.
-// tồn tối thiểu/tối đa và vị trí kho đặt riêng từng chi nhánh qua PUT /products/:id/branches/:branchId.
+// Body chỉ chứa thông tin DÙNG CHUNG cho cả hai chi nhánh. Vị trí kho sẽ có bảng riêng (một mã hàng có thể nằm ở nhiều vị trí), chưa làm.
 // Lỗi: 409 DUPLICATE_CODE (field code)
 ```
 
@@ -288,7 +285,7 @@ Bộ lọc `GET /products`: `q` (tìm không dấu theo mã và tên), `category
 - **Số liệu của combo luôn tính từ thành phần tại chi nhánh làm việc** (combo không có dòng tồn riêng):
   - `onHand` = số combo ghép được = min(⌊tồn thành phần ÷ SL trong combo⌋); `available` tính tương tự trên tồn khả dụng (đã trừ phần giữ cho đơn nháp), không âm; `reserved` luôn `"0.000"`.
   - `costPrice` (giá gốc) = **tổng (giá vốn thành phần × SL)**; `lastPurchasePrice` = tổng giá nhập cuối thành phần (null nếu có thành phần chưa có giá nhập). Cả hai vắng mặt nếu thiếu `product.cost.view`.
-  - `minStock`, `maxStock`, `location` luôn `null`; `PUT /products/:id/branches/:branchId` và `GET /products/:id/stock-card` với combo → `400 INVALID_STATE` (đặt/xem ở hàng thành phần).
+  - `GET /products/:id/stock-card` với combo → `400 INVALID_STATE` (đặt/xem ở hàng thành phần).
   - Combo không có giá bán riêng trong hệ thống (giá quy ước ở mô tả).
 - **Đổi `productType`** chỉ khi hàng **chưa có giao dịch** và (khi đổi sang combo) **chưa là thành phần của combo nào** → ngược lại `400 INVALID_STATE`. Đổi sang combo bắt buộc gửi kèm `components`; đổi về hàng hóa thì thành phần bị bỏ.
 - Mọi thay đổi tồn kho đều từ chối combo (`400 INVALID_STATE`): không thể nhập/xuất/chuyển kho trực tiếp cho combo.
@@ -327,9 +324,6 @@ Màn hình chỉ cần một nút Lưu và gọi lần lượt hai API này. N�
   }
 ]
 
-// PUT /products/:id/branches/:branchId   body: { "minStock": "10", "maxStock": "2000", "location": "Kệ A1" }
-// Gửi null để xóa; chỉ gửi trường cần đổi; phải minStock <= maxStock. KHÔNG đổi được tồn kho hay giá vốn
-// (chỉ nhập/xuất/chuyển kho mới đổi được). Trả đối tượng như một phần tử ở trên.
 ```
 
 ```json
@@ -933,7 +927,7 @@ Dùng cho import hàng loạt (chuyển dữ liệu từ KiotViet và nhập tay
 | GET    | `/imports/:id`            | Kết quả và lỗi từng dòng của một lần nhập                                                      | `import.run` |
 | GET    | `/imports/:type/template` | Tải file Excel mẫu                                                                             | `import.run` |
 
-Tham số query của `POST`: `dryRun` (**mặc định `true`**: chỉ kiểm tra, không ghi gì; gửi `dryRun=false` mới ghi thật), `branchId` (chi nhánh cho tồn tối thiểu-tối đa / vị trí / tồn kho của Import thêm; bắt buộc nếu file có các cột đó hoặc khi `mode=add`), `mode` (`overwrite` mặc định = **Import đè**; `add` = **Import thêm**, xem mục "Hai chế độ nhập"). Giá trị `mode` khác → `400 VALIDATION_ERROR`. Phản hồi có thêm field `mode`.
+Tham số query của `POST`: `dryRun` (**mặc định `true`**: chỉ kiểm tra, không ghi gì; gửi `dryRun=false` mới ghi thật), `branchId` (chi nhánh làm việc; **bắt buộc khi `mode=add`** vì cộng/trừ tồn kho của chi nhánh đó, ở chế độ đè có thể bỏ trống), `mode` (`overwrite` mặc định = **Import đè**; `add` = **Import thêm**, xem mục "Hai chế độ nhập"). Giá trị `mode` khác → `400 VALIDATION_ERROR`. Phản hồi có thêm field `mode`.
 
 ```json
 // POST /imports/products?dryRun=false&branchId=…   → 202
@@ -958,7 +952,7 @@ Tham số query của `POST`: `dryRun` (**mặc định `true`**: chỉ kiểm t
 | | `overwrite` — Import đè (mặc định) | `add` — Import thêm |
 | --- | --- | --- |
 | Khóa so khớp | `Mã hàng`, không phân biệt hoa thường | như bên trái |
-| Mã đã có | Thông tin trong file **đè** lên bản cũ (ô trống giữ nguyên). Mã không có trong file thì không đổi | **Chỉ CỘNG/TRỪ tồn** theo cột `Tồn kho` của chi nhánh `branchId`; mọi thông tin khác (tên, nhóm, mô tả, trạng thái, ảnh, thành phần, tồn tối thiểu/tối đa, vị trí) **giữ nguyên bản cũ** |
+| Mã đã có | Thông tin trong file **đè** lên bản cũ (ô trống giữ nguyên). Mã không có trong file thì không đổi | **Chỉ CỘNG/TRỪ tồn** theo cột `Tồn kho` của chi nhánh `branchId`; mọi thông tin khác (tên, nhóm, mô tả, trạng thái, trạng thái thanh lý, ảnh, thành phần) **giữ nguyên bản cũ** |
 | Mã mới | Tạo mới | Tạo mới đầy đủ (cần `Tên hàng`) rồi cộng tồn |
 | Cột `Tồn kho`, `Giá vốn` | Bị bỏ qua | Dùng như bên dưới |
 | Chạy lại cùng file | Không đổi gì (idempotent) | **Cộng thêm lần nữa** (không idempotent): luôn chạy `dryRun=true` trước |
@@ -979,12 +973,13 @@ Chi tiết `add`: bắt buộc `branchId` và cột `Tồn kho`. `Tồn kho` là
 | Cột                                      | Ghi chú                                                                                                                                             |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Mã hàng`, `Tên hàng`                    | **Bắt buộc**. Mã theo quy tắc ở mục 2.2; không trùng trong file                                                                                     |
+| `Trạng thái thanh lý`                    | `Thường` (mặc định), `Thanh Lý`, `Tắt Mã`, `Tồn Cao`, `Tồn Ưu Tiên` (nhận cả mã `normal`…). Ô trống = giữ nguyên |
+| `Tồn nhỏ nhất`, `Tồn lớn nhất`, `Vị trí`, `Giá bán` | **Bị bỏ qua** (hệ thống không còn tồn tối thiểu/tối đa, vị trí kho nằm ở bảng riêng sau này, không có giá bán) |
 | `Loại hàng`                              | `Hàng hóa` (mặc định) hoặc `Combo` (KiotViet ghi `Combo - Đóng gói` cũng nhận). Trống mà có `Hàng thành phần` → coi là combo. Không đổi được loại của hàng đã có qua Excel |
 | `Hàng thành phần`                        | Của combo, dạng `MSP/SL,MSP/SL`. Thành phần là hàng hóa trong file (dù đứng sau) hoặc đã có trong hệ thống; chạy lại cùng file không đổi gì, đổi số lượng thì cập nhật |
 | `Nhóm hàng(3 Cấp)`                       | Dạng `NHÀ BẾP>>Dao kéo`, tối đa 3 cấp; **tự tạo nhóm còn thiếu**                                                                                    |
 | `Tồn kho`, `Giá vốn` | **Chỉ dùng ở `mode=add`** (cộng/trừ tồn, giá nhập của lô cộng); ở `overwrite` bị bỏ qua (số dư đầu kỳ do công cụ chuyển dữ liệu riêng xử lý) |
 | `Giá bán` và cột khác | **Bị bỏ qua**: hệ thống không có giá bán |
-| `Tồn nhỏ nhất`, `Tồn lớn nhất`, `Vị trí` | Ghi cho chi nhánh `branchId`                                                                                                                        |
 | `Đang kinh doanh`                        | `1`/`0`                                                                                                                                             |
 | `Mô tả`                                  |                                                                                                                                                     |
 | `Hình ảnh (url1,url2...)`                | Nhiều địa chỉ `http(s)` cách nhau dấu phẩy → **giữ nguyên URL gốc** (không tải về kho file); thêm ảnh chưa có, không xóa ảnh hiện có; tối đa 10 ảnh |

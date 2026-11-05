@@ -1,5 +1,5 @@
 {
-  "id": "9bbf5695-1bb6-4dd6-a315-dd0f8669ff06",
+  "id": "f69357b2-b9b7-451c-a34b-32db6517b0fc",
   "prevId": "20484ecc-0f57-46f3-87a5-a47cb149f4bc",
   "version": "7",
   "dialect": "postgresql",
@@ -531,14 +531,6 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
-        },
-        "mode": {
-          "name": "mode",
-          "type": "import_mode",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'overwrite'"
         },
         "status": {
           "name": "status",
@@ -1563,6 +1555,14 @@
           "notNull": true,
           "default": "'goods'"
         },
+        "liquidation_status": {
+          "name": "liquidation_status",
+          "type": "liquidation_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'normal'"
+        },
         "description": {
           "name": "description",
           "type": "text",
@@ -1654,6 +1654,21 @@
           "columns": [
             {
               "expression": "product_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "products_liquidation_idx": {
+          "name": "products_liquidation_idx",
+          "columns": [
+            {
+              "expression": "liquidation_status",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2846,24 +2861,6 @@
         "last_purchase_price": {
           "name": "last_purchase_price",
           "type": "numeric(18, 4)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "min_stock": {
-          "name": "min_stock",
-          "type": "numeric(14, 3)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "max_stock": {
-          "name": "max_stock",
-          "type": "numeric(14, 3)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "location": {
-          "name": "location",
-          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -5728,14 +5725,6 @@
         "cancelled"
       ]
     },
-    "public.import_mode": {
-      "name": "import_mode",
-      "schema": "public",
-      "values": [
-        "overwrite",
-        "add"
-      ]
-    },
     "public.import_status": {
       "name": "import_status",
       "schema": "public",
@@ -5766,6 +5755,17 @@
         "return",
         "adjustment",
         "transfer"
+      ]
+    },
+    "public.liquidation_status": {
+      "name": "liquidation_status",
+      "schema": "public",
+      "values": [
+        "normal",
+        "clearance",
+        "disabled",
+        "high_stock",
+        "priority_stock"
       ]
     },
     "public.order_status": {

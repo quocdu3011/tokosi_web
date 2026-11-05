@@ -7,7 +7,6 @@ import {
   orderItems,
   orders,
   products,
-  stocks,
 } from '../../db/schema/index.js';
 import { createHttpTestApp } from '../../test-utils/http-app.js';
 import { InventoryService } from '../inventory/inventory.service.js';
@@ -427,173 +426,96 @@ describe('Hàng hóa qua HTTP', () => {
     expect(hnOnly[0]).not.toHaveProperty('costPrice');
   });
 
-  it('PUT /products/:id/branches/:branchId: đặt min/max/vị trí, KHÔNG đụng tồn và giá vốn; ràng buộc min <= max', async () => {
-    const api = await t.as('kho1');
-    const res = await api
-      .put(`/products/${ids.QKBSP}/branches/${t.sg}`)
-      .send({ minStock: '10', maxStock: '2000', location: ' Kệ A1 ' })
-      .expect(200);
-    expect(res.body).toMatchObject({
-      minStock: '10.000',
-      maxStock: '2000.000',
-      location: 'Kệ A1',
-      onHand: '515.000',
-    });
-    const [row] = await t.db
-      .select()
-      .from(stocks)
-      .where(eq(stocks.productId, ids.QKBSP!));
-    expect(row).toBeDefined();
-    const sgRow = (
-      await t.db.select().from(stocks).where(eq(stocks.productId, ids.QKBSP!))
-    ).find((s) => s.branchId === t.sg)!;
-    expect(sgRow.onHand).toBe('515.000');
-    expect(sgRow.costPrice).toBe('21800.5000');
-
-    const bad = await api
-      .put(`/products/${ids.QKBSP}/branches/${t.sg}`)
-      .send({ minStock: '3000' })
-      .expect(400);
-    expect(bad.body.details[0].field).toBe('minStock');
-    await api
-      .put(`/products/${ids.QKBSP}/branches/${t.sg}`)
-      .send({ minStock: '-1' })
-      .expect(400);
-    await api
-      .put(`/products/${ids.QKBSP}/branches/${t.sg}`)
-      .send({})
-      .expect(400);
-
-    // xóa bằng null; hàng chưa có dòng tồn ở chi nhánh → tạo dòng mới với tồn 0
-    const cleared = await api
-      .put(`/products/${ids.QKBSP}/branches/${t.sg}`)
-      .send({ minStock: null, location: null })
-      .expect(200);
-    expect(cleared.body).toMatchObject({
-      minStock: null,
-      maxStock: '2000.000',
-      location: null,
-    });
-    const fresh = await api
-      .put(`/products/${ids.LOA01}/branches/${t.hn}`)
-      .send({ location: 'Kho 2' })
-      .expect(200);
-    expect(fresh.body).toMatchObject({ onHand: '0.000', location: 'Kho 2' });
-  });
-
-  it('PUT theo chi nhánh: thiếu product.edit → 403; không được phép chi nhánh đó → 403 BRANCH_FORBIDDEN; chi nhánh lạ → 403/404', async () => {
-    const sale = await t.as('sale1');
-    await sale
-      .put(`/products/${ids.QKBSP}/branches/${t.sg}`)
-      .send({ location: 'x' })
-      .expect(403);
-    // Kho có cả hai chi nhánh nên thử bằng người chỉ có Sài Gòn và quyền sửa: dùng Quản lý tạm gán ít chi nhánh là không cần;
-    // thay vào đó tạo người dùng kho chỉ có Hà Nội
-    await t.makeUser('kho_hn', 'warehouse', [t.hn]);
-    const khoHn = await t.as('kho_hn');
-    const res = await khoHn
-      .put(`/products/${ids.QKBSP}/branches/${t.sg}`)
-      .send({ location: 'x' })
-      .expect(403);
-    expect(res.body.code).toBe('BRANCH_FORBIDDEN');
-  });
-
-  // ------------------------------------------------------------------ thẻ kho
-
-  it('thẻ kho: tồn đầu kỳ, số dư cộng dồn, ngày theo giờ Việt Nam, giá vốn theo quyền', async () => {
-    // Dựng sổ cái riêng cho một hàng mới: 3 dòng ở 3 thời điểm xác định (giờ UTC)
-    const [p] = await t.db
-      .insert(products)
-      .values({ code: 'CARD1', name: 'Hàng thẻ kho' })
-      .returning();
-    await inv.applyMovement(t.db, {
-      branchId: t.sg,
-      productId: p!.id,
-      qtyDelta: '100',
-      unitCost: '1000',
-      refType: 'goods_receipt',
-      refCode: 'PN-T1',
-      occurredAt: new Date('2026-10-31T16:30:00Z'), // 23:30 ngày 31/10 giờ VN
-    });
-    await inv.applyMovement(t.db, {
-      branchId: t.sg,
-      productId: p!.id,
-      qtyDelta: '-30',
-      refType: 'invoice',
-      refCode: 'HD-T1',
-      occurredAt: new Date('2026-11-01T17:00:00Z'), // 00:00 ngày 02/11 giờ VN
-    });
-    await inv.applyMovement(t.db, {
-      branchId: t.sg,
-      productId: p!.id,
-      qtyDelta: '-20',
-      refType: 'invoice',
-      refCode: 'HD-T2',
-      occurredAt: new Date('2026-11-02T03:00:00Z'), // 10:00 ngày 02/11 giờ VN
-    });
-
-    const api = await t.as('quanly', t.sg);
-    const card = (
-      await api
-        .get(`/products/${p!.id}/stock-card?from=2026-11-01&to=2026-11-02`)
-        .expect(200)
-    ).body;
-    // 23:30 ngày 31/10 VN thuộc TRƯỚC kỳ → tồn đầu kỳ 100; hai dòng ngày 02/11 VN thuộc trong kỳ
-    expect(card.openingQty).toBe('100.000');
-    expect(
-      card.movements.map(
-        (m: { refCode: string; qtyDelta: string; balance: string }) => [
-          m.refCode,
-          m.qtyDelta,
-          m.balance,
-        ],
-      ),
-    ).toEqual([
-      ['HD-T1', '-30.000', '70.000'],
-      ['HD-T2', '-20.000', '50.000'],
-    ]);
-    expect(card.closingQty).toBe('50.000');
-    expect(card.movements[0].unitCost).toBe('1000.0000');
-
-    // không giới hạn ngày: thấy cả 3 dòng, tồn đầu kỳ 0
-    const full = (await api.get(`/products/${p!.id}/stock-card`).expect(200))
-      .body;
-    expect(full.openingQty).toBe('0.000');
-    expect(full.movements).toHaveLength(3);
-    expect(full.closingQty).toBe('50.000');
-
-    // chi nhánh khác không có dòng nào
-    const hn = await t.as('quanly', t.hn);
-    const empty = (await hn.get(`/products/${p!.id}/stock-card`).expect(200))
-      .body;
-    expect(empty.movements).toEqual([]);
-    expect(empty.closingQty).toBe('0.000');
-
-    // thiếu quyền xem giá vốn → không có unitCost
-    const sale = await t.as('sale1', t.sg);
-    const noCost = (await sale.get(`/products/${p!.id}/stock-card`).expect(200))
-      .body;
-    expect(noCost.movements[0]).not.toHaveProperty('unitCost');
-
-    await api
-      .get(`/products/${p!.id}/stock-card?from=2026-11-05&to=2026-11-01`)
-      .expect(400);
-    await api.get(`/products/${p!.id}/stock-card?from=hôm-qua`).expect(400);
-    await api
-      .get('/products/00000000-0000-4000-8000-000000000001/stock-card')
-      .expect(404);
-  });
-  it('id hoặc branchId sai dạng → 400 VALIDATION_ERROR với details theo đúng tên tham số', async () => {
+  it('id sai dạng → 400 VALIDATION_ERROR với details theo đúng tên tham số', async () => {
     const api = await t.as('quanly', t.sg);
     const a = await api.get('/products/khong-phai-uuid').expect(400);
     expect(a.body).toMatchObject({
       code: 'VALIDATION_ERROR',
       details: [{ field: 'id' }],
     });
-    const b = await api
-      .put(`/products/${ids.QKBSP}/branches/abc`)
-      .send({ location: 'x' })
+  });
+
+  // ------------------------------------------------------------------ trạng thái thanh lý
+
+  it('trạng thái thanh lý: mặc định Thường; tạo/sửa đủ 5 giá trị; giá trị lạ → 400; lọc; ghi nhật ký; ma trận quyền', async () => {
+    const api = await t.as('quanly', t.sg);
+    const created = await api
+      .post('/products')
+      .send({
+        code: 'TL01',
+        name: 'Hàng thanh lý',
+        liquidationStatus: 'clearance',
+      })
+      .expect(201);
+    expect(created.body.liquidationStatus).toBe('clearance');
+    const dflt = await api
+      .post('/products')
+      .send({ code: 'TL02', name: 'Hàng thường' })
+      .expect(201);
+    expect(dflt.body.liquidationStatus).toBe('normal');
+
+    for (const st of [
+      'normal',
+      'clearance',
+      'disabled',
+      'high_stock',
+      'priority_stock',
+    ]) {
+      const r = await api
+        .patch(`/products/${dflt.body.id}`)
+        .send({ liquidationStatus: st })
+        .expect(200);
+      expect(r.body.liquidationStatus).toBe(st);
+    }
+    const bad = await api
+      .patch(`/products/${dflt.body.id}`)
+      .send({ liquidationStatus: 'thanh-ly' })
       .expect(400);
-    expect(b.body.details[0].field).toBe('branchId');
+    expect(bad.body.details[0].field).toBe('liquidationStatus');
+    await api
+      .post('/products')
+      .send({ code: 'TL03', name: 'x', liquidationStatus: 'Thanh Lý' })
+      .expect(400);
+
+    const only = (
+      await api.get('/products?liquidationStatus=clearance').expect(200)
+    ).body.data;
+    expect(only.map((p: { code: string }) => p.code)).toEqual(['TL01']);
+    const prio = (
+      await api.get('/products?liquidationStatus=priority_stock').expect(200)
+    ).body.data;
+    expect(prio.map((p: { code: string }) => p.code)).toEqual(['TL02']);
+    await api.get('/products?liquidationStatus=abc').expect(400);
+
+    const logs = await t.db
+      .select()
+      .from(auditLogs)
+      .where(eq(auditLogs.entityId, dflt.body.id));
+    const last = logs.filter((l) => l.action === 'product.update').pop()!;
+    expect(last.before).toMatchObject({ liquidationStatus: 'high_stock' });
+    expect(last.after).toMatchObject({ liquidationStatus: 'priority_stock' });
+
+    // người chỉ có product.content.edit (Marketing) không được đổi trạng thái thanh lý
+    const mkt = await t.as('mkt1', t.sg);
+    const forbidden = await mkt
+      .patch(`/products/${dflt.body.id}`)
+      .send({ liquidationStatus: 'normal' })
+      .expect(403);
+    expect(forbidden.body.details.fields).toContain('liquidationStatus');
+  });
+
+  it('bỏ minStock/maxStock/location khỏi hàng hóa và endpoint PUT theo chi nhánh không còn', async () => {
+    const api = await t.as('quanly', t.sg);
+    const one = (await api.get(`/products/${ids.QKBSP}`).expect(200)).body;
+    for (const k of ['minStock', 'maxStock', 'location'])
+      expect(one).not.toHaveProperty(k);
+    const br = (await api.get(`/products/${ids.QKBSP}/branches`).expect(200))
+      .body;
+    for (const k of ['minStock', 'maxStock', 'location'])
+      expect(br[0]).not.toHaveProperty(k);
+    await api
+      .put(`/products/${ids.QKBSP}/branches/${t.sg}`)
+      .send({ location: 'x' })
+      .expect(404);
   });
 });

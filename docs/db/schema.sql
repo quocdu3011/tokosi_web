@@ -643,5 +643,7 @@ ALTER TABLE "invoices" DROP CONSTRAINT IF EXISTS "invoices_price_book_id_price_b
 ALTER TABLE "orders" DROP CONSTRAINT IF EXISTS "orders_price_book_id_price_books_id_fk";
 DROP INDEX IF EXISTS "customers_price_book_idx";ALTER TABLE "customers" DROP COLUMN "default_price_book_id";ALTER TABLE "invoices" DROP COLUMN "price_book_id";ALTER TABLE "orders" DROP COLUMN "price_book_id";DELETE FROM "role_permissions" WHERE "permission_code" = 'price.edit';
 
--- ===== 0020_che_do_nhap_excel.sql =====
+-- ===== 0020_trang_thai_thanh_ly.sql =====
+CREATE TYPE "public"."liquidation_status" AS ENUM('normal', 'clearance', 'disabled', 'high_stock', 'priority_stock');ALTER TABLE "products" ADD COLUMN "liquidation_status" "liquidation_status" DEFAULT 'normal' NOT NULL;CREATE INDEX "products_liquidation_idx" ON "products" USING btree ("liquidation_status");ALTER TABLE "stocks" DROP COLUMN "min_stock";ALTER TABLE "stocks" DROP COLUMN "max_stock";ALTER TABLE "stocks" DROP COLUMN "location";
+-- ===== 0021_che_do_nhap_excel.sql =====
 CREATE TYPE "public"."import_mode" AS ENUM('overwrite', 'add');ALTER TABLE "import_jobs" ADD COLUMN "mode" "import_mode" DEFAULT 'overwrite' NOT NULL;

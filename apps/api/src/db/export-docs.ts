@@ -173,7 +173,8 @@ const COLUMN_NOTES: Record<string, string> = {
     'Hạn mức công nợ tại chi nhánh này (cảnh báo mềm)',
   'stocks.cost_price': 'Giá vốn bình quân gia quyền CỦA chi nhánh này',
   'stocks.last_purchase_price': 'Giá nhập cuối của chi nhánh này',
-  'stocks.location': 'Vị trí kho tại chi nhánh này',
+  'products.liquidation_status':
+    'Trạng thái thanh lý: normal = Thường (mặc định), clearance = Thanh Lý, disabled = Tắt Mã, high_stock = Tồn Cao, priority_stock = Tồn Ưu Tiên',
   'price_book_items.price':
     'Giá bán tại chi nhánh (branch_id) trong bảng giá (price_book_id)',
   'debt_ledger.branch_id': 'Công nợ tách biệt theo chi nhánh',

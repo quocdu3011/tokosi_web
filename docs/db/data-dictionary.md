@@ -2,7 +2,7 @@
 
 > **Sinh tự động** từ `apps/api/src/db/schema` bằng `pnpm db:docs` — không sửa tay. Tổng quan và cách xem sơ đồ: [`README.md`](README.md).
 
-**40 bảng · 19 kiểu liệt kê (enum)**
+**40 bảng · 20 kiểu liệt kê (enum)**
 
 ## Mục lục
 
@@ -26,6 +26,7 @@
 | `import_status` | `queued`, `running`, `completed`, `failed` |
 | `import_type` | `products`, `customers`, `suppliers`, `price-books` |
 | `ledger_entry_type` | `opening`, `invoice`, `payment`, `return`, `adjustment`, `transfer` |
+| `liquidation_status` | `normal`, `clearance`, `disabled`, `high_stock`, `priority_stock` |
 | `order_status` | `draft`, `completed`, `cancelled` |
 | `party_type` | `customer`, `supplier`, `employee` |
 | `payment_method` | `cash`, `bank` |
@@ -299,6 +300,7 @@ Hàng hóa — chỉ thông tin DÙNG CHUNG giữa các chi nhánh. Giá bán �
 | `name` | text |  |  |  |
 | `category_id` | uuid | ✔ |  | → `categories.id` |
 | `product_type` | product_type |  | `'goods'` | Loại hàng: goods = Hàng hóa (mặc định), combo = gói các hàng thành phần (không có tồn/giá vốn riêng) |
+| `liquidation_status` | liquidation_status |  | `'normal'` | Trạng thái thanh lý: normal = Thường (mặc định), clearance = Thanh Lý, disabled = Tắt Mã, high_stock = Tồn Cao, priority_stock = Tồn Ưu Tiên |
 | `description` | text | ✔ |  |  |
 | `is_active` | boolean |  | `true` |  |
 | `created_by` | uuid | ✔ |  | → `users.id` |
@@ -312,6 +314,7 @@ Hàng hóa — chỉ thông tin DÙNG CHUNG giữa các chi nhánh. Giá bán �
 - `products_search_trgm`: `f_search_text(code || ' ' || name) gin_trgm_ops`
 - `products_active_idx`: `is_active`
 - `products_type_idx`: `product_type`
+- `products_liquidation_idx`: `liquidation_status`
 - `products_code_lower_unique` (unique): `lower(code)`
 
 ### product_images
@@ -366,9 +369,6 @@ Kho theo (chi nhánh, sản phẩm): tồn, giá vốn bình quân, giá nhập 
 | `on_hand` | numeric(14,3) |  | `0` | Tồn thực tế; không âm (CHECK) |
 | `cost_price` | numeric(18,4) |  | `0` | Giá vốn bình quân gia quyền CỦA chi nhánh này |
 | `last_purchase_price` | numeric(18,4) | ✔ |  | Giá nhập cuối của chi nhánh này |
-| `min_stock` | numeric(14,3) | ✔ |  |  |
-| `max_stock` | numeric(14,3) | ✔ |  |  |
-| `location` | text | ✔ |  | Vị trí kho tại chi nhánh này |
 | `updated_at` | timestamptz |  | `now()` |  |
 
 **Khóa chính ghép:** (`branch_id`, `product_id`)

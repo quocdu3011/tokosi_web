@@ -11,7 +11,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { productType } from './enums.js';
+import { liquidationStatus, productType } from './enums.js';
 import { pk, softDelete, timestamps, tstz } from './_helpers.js';
 import { productSearchExpr, trgmIndex } from './_search.js';
 import { users } from './system.js';
@@ -53,6 +53,7 @@ export const products = pgTable(
     name: text().notNull(),
     categoryId: uuid().references(() => categories.id),
     productType: productType().notNull().default('goods'),
+    liquidationStatus: liquidationStatus().notNull().default('normal'),
     description: text(),
     isActive: boolean().notNull().default(true),
     createdBy: uuid().references(() => users.id),
@@ -64,6 +65,7 @@ export const products = pgTable(
     trgmIndex('products_search_trgm', productSearchExpr(t)),
     index('products_active_idx').on(t.isActive),
     index('products_type_idx').on(t.productType),
+    index('products_liquidation_idx').on(t.liquidationStatus),
     // Mã hàng không trùng kể cả khác hoa thường (cột `code` đã có ràng buộc duy nhất phân biệt hoa thường)
     uniqueIndex('products_code_lower_unique').on(sql`lower(${t.code})`),
   ],

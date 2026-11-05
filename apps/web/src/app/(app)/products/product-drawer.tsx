@@ -101,7 +101,7 @@ export function ProductDrawer({ target, onClose }: { target: DrawerTarget; onClo
                 <ImageManager product={product} canEdit={canEditImages} />
               </TabsContent>
               <TabsContent value="branches">
-                <ProductBranchesTab product={product} canEdit={can(me, 'product.edit')} />
+                <ProductBranchesTab product={product} />
               </TabsContent>
               {product.productType === 'goods' && (
                 <TabsContent value="stock-card">

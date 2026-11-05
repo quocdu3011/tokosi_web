@@ -6,7 +6,6 @@ import type {
   CreateProductInput,
   Product,
   ProductBranch,
-  ProductBranchSettings,
   ProductList,
   ProductLookup,
   StockCard,
@@ -141,15 +140,6 @@ export function useProductBranches(id: string | null) {
     queryKey: productKeys.branches(id ?? ''),
     enabled: id !== null,
     queryFn: ({ signal }) => api.get<ProductBranch[]>(`/products/${id}/branches`, { signal }),
-  });
-}
-
-export function useSaveProductBranch() {
-  const invalidate = useInvalidateProducts();
-  return useMutation({
-    mutationFn: (args: { id: string; branchId: string; settings: ProductBranchSettings }) =>
-      api.put<ProductBranch>(`/products/${args.id}/branches/${args.branchId}`, args.settings),
-    onSuccess: invalidate,
   });
 }
 
