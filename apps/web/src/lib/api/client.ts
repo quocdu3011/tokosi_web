@@ -24,6 +24,8 @@ export interface RequestOptions {
   /** `false` với endpoint công khai (đăng nhập…) — không gửi token, không tự refresh. */
   auth?: boolean;
   signal?: AbortSignal;
+  /** Giá trị header `Accept`; mặc định `application/json`. */
+  accept?: string;
 }
 
 export interface ApiClientDeps {
@@ -46,6 +48,21 @@ export function buildUrl(baseUrl: string, path: string, query?: Record<string, Q
   }
   const qs = params.toString();
   return qs ? `${url}?${qs}` : url;
+}
+
+/** Lấy tên file từ header `Content-Disposition` (hỗ trợ `filename*=UTF-8''…` và `filename="…"`). */
+export function parseContentDispositionFilename(header: string | null): string | null {
+  if (!header) return null;
+  const star = /filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)/.exec(header);
+  if (star?.[1]) {
+    try {
+      return decodeURIComponent(star[1].trim());
+    } catch {
+      // rơi xuống dạng thường
+    }
+  }
+  const plain = /filename\s*=\s*"?([^";]+)"?/.exec(header);
+  return plain?.[1]?.trim() || null;
 }
 
 /** Đọc thân lỗi; server có thể trả HTML/rỗng khi proxy lỗi → vẫn ra `ApiError` có `code`. */
@@ -113,7 +130,7 @@ export function createApiClient(deps: ApiClientDeps) {
   }
 
   async function send(path: string, opts: RequestOptions, token: string | null) {
-    const headers: Record<string, string> = { Accept: 'application/json' };
+    const headers: Record<string, string> = { Accept: opts.accept ?? 'application/json' };
     if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
     if (token) headers.Authorization = `Bearer ${token}`;
     const branchId = opts.branchId === undefined ? deps.getBranchId() : opts.branchId;
@@ -138,7 +155,8 @@ export function createApiClient(deps: ApiClientDeps) {
     }
   }
 
-  async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
+  /** Gửi yêu cầu (có refresh token, thử lại đúng một lần) và trả về phản hồi đã `ok`; lỗi → `ApiError`. */
+  async function execute(path: string, opts: RequestOptions): Promise<Response> {
     const useAuth = opts.auth !== false;
     let token = useAuth ? deps.getAccessToken() : null;
     // Tải lại trang làm mất token trong bộ nhớ: lấy lại bằng cookie refresh trước khi gọi.
@@ -165,13 +183,31 @@ export function createApiClient(deps: ApiClientDeps) {
     }
 
     if (!res.ok) throw await toApiError(res);
+    return res;
+  }
+
+  async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
+    const res = await execute(path, opts);
     if (res.status === 204) return undefined as T;
     const text = await res.text();
     return (text ? JSON.parse(text) : undefined) as T;
   }
 
+  /** Tải một file (vd. `?format=xlsx`) kèm tên file lấy từ `Content-Disposition` nếu trình duyệt đọc được. */
+  async function download(
+    path: string,
+    opts: Omit<RequestOptions, 'method' | 'body' | 'accept'> = {},
+  ): Promise<{ blob: Blob; filename: string | null }> {
+    const res = await execute(path, { ...opts, method: 'GET', accept: '*/*' });
+    return {
+      blob: await res.blob(),
+      filename: parseContentDispositionFilename(res.headers.get('content-disposition')),
+    };
+  }
+
   return {
     request,
+    download,
     refreshAccessToken,
     get: <T>(path: string, opts?: Omit<RequestOptions, 'method' | 'body'>) =>
       request<T>(path, { ...opts, method: 'GET' }),

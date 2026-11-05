@@ -90,6 +90,172 @@
   animation: rowPulseHighlight 1.2s ease-out;
 }
 
+/* ---------- Bảng kẻ cột + đổi độ rộng + sắp xếp (tham khảo bảng báo cáo Tokosi) ---------- */
+
+/* Độ rộng cột cố định theo <colgroup>; chữ dài tự xuống dòng thay vì làm bảng giãn ra */
+.data-table.data-table-fixed {
+  table-layout: fixed;
+}
+.data-table-fixed th,
+.data-table-fixed td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+/* Kẻ dọc giữa các cột cho dễ dò theo hàng */
+.data-table-fixed th,
+.data-table-fixed td {
+  border-right: 1px solid var(--row-divider);
+}
+.data-table-fixed th {
+  border-right-color: var(--border);
+}
+.data-table-fixed th:last-child,
+.data-table-fixed td:last-child {
+  border-right: 0;
+}
+
+/* Nút sắp xếp phủ cả ô tiêu đề */
+.sort-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sort-button .sort-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.sort-button:hover {
+  color: var(--text);
+}
+.sort-button:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs, 4px);
+}
+.sort-indicator {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--muted);
+  opacity: 0.7;
+}
+.sort-indicator svg {
+  width: 14px;
+  height: 14px;
+}
+.sort-button:hover .sort-indicator {
+  opacity: 1;
+}
+.data-table th[aria-sort='ascending'],
+.data-table th[aria-sort='descending'] {
+  color: var(--amber);
+}
+.data-table th[aria-sort='ascending'] .sort-indicator,
+.data-table th[aria-sort='descending'] .sort-indicator {
+  color: var(--amber);
+  opacity: 1;
+}
+
+/* Tay nắm kéo ở mép phải tiêu đề (th đã `position: sticky` nên làm mốc định vị) */
+.column-resizer {
+  position: absolute;
+  inset: 0 0 0 auto;
+  z-index: 4;
+  display: block;
+  width: 9px;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+.column-resizer::after {
+  content: '';
+  position: absolute;
+  top: 20%;
+  right: 0;
+  bottom: 20%;
+  width: 1px;
+  background: var(--border);
+}
+.column-resizer:hover::after,
+.column-resizer:focus-visible::after {
+  right: 0;
+  width: 2px;
+  background: var(--blue);
+}
+.column-resizer:focus-visible {
+  outline: none;
+}
+body.is-col-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+/* Ô tìm kiếm: nút xóa nhanh */
+.toolbar-search .form-input[type='search']::-webkit-search-cancel-button {
+  display: none;
+}
+.toolbar-search-clear {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+.toolbar-search-clear:hover {
+  background: var(--panel-3);
+  color: var(--text);
+}
+.toolbar-search-clear:focus-visible {
+  outline: 2px solid var(--border-focus);
+}
+.toolbar-search .toolbar-search-clear svg {
+  position: static;
+  width: 14px;
+  height: 14px;
+  transform: none;
+}
+.toolbar-search .form-input[type='search'] {
+  padding-right: 36px;
+}
+
+/* Đẩy nhóm bên phải (số kết quả, xuất file) sang mép phải thanh công cụ */
+.toolbar-end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-left: auto;
+}
+.toolbar-count {
+  font-size: 13px;
+  color: var(--canvas-text);
+  white-space: nowrap;
+}
+.btn-secondary .spinner {
+  border-color: var(--panel-3);
+  border-top-color: var(--primary);
+}
+
 /* Phân trang */
 .pagination-controls {
   display: flex;
