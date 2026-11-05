@@ -29,12 +29,28 @@ import {
   type ProductFilterParams,
 } from '@/lib/queries/products';
 import { buildHtmlDocument, exportFilename, saveBlob, type ExportColumn } from '@/lib/table-export';
+import { decimalSortValue, sortRows, type SortValue } from '@/lib/table-sort';
 
 const ALL = 'all';
 const PAGE_SIZE = 20;
 
-/** Cột server cho phép sắp xếp (endpoints.md mục 2.1: `code`, `name`, `onHand`, `createdAt`). */
-const SORTABLE_IDS = ['code', 'name', 'onHand'] as const;
+/** Cột server sắp xếp được trên TOÀN BỘ kết quả (endpoints.md mục 2.1: `code`, `name`, `onHand`, `createdAt`). */
+const SERVER_SORT_IDS: readonly string[] = ['code', 'name', 'onHand'];
+
+/** Các cột còn lại API chưa hỗ trợ `sort` → chỉ sắp xếp được trong trang đang xem. */
+const PAGE_SORT: Record<string, (p: Product) => SortValue> = {
+  unit: (p) => p.unit,
+  basePrice: (p) => decimalSortValue(p.basePrice),
+  costPrice: (p) => decimalSortValue(p.costPrice),
+  reserved: (p) => decimalSortValue(p.reserved),
+  available: (p) => decimalSortValue(p.available),
+  location: (p) => p.location,
+  status: (p) => (p.isActive ? 0 : 1),
+};
+const SORTABLE_IDS: readonly string[] = [...SERVER_SORT_IDS, ...Object.keys(PAGE_SORT)];
+const SORT_HINTS: Record<string, string> = Object.fromEntries(
+  Object.keys(PAGE_SORT).map((id) => [id, 'Sắp xếp trong trang đang xem']),
+);
 
 /** Độ rộng mặc định (px) từng cột; người dùng kéo mép tiêu đề để đổi, được nhớ theo trình duyệt. */
 const DEFAULT_WIDTHS = {
@@ -81,13 +97,16 @@ export function ProductsScreen() {
     categoryId: categoryId === ALL ? undefined : categoryId,
     isActive: status === ALL ? undefined : status === 'active',
     inStock: stock === 'in' ? true : undefined,
-    sort: sort ? `${sort.desc ? '-' : ''}${sort.id}` : undefined,
+    sort:
+      sort && SERVER_SORT_IDS.includes(sort.id) ? `${sort.desc ? '-' : ''}${sort.id}` : undefined,
   };
   const { data, isLoading, isError, error } = useProductList({
     ...filters,
     page,
     limit: PAGE_SIZE,
   });
+  // Cột không có ở API: sắp xếp ngay trên các dòng của trang hiện tại.
+  const rows = useMemo(() => sortRows(data?.data ?? EMPTY, sort, PAGE_SORT), [data, sort]);
   const { data: categoryTree } = useCategories();
   const categories = useMemo(() => flattenCategories(categoryTree ?? []), [categoryTree]);
 
@@ -228,12 +247,12 @@ export function ProductsScreen() {
       saveBlob(blob, filename ?? exportFilename('hang-hoa', 'xlsx'));
       return;
     }
-    const rows = await fetchAllProducts(filters);
+    const all = await fetchAllProducts(filters);
     const html = buildHtmlDocument({
       title: 'Danh sách hàng hóa',
       subtitle: debouncedQ ? `Tìm: "${debouncedQ}"` : undefined,
       columns: exportColumns,
-      rows,
+      rows: sortRows(all, sort, PAGE_SORT),
     });
     saveBlob(
       new Blob([html], { type: 'text/html;charset=utf-8' }),
@@ -306,13 +325,14 @@ export function ProductsScreen() {
         <>
           <DataTable
             columns={columns}
-            data={data?.data ?? EMPTY}
+            data={rows}
             isLoading={isLoading}
             emptyText="Không có hàng hóa phù hợp"
             getRowId={(p) => p.id}
             sort={sort}
             onSortChange={(s) => resetFilters(() => setSort(s))}
             sortableIds={SORTABLE_IDS}
+            sortHints={SORT_HINTS}
             resizable={{ storageKey: 'table:products', defaultWidths: DEFAULT_WIDTHS }}
             columnLabels={COLUMN_LABELS}
           />

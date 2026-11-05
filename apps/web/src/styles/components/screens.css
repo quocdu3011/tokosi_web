@@ -209,6 +209,40 @@
 .price-input[data-changed="true"] {
   border-color: var(--amber);
 }
+
+/* Ô giá trong lưới: phẳng như ô bảng tính — ô nhập phủ kín ô bảng, không viền, không bo góc.
+   Mọi ô giá trông giống nhau; chỉ cột Mã/Tên/Giá vốn là chữ thường (không sửa được). */
+.data-table td.cell-edit {
+  padding: 0;
+}
+.data-table td.cell-edit .price-input {
+  display: block;
+  width: 100%;
+  min-height: 42px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 13px;
+  text-align: right;
+}
+.data-table td.cell-edit .price-input:hover:not(:disabled) {
+  background: var(--panel-3);
+}
+.data-table td.cell-edit .price-input:focus-visible {
+  background: var(--panel-2);
+  box-shadow: inset 0 0 0 2px var(--border-focus);
+}
+.data-table td.cell-edit .price-input[data-changed="true"] {
+  background: var(--accent-blue-12);
+  box-shadow: inset 3px 0 0 var(--amber);
+}
+.data-table td.cell-edit .price-input[aria-invalid="true"] {
+  background: var(--alert-error-bg);
+  box-shadow: inset 0 0 0 1px var(--red);
+}
 .save-bar {
   display: flex;
   flex-wrap: wrap;

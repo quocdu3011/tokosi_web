@@ -1,12 +1,13 @@
 'use client';
 
-import { Copy, Percent, RotateCcw, Save, Search } from 'lucide-react';
+import { Copy, Percent, RotateCcw, Save } from 'lucide-react';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { PageHeader } from '@/components/common/coming-soon';
-import { DataTable, type AppColumnDef } from '@/components/data-table/data-table';
+import { DataTable, type AppColumnDef, type SortState } from '@/components/data-table/data-table';
 import { Pagination } from '@/components/data-table/pagination';
+import { ExportMenu, TableSearch, type ExportFormat } from '@/components/data-table/table-toolbar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -21,7 +22,7 @@ import { errorMessage } from '@/lib/api';
 import type { PriceGridRow } from '@/lib/api/types';
 import { useAuthStore } from '@/lib/auth/store';
 import { useBranchStore } from '@/lib/branch';
-import { formatMoney } from '@/lib/format';
+import { formatDecimal, formatMoney } from '@/lib/format';
 import { can } from '@/lib/permissions';
 import {
   cellKey,
@@ -30,14 +31,44 @@ import {
   summarizeDrafts,
   type CellDraft,
 } from '@/lib/price-grid';
-import { usePriceGrid, useSaveGrid } from '@/lib/queries/price-books';
+import {
+  downloadPriceGridXlsx,
+  fetchAllPriceGrid,
+  usePriceGrid,
+  useSaveGrid,
+  type PriceGridFilterParams,
+} from '@/lib/queries/price-books';
 import { flattenCategories, useCategories } from '@/lib/queries/products';
+import { buildHtmlDocument, exportFilename, saveBlob, type ExportColumn } from '@/lib/table-export';
+import { decimalSortValue, sortRows, type SortValue } from '@/lib/table-sort';
 
 import { BulkAdjustDialog } from './bulk-adjust-dialog';
 import { CopyBranchDialog } from './copy-branch-dialog';
 
 const ALL = 'all';
 const PAGE_SIZE = 50;
+
+/** Cột của file HTML: chữ thuần, mỗi bảng giá một cột (giá vốn chỉ khi đủ quyền). */
+function exportColumnsFor(
+  books: { id: string; name: string }[],
+  canSeeCost: boolean,
+): ExportColumn<PriceGridRow>[] {
+  const cols: ExportColumn<PriceGridRow>[] = [
+    { header: 'Mã hàng', value: (r) => r.code },
+    { header: 'Tên hàng', value: (r) => r.name },
+  ];
+  if (canSeeCost) {
+    cols.push({ header: 'Giá vốn (₫)', value: (r) => formatDecimal(r.costPrice), numeric: true });
+  }
+  for (const b of books) {
+    cols.push({
+      header: `${b.name} (₫)`,
+      value: (r) => formatDecimal(r.prices[b.id]),
+      numeric: true,
+    });
+  }
+  return cols;
+}
 
 interface DraftsApi {
   drafts: Record<string, CellDraft>;
@@ -63,14 +94,19 @@ function PriceGridView() {
   const [q, setQ] = useState('');
   const [categoryId, setCategoryId] = useState<string>(ALL);
   const [page, setPage] = useState(1);
+  const [sort, setSort] = useState<SortState | null>(null);
   const [drafts, setDrafts] = useState<Record<string, CellDraft>>({});
   const [bulkOpen, setBulkOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
   const debouncedQ = useDebouncedValue(q.trim());
 
-  const { data, isLoading, isError, error } = usePriceGrid({
+  // Bộ lọc dùng chung cho lưới, xuất Excel và xuất HTML (file luôn khớp màn hình).
+  const filters: PriceGridFilterParams = {
     q: debouncedQ || undefined,
     categoryId: categoryId === ALL ? undefined : categoryId,
+  };
+  const { data, isLoading, isError, error } = usePriceGrid({
+    ...filters,
     page,
     limit: PAGE_SIZE,
   });
@@ -134,6 +170,58 @@ function PriceGridView() {
     return cols;
   }, [books, canSeeCost]);
 
+  // Lưới giá chưa có tham số `sort` ở API → mọi cột sắp xếp trong trang đang xem.
+  // Sắp xếp theo giá GỐC (đã lưu), không theo bản nháp, để dòng không nhảy khi đang gõ.
+  const sortKit = useMemo(() => {
+    const accessors: Record<string, (r: PriceGridRow) => SortValue> = {
+      code: (r) => r.code,
+      name: (r) => r.name,
+      costPrice: (r) => decimalSortValue(r.costPrice),
+    };
+    const hints: Record<string, string> = {};
+    const labels: Record<string, string> = {
+      code: 'mã hàng',
+      name: 'tên hàng',
+      costPrice: 'giá vốn',
+    };
+    const widths: Record<string, number> = { code: 120, name: 280, costPrice: 130 };
+    const editCells: Record<string, string> = {};
+    for (const book of books ?? []) {
+      const id = `book-${book.id}`;
+      accessors[id] = (r) => decimalSortValue(r.prices[book.id]);
+      labels[id] = book.name.toLowerCase();
+      widths[id] = 140;
+      editCells[id] = 'cell-edit';
+    }
+    for (const id of Object.keys(accessors)) hints[id] = 'Sắp xếp trong trang đang xem';
+    return { accessors, hints, labels, widths, editCells, ids: Object.keys(accessors) };
+  }, [books]);
+
+  const rows = useMemo(
+    () => sortRows(data?.data ?? EMPTY, sort, sortKit.accessors),
+    [data, sort, sortKit],
+  );
+
+  const handleExport = async (format: ExportFormat) => {
+    if (!branchId) return;
+    if (format === 'xlsx') {
+      const { blob, filename } = await downloadPriceGridXlsx(branchId, filters);
+      saveBlob(blob, filename ?? exportFilename('thiet-lap-gia', 'xlsx'));
+      return;
+    }
+    const grid = await fetchAllPriceGrid(branchId, filters);
+    const html = buildHtmlDocument({
+      title: 'Thiết lập giá',
+      subtitle: branchName ? `Chi nhánh ${branchName}` : undefined,
+      columns: exportColumnsFor(grid.books, canSeeCost),
+      rows: sortRows(grid.data, sort, sortKit.accessors),
+    });
+    saveBlob(
+      new Blob([html], { type: 'text/html;charset=utf-8' }),
+      exportFilename('thiet-lap-gia', 'html'),
+    );
+  };
+
   const resetFilters = (fn: () => void) => {
     fn();
     setPage(1);
@@ -173,15 +261,12 @@ function PriceGridView() {
       />
 
       <div className="toolbar">
-        <div className="toolbar-search">
-          <Search aria-hidden="true" />
-          <Input
-            value={q}
-            onChange={(e) => resetFilters(() => setQ(e.target.value))}
-            placeholder="Tìm mã hoặc tên hàng"
-            aria-label="Tìm hàng hóa"
-          />
-        </div>
+        <TableSearch
+          value={q}
+          onChange={(v) => resetFilters(() => setQ(v))}
+          placeholder="Tìm mã hoặc tên hàng"
+          label="Tìm hàng hóa"
+        />
         <Select value={categoryId} onValueChange={(v) => resetFilters(() => setCategoryId(v))}>
           <SelectTrigger aria-label="Lọc theo nhóm hàng" className="toolbar-select">
             <SelectValue />
@@ -196,6 +281,14 @@ function PriceGridView() {
             ))}
           </SelectContent>
         </Select>
+        <div className="toolbar-end">
+          {data && (
+            <span className="toolbar-count tabular" aria-live="polite">
+              {data.meta.total.toLocaleString('vi-VN')} kết quả
+            </span>
+          )}
+          <ExportMenu onExport={handleExport} disabled={!data || data.meta.total === 0} />
+        </div>
       </div>
 
       {canEdit && hasPending && (
@@ -242,10 +335,17 @@ function PriceGridView() {
         <DraftsContext.Provider value={draftsApi}>
           <DataTable
             columns={columns}
-            data={data?.data ?? EMPTY}
+            data={rows}
             isLoading={isLoading}
             emptyText="Không có hàng hóa phù hợp"
             getRowId={(r) => r.productId}
+            sort={sort}
+            onSortChange={setSort}
+            sortableIds={sortKit.ids}
+            sortHints={sortKit.hints}
+            resizable={{ storageKey: 'table:price-grid', defaultWidths: sortKit.widths }}
+            columnLabels={sortKit.labels}
+            cellClassNames={canEdit ? sortKit.editCells : undefined}
           />
           <Pagination meta={data?.meta} onPageChange={setPage} />
         </DraftsContext.Provider>

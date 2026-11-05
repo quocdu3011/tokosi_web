@@ -53,6 +53,8 @@ export function DataTable<TData extends RowData>({
   sortableIds,
   resizable,
   columnLabels,
+  sortHints,
+  cellClassNames,
 }: {
   columns: AppColumnDef<TData>[];
   data: TData[];
@@ -65,6 +67,10 @@ export function DataTable<TData extends RowData>({
   resizable?: ResizableOptions;
   /** Tên cột (chữ thường) cho nhãn trợ năng của tay nắm kéo; thiếu thì dùng id cột. */
   columnLabels?: Record<string, string>;
+  /** Gợi ý (tooltip) riêng cho nút sắp xếp của từng cột, vd. cột chỉ sắp xếp được trong trang đang xem. */
+  sortHints?: Record<string, string>;
+  /** Lớp CSS thêm cho ô dữ liệu (`td`) theo id cột, vd. `cell-edit` cho ô nhập liệu. */
+  cellClassNames?: Record<string, string>;
 }) {
   const table = useTable({ features, columns, data, getRowId });
   const { widths, setWidth, resetWidth } = useColumnWidths(
@@ -115,7 +121,7 @@ export function DataTable<TData extends RowData>({
                         type="button"
                         className="sort-button"
                         onClick={() => onSortChange?.(nextSort(id))}
-                        title="Bấm để sắp xếp"
+                        title={sortHints?.[id] ?? 'Bấm để sắp xếp'}
                       >
                         <span className="sort-label">{content}</span>
                         <span className="sort-indicator" aria-hidden="true">
@@ -166,7 +172,7 @@ export function DataTable<TData extends RowData>({
             table.getRowModel().rows.map((row) => (
               <TableRow key={row.id}>
                 {row.getAllCells().map((cell) => (
-                  <TableCell key={cell.id}>
+                  <TableCell key={cell.id} className={cellClassNames?.[cell.column.id]}>
                     <table.FlexRender cell={cell} />
                   </TableCell>
                 ))}
