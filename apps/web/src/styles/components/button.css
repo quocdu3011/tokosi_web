@@ -1,0 +1,134 @@
+/* NÚT BẤM – MASTER 5.1 (+ 7.2: chỉ translateY 2D, không transition: all) */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  min-height: 40px;
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+  transition:
+    transform 150ms var(--ease-out),
+    box-shadow 150ms var(--ease-out),
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    opacity 150ms ease;
+}
+.btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.btn:disabled,
+.btn[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Nút chính (CTA) */
+.btn-primary {
+  background: var(--primary-gradient);
+  color: var(--primary-text);
+  font-family: var(--font-display);
+  font-weight: 700;
+  box-shadow: var(--primary-shadow);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--primary-shadow-hover);
+}
+.btn-primary:active:not(:disabled) {
+  box-shadow: 0 2px 8px 0 rgba(var(--primary-rgb), 0.3);
+}
+
+/* Nút phụ (viền) */
+.btn-secondary {
+  background: var(--panel-2);
+  color: var(--text);
+  border-color: var(--border);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: var(--panel-3);
+  border-color: var(--muted);
+  transform: translateY(-1px);
+}
+
+/* Nút nền trong suốt */
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+/* Thao tác nguy hiểm */
+.btn-danger {
+  background: color-mix(in srgb, var(--red) 90%, #000);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+.btn-danger:hover:not(:disabled) {
+  background: var(--red);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px -4px rgba(var(--glow-red-rgb), 0.5);
+}
+
+/* Liên kết dạng chữ */
+.btn-link {
+  min-height: 0;
+  padding: 0;
+  background: none;
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.btn-sm {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.btn-lg {
+  min-height: 44px;
+  padding: 12px 22px;
+}
+.btn-icon {
+  width: 40px;
+  min-height: 40px;
+  padding: 0;
+}
+
+/* Cảm ứng: ô bấm tối thiểu 44px (MASTER 5.5) */
+@media (pointer: coarse), (max-width: 760px) {
+  .btn,
+  .btn-sm {
+    min-height: 44px;
+  }
+  .btn-icon {
+    width: 44px;
+  }
+  .btn-link {
+    min-height: 0;
+  }
+}

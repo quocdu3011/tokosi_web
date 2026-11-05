@@ -1,0 +1,109 @@
+/* HUY HIỆU / VIÊN THUỐC TRẠNG THÁI – MASTER 5.3, 5.6 */
+
+.badge,
+.role-badge,
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 3px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  white-space: nowrap;
+  width: fit-content;
+}
+.badge svg {
+  width: 12px;
+  height: 12px;
+}
+
+.badge-success {
+  color: var(--green);
+  background: rgba(var(--glow-green-rgb), 0.14);
+  border-color: rgba(var(--glow-green-rgb), 0.3);
+}
+.badge-warning {
+  color: var(--amber);
+  background: rgba(var(--glow-amber-rgb), 0.14);
+  border-color: rgba(var(--glow-amber-rgb), 0.3);
+}
+.badge-danger {
+  color: var(--red);
+  background: rgba(var(--glow-red-rgb), 0.14);
+  border-color: rgba(var(--glow-red-rgb), 0.3);
+}
+.badge-info {
+  color: var(--blue);
+  background: rgba(var(--primary-rgb), 0.14);
+  border-color: rgba(var(--primary-rgb), 0.3);
+}
+.badge-neutral {
+  color: var(--text-secondary);
+  background: var(--status-inactive-bg);
+  border-color: var(--border);
+}
+
+/* Vai trò (token --role-*) */
+.role-quan-ly {
+  background: var(--role-quan-ly-bg);
+  color: var(--role-quan-ly-fg);
+  border-color: var(--role-quan-ly-border);
+}
+.role-tro-ly {
+  background: var(--role-tro-ly-bg);
+  color: var(--role-tro-ly-fg);
+  border-color: var(--role-tro-ly-border);
+}
+.role-ke-toan {
+  background: var(--role-ke-toan-bg);
+  color: var(--role-ke-toan-fg);
+  border-color: var(--role-ke-toan-border);
+}
+.role-nhan-vien-kho {
+  background: var(--role-nhan-vien-kho-bg);
+  color: var(--role-nhan-vien-kho-fg);
+  border-color: var(--role-nhan-vien-kho-border);
+}
+.role-lai-xe {
+  background: var(--role-lai-xe-bg);
+  color: var(--role-lai-xe-fg);
+  border-color: var(--role-lai-xe-border);
+}
+.role-nhan-vien-sale {
+  background: var(--role-nhan-vien-sale-bg);
+  color: var(--role-nhan-vien-sale-fg);
+  border-color: var(--role-nhan-vien-sale-border);
+}
+.role-nhan-vien-marketing {
+  background: var(--role-nhan-vien-marketing-bg);
+  color: var(--role-nhan-vien-marketing-fg);
+  border-color: var(--role-nhan-vien-marketing-border);
+}
+.role-khach {
+  background: var(--role-khach-bg);
+  color: var(--role-khach-fg);
+  border-color: var(--role-khach-border);
+}
+
+/* Trạng thái tài khoản */
+.status-active {
+  background: var(--status-active-bg);
+  color: var(--green);
+}
+.status-locked {
+  background: var(--status-locked-bg);
+  color: var(--red);
+}
+.status-pending {
+  background: var(--status-pending-bg);
+  color: var(--amber);
+}
+.status-inactive {
+  background: var(--status-inactive-bg);
+  color: var(--muted);
+}

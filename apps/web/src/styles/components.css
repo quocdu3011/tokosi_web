@@ -1,0 +1,9 @@
+/* Tập hợp component CSS thuần (MASTER mục 5). Thêm file mới vào đây. */
+@import './components/button.css';
+@import './components/badge.css';
+@import './components/form.css';
+@import './components/popover.css';
+@import './components/card.css';
+@import './components/table.css';
+@import './components/modal.css';
+@import './components/screens.css';

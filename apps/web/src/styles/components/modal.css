@@ -1,0 +1,214 @@
+/* HỘP THOẠI + NGĂN KÉO + TOAST – MASTER 5.7, 5.8
+   Overlay chỉ dùng màu đặc --overlay-bg; TUYỆT ĐỐI không backdrop-filter (MASTER 7.1). */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--overlay-bg);
+}
+.modal-overlay[data-state='open'] {
+  animation: fadeIn 180ms ease-out;
+}
+.modal-overlay[data-state='closed'] {
+  animation: fadeOut 140ms ease-in forwards;
+}
+
+.modal-box {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 201;
+  display: grid;
+  gap: var(--space-xl);
+  width: calc(100% - 2rem);
+  max-width: 480px;
+  max-height: calc(100svh - 2rem);
+  padding: var(--space-2xl);
+  overflow-y: auto;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-modal);
+  transform: translate(-50%, -50%);
+}
+.modal-box[data-state='open'] {
+  animation: modalIn 200ms var(--ease-out);
+}
+.modal-box[data-state='closed'] {
+  animation: modalOut 140ms ease-in forwards;
+}
+.modal-box.modal-lg {
+  max-width: 720px;
+}
+
+.modal-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding-right: 40px;
+}
+.modal-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+.modal-description {
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.modal-footer {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--space-md);
+}
+@media (min-width: 640px) {
+  .modal-footer {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+.modal-close:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.modal-close svg {
+  width: 18px;
+  height: 18px;
+}
+@media (pointer: coarse), (max-width: 760px) {
+  .modal-close {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* Ngăn kéo (menu điện thoại) */
+.sheet-content {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  z-index: 201;
+  display: flex;
+  flex-direction: column;
+  width: min(80%, 280px);
+  background: var(--panel);
+  color: var(--text);
+  border: 0 solid var(--border);
+  box-shadow: var(--shadow-modal);
+  overflow-y: auto;
+}
+.sheet-content[data-side='left'] {
+  left: 0;
+  border-right-width: 1px;
+}
+.sheet-content[data-side='right'] {
+  right: 0;
+  border-left-width: 1px;
+}
+.sheet-content[data-side='left'][data-state='open'] {
+  animation: sheetInLeft 240ms var(--ease-out);
+}
+.sheet-content[data-side='left'][data-state='closed'] {
+  animation: sheetOutLeft 180ms ease-in forwards;
+}
+.sheet-content[data-side='right'][data-state='open'] {
+  animation: sheetInRight 240ms var(--ease-out);
+}
+.sheet-content[data-side='right'][data-state='closed'] {
+  animation: sheetOutRight 180ms ease-in forwards;
+}
+
+/* Toast (Sonner) – bo góc/viền theo token */
+.toaster [data-sonner-toast] {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: var(--shadow-toast);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 12px));
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+@keyframes modalOut {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 8px));
+  }
+}
+@keyframes sheetInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes sheetOutLeft {
+  to {
+    transform: translateX(-100%);
+  }
+}
+@keyframes sheetInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes sheetOutRight {
+  to {
+    transform: translateX(100%);
+  }
+}

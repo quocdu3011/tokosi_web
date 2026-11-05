@@ -26,17 +26,17 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-2" aria-label="Tài khoản">
-          <UserRound className="size-4" />
-          <span className="hidden max-w-40 truncate sm:inline">{user.fullName}</span>
+        <Button id="user-menu" variant="ghost" size="sm" aria-label="Tài khoản">
+          <UserRound />
+          <span className="user-menu-name">{user.fullName}</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="flex flex-col gap-0.5">
-          <span className="truncate">{user.fullName}</span>
-          <span className="text-muted-foreground text-xs font-normal">
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel className="menu-label-user">
+          <strong>{user.fullName}</strong>
+          <small>
             {user.username} · {ROLE_LABELS[user.role as Role]}
-          </span>
+          </small>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => router.push('/change-password')}>

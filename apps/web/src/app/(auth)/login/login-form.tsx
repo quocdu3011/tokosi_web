@@ -1,16 +1,15 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
+import { AuthCard } from '@/components/common/auth-card';
 import { Field } from '@/components/common/field';
 import { FullPageLoader } from '@/components/common/full-page-loader';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { errorMessage, isApiError } from '@/lib/api';
 import { login } from '@/lib/auth/session';
@@ -69,45 +68,39 @@ export function LoginForm() {
   if (status === 'loading') return <FullPageLoader />;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-xl">Đăng nhập</CardTitle>
-        <CardDescription>Hệ thống quản lý bán hàng sỉ</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={onSubmit} className="grid gap-4" noValidate>
-          <Field id="username" label="Tên đăng nhập" error={errors.username?.message}>
-            <Input
-              id="username"
-              autoComplete="username"
-              autoCapitalize="none"
-              autoFocus
-              aria-invalid={!!errors.username}
-              aria-describedby={errors.username ? 'username-error' : undefined}
-              {...register('username')}
-            />
-          </Field>
-          <Field id="password" label="Mật khẩu" error={errors.password?.message}>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              aria-invalid={!!errors.password}
-              aria-describedby={errors.password ? 'password-error' : undefined}
-              {...register('password')}
-            />
-          </Field>
-          {formError ? (
-            <p className="text-destructive text-sm" role="alert">
-              {formError}
-            </p>
-          ) : null}
-          <Button type="submit" disabled={isSubmitting} className="w-full">
-            {isSubmitting && <Loader2 className="animate-spin" />}
-            Đăng nhập
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+    <AuthCard title="Đăng nhập" description="Hệ thống quản lý bán hàng sỉ Tokosi">
+      <form onSubmit={onSubmit} className="auth-form" noValidate>
+        <Field id="username" label="Tên đăng nhập" error={errors.username?.message}>
+          <Input
+            id="username"
+            autoComplete="username"
+            autoCapitalize="none"
+            autoFocus
+            aria-invalid={!!errors.username}
+            aria-describedby={errors.username ? 'username-error' : undefined}
+            {...register('username')}
+          />
+        </Field>
+        <Field id="password" label="Mật khẩu" error={errors.password?.message}>
+          <Input
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            aria-invalid={!!errors.password}
+            aria-describedby={errors.password ? 'password-error' : undefined}
+            {...register('password')}
+          />
+        </Field>
+        {formError ? (
+          <p className="alert alert-error" role="alert">
+            {formError}
+          </p>
+        ) : null}
+        <Button type="submit" id="login-submit" disabled={isSubmitting} size="lg">
+          {isSubmitting && <span className="spinner" aria-hidden="true" />}
+          Đăng nhập
+        </Button>
+      </form>
+    </AuthCard>
   );
 }

@@ -56,7 +56,14 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+    // Dark Obsidian mặc định, chuyển Light bằng nút; lưu lựa chọn trong localStorage
+    <ThemeProvider
+      attribute="data-theme"
+      defaultTheme="dark"
+      enableSystem={false}
+      themes={['dark', 'light']}
+      disableTransitionOnChange
+    >
       <QueryClientProvider client={client}>
         <BranchCacheReset client={client} />
         {children}

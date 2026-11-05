@@ -1,0 +1,107 @@
+/* BẢNG DỮ LIỆU DÀY ĐẶC + PHÂN TRANG – MASTER 5.5 */
+
+.data-table-frame {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+
+/* Một khung cuộn duy nhất để tiêu đề dính có tác dụng */
+.data-table-scroll {
+  position: relative;
+  width: 100%;
+  max-height: min(72svh, 760px);
+  overflow: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+.data-table th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 10px 14px;
+  background: var(--panel-2);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+.data-table td {
+  padding: 10px 14px;
+  color: var(--text);
+  vertical-align: middle;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--row-divider);
+}
+.data-table tbody tr {
+  transition: background-color 100ms ease;
+}
+.data-table tbody tr:hover {
+  background: var(--panel-2);
+}
+.data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Cột số liệu / mã: canh phải, phông dữ liệu */
+.data-table .col-numeric {
+  text-align: right;
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.data-table .col-actions {
+  width: 1%;
+  text-align: right;
+}
+
+.data-table-empty {
+  height: 96px;
+  text-align: center;
+  color: var(--muted);
+}
+
+/* Dòng bấm được để mở chi tiết */
+.data-table tr.row-clickable {
+  cursor: pointer;
+}
+
+/* Hiệu ứng nháy dòng vừa cập nhật (MASTER 5.16) */
+@keyframes rowPulseHighlight {
+  0% {
+    background-color: var(--accent-blue-18);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.row-highlight-update {
+  animation: rowPulseHighlight 1.2s ease-out;
+}
+
+/* Phân trang */
+.pagination-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  font-size: 13px;
+  color: var(--canvas-text);
+}
+.pagination-buttons {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}

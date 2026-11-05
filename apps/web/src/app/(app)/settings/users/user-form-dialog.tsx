@@ -2,7 +2,6 @@
 
 import { ROLE_LABELS, ROLES } from '@kiot/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2 } from 'lucide-react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -201,7 +200,7 @@ export function UserFormDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="modal-form">
         <DialogHeader>
           <DialogTitle>{isNew ? 'Thêm người dùng' : `Sửa ${user.username}`}</DialogTitle>
           <DialogDescription>
@@ -211,7 +210,7 @@ export function UserFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
+        <form onSubmit={onSubmit} className="form-grid" noValidate>
           <Field id={fid('username')} label="Tên đăng nhập" error={err('username')}>
             <Input
               id={fid('username')}
@@ -237,7 +236,7 @@ export function UserFormDialog({
               name="role"
               render={({ field }) => (
                 <Select value={field.value} onValueChange={field.onChange} disabled={isSelf}>
-                  <SelectTrigger id={fid('role')} className="w-full" {...aria('role')}>
+                  <SelectTrigger id={fid('role')} {...aria('role')}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -261,19 +260,19 @@ export function UserFormDialog({
             />
           </Field>
 
-          <fieldset className="grid gap-2 sm:col-span-2">
-            <legend className="mb-2 text-sm font-medium">Chi nhánh được làm việc</legend>
+          <fieldset className="fieldset span-2">
+            <legend>Chi nhánh được làm việc</legend>
             {role === 'manager' ? (
-              <p className="text-muted-foreground text-xs">
+              <p className="field-hint">
                 Quản lý làm việc được ở mọi chi nhánh; danh sách dưới đây chỉ để chọn chi nhánh mặc
                 định.
               </p>
             ) : null}
-            <div className="flex flex-wrap gap-4">
+            <div className="check-group">
               {branches.map((b) => {
                 const checked = branchIds.includes(b.id);
                 return (
-                  <div key={b.id} className="flex items-center gap-2">
+                  <div key={b.id} className="check-row">
                     <Checkbox
                       id={`uf-branch-${b.id}`}
                       checked={checked}
@@ -285,15 +284,13 @@ export function UserFormDialog({
                         )
                       }
                     />
-                    <Label htmlFor={`uf-branch-${b.id}`} className="font-normal">
-                      {b.name}
-                    </Label>
+                    <Label htmlFor={`uf-branch-${b.id}`}>{b.name}</Label>
                   </div>
                 );
               })}
             </div>
             {err('branchIds') ? (
-              <p id={`${fid('branchIds')}-error`} className="text-destructive text-sm" role="alert">
+              <p id={`${fid('branchIds')}-error`} className="field-error" role="alert">
                 {err('branchIds')}
               </p>
             ) : null}
@@ -312,7 +309,7 @@ export function UserFormDialog({
                   value={branchIds.includes(field.value) ? field.value : NONE}
                   onValueChange={field.onChange}
                 >
-                  <SelectTrigger id={fid('defaultBranchId')} className="w-full">
+                  <SelectTrigger id={fid('defaultBranchId')}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -331,8 +328,8 @@ export function UserFormDialog({
           </Field>
 
           {!isNew && (
-            <div className="grid content-end gap-2">
-              <div className="flex items-center gap-2">
+            <div className="stack-sm align-end">
+              <div className="check-row">
                 <Controller
                   control={control}
                   name="isActive"
@@ -345,11 +342,9 @@ export function UserFormDialog({
                     />
                   )}
                 />
-                <Label htmlFor={fid('isActive')} className="font-normal">
-                  Đang hoạt động
-                </Label>
+                <Label htmlFor={fid('isActive')}>Đang hoạt động</Label>
               </div>
-              <p className="text-muted-foreground text-xs">
+              <p className="field-hint">
                 {isSelf
                   ? 'Không tự khóa được tài khoản của mình.'
                   : 'Khóa sẽ đăng xuất người dùng ngay lập tức.'}
@@ -358,8 +353,8 @@ export function UserFormDialog({
           )}
 
           {isNew && (
-            <div className="grid gap-3 sm:col-span-2">
-              <div className="flex items-center gap-2">
+            <div className="stack-md span-2">
+              <div className="check-row">
                 <Controller
                   control={control}
                   name="setPassword"
@@ -371,7 +366,7 @@ export function UserFormDialog({
                     />
                   )}
                 />
-                <Label htmlFor={fid('setPassword')} className="font-normal">
+                <Label htmlFor={fid('setPassword')}>
                   Tự đặt mật khẩu (bỏ trống để hệ thống sinh mật khẩu tạm)
                 </Label>
               </div>
@@ -394,12 +389,12 @@ export function UserFormDialog({
             </div>
           )}
 
-          <DialogFooter className="sm:col-span-2">
+          <DialogFooter className="span-2">
             <Button type="button" variant="outline" onClick={onClose}>
               Hủy
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="animate-spin" />}
+              {isSubmitting && <span className="spinner" aria-hidden="true" />}
               {isNew ? 'Tạo tài khoản' : 'Lưu'}
             </Button>
           </DialogFooter>

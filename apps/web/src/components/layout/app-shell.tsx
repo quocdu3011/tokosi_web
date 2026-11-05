@@ -1,6 +1,7 @@
 'use client';
 
 import { Menu } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -12,49 +13,60 @@ import { SidebarNav } from './sidebar-nav';
 import { ThemeToggle } from './theme-toggle';
 import { UserMenu } from './user-menu';
 
-function Brand() {
+export function Brand() {
   return (
-    <Link href="/" className="flex h-14 items-center gap-2 px-5 font-semibold">
-      <span className="bg-primary text-primary-foreground grid size-7 place-items-center rounded-md text-xs">
-        K
+    <Link href="/" className="brand" aria-label="Tokosi – về trang chủ">
+      <span className="brand-mark">
+        <Image src="/logo.jpg" alt="" width={36} height={36} priority />
       </span>
-      Kiot bán sỉ
+      <span>
+        Tokosi
+        <span className="brand-sub">Quản lý bán sỉ</span>
+      </span>
     </Link>
   );
 }
 
-/** Khung trang quản trị: sidebar (máy tính) / ngăn kéo (điện thoại) + thanh trên. */
+/** Khung trang quản trị: thanh bên (máy tính) / ngăn kéo (điện thoại) + thanh trên. */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="flex min-h-svh">
-      <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border sticky top-0 hidden h-svh w-60 shrink-0 flex-col overflow-y-auto border-r lg:flex">
+    <div className="app-shell">
+      <aside className="sidebar">
         <Brand />
         <SidebarNav />
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-40 flex h-14 items-center gap-2 border-b px-4 backdrop-blur">
+      <div className="app-main">
+        <header className="app-header">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Mở menu">
+              <Button
+                id="open-menu"
+                variant="ghost"
+                size="icon"
+                className="menu-btn"
+                aria-label="Mở menu"
+              >
                 <Menu />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="bg-sidebar w-64 overflow-y-auto p-0">
+            <SheetContent side="left">
               <SheetTitle className="sr-only">Menu</SheetTitle>
-              <Brand />
-              <SidebarNav onNavigate={() => setMobileOpen(false)} />
+              <div className="sidebar-drawer">
+                <Brand />
+                <SidebarNav onNavigate={() => setMobileOpen(false)} />
+              </div>
             </SheetContent>
           </Sheet>
           <BranchSwitcher />
-          <div className="ml-auto flex items-center gap-1">
+          <div className="app-header-end">
             <ThemeToggle />
             <UserMenu />
           </div>
         </header>
-        <main className="flex-1 p-4 md:p-6">{children}</main>
+        <main className="app-content">{children}</main>
       </div>
     </div>
   );

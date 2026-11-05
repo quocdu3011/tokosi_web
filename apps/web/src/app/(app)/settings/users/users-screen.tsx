@@ -1,11 +1,12 @@
 'use client';
 
-import { ROLE_LABELS, ROLES, type Role } from '@kiot/shared';
+import { ROLE_LABELS, ROLES } from '@kiot/shared';
 import { KeyRound, Pencil, Plus, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { PageHeader } from '@/components/common/coming-soon';
+import { RoleBadge } from '@/components/common/role-badge';
 import { DataTable, type AppColumnDef } from '@/components/data-table/data-table';
 import { Pagination } from '@/components/data-table/pagination';
 import {
@@ -78,22 +79,22 @@ export function UsersScreen() {
         id: 'name',
         header: 'Họ tên',
         cell: ({ row }) => (
-          <div className="flex flex-col">
-            <span className="font-medium">{row.original.fullName}</span>
-            <span className="text-muted-foreground text-xs">{row.original.username}</span>
+          <div className="cell-stack">
+            <span className="cell-title">{row.original.fullName}</span>
+            <span className="cell-sub">{row.original.username}</span>
           </div>
         ),
       },
-      { id: 'role', header: 'Vai trò', cell: ({ row }) => ROLE_LABELS[row.original.role as Role] },
+      { id: 'role', header: 'Vai trò', cell: ({ row }) => <RoleBadge role={row.original.role} /> },
       { id: 'phone', header: 'Số điện thoại', cell: ({ row }) => row.original.phone ?? '' },
       {
         id: 'branches',
         header: 'Chi nhánh',
         cell: ({ row }) =>
           row.original.role === 'manager' ? (
-            <span className="text-muted-foreground">Tất cả</span>
+            <span className="muted">Tất cả</span>
           ) : (
-            <div className="flex flex-wrap gap-1">
+            <div className="cell-badges">
               {row.original.branchIds.map((id) => (
                 <Badge
                   key={id}
@@ -109,13 +110,13 @@ export function UsersScreen() {
         id: 'status',
         header: 'Trạng thái',
         cell: ({ row }) => (
-          <div className="flex flex-wrap gap-1">
+          <div className="cell-badges">
             {row.original.isActive ? (
-              <Badge variant="outline">Hoạt động</Badge>
+              <Badge variant="success">Hoạt động</Badge>
             ) : (
               <Badge variant="destructive">Đã khóa</Badge>
             )}
-            {row.original.mustChangePassword && <Badge variant="secondary">Chờ đổi mật khẩu</Badge>}
+            {row.original.mustChangePassword && <Badge variant="warning">Chờ đổi mật khẩu</Badge>}
           </div>
         ),
       },
@@ -134,7 +135,7 @@ export function UsersScreen() {
         cell: ({ row }) => {
           const isSelf = row.original.id === me?.id;
           return (
-            <div className="flex justify-end gap-1">
+            <div className="cell-actions">
               <Button
                 variant="ghost"
                 size="icon"
@@ -167,7 +168,7 @@ export function UsersScreen() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="page">
       <PageHeader
         title="Người dùng"
         description="Tài khoản nhân viên, vai trò và chi nhánh được làm việc."
@@ -178,19 +179,18 @@ export function UsersScreen() {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:w-72">
-          <Search className="text-muted-foreground absolute top-2.5 left-2.5 size-4" />
+      <div className="toolbar">
+        <div className="toolbar-search">
+          <Search aria-hidden="true" />
           <Input
             value={q}
             onChange={(e) => resetFilters(() => setQ(e.target.value))}
             placeholder="Tìm mã, tên, tên đăng nhập, SĐT"
-            className="pl-8"
             aria-label="Tìm người dùng"
           />
         </div>
         <Select value={role} onValueChange={(v) => resetFilters(() => setRole(v))}>
-          <SelectTrigger aria-label="Lọc theo vai trò" className="w-40">
+          <SelectTrigger aria-label="Lọc theo vai trò" className="toolbar-select">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -203,7 +203,7 @@ export function UsersScreen() {
           </SelectContent>
         </Select>
         <Select value={status} onValueChange={(v) => resetFilters(() => setStatus(v))}>
-          <SelectTrigger aria-label="Lọc theo trạng thái" className="w-40">
+          <SelectTrigger aria-label="Lọc theo trạng thái" className="toolbar-select">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -215,7 +215,7 @@ export function UsersScreen() {
       </div>
 
       {isError ? (
-        <p className="text-destructive text-sm" role="alert">
+        <p className="alert alert-error" role="alert">
           {errorMessage(error)}
         </p>
       ) : (

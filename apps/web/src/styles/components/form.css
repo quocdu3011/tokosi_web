@@ -1,0 +1,200 @@
+/* BIỂU MẪU – MASTER 5.4, 5.12 */
+
+.field {
+  display: grid;
+  gap: var(--space-md);
+}
+.form-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  user-select: none;
+}
+.field-error {
+  font-size: 12.5px;
+  color: var(--red);
+}
+.field-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 10px 14px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    background-color 150ms ease;
+}
+.form-input::placeholder,
+.form-textarea::placeholder {
+  color: var(--muted);
+}
+.form-input:hover:not(:disabled),
+.form-select:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+.form-input:focus-visible,
+.form-select:focus-visible,
+.form-textarea:focus-visible,
+.form-select[data-state='open'] {
+  border-color: var(--border-focus);
+  box-shadow: var(--shadow-focus-input);
+}
+.form-input:disabled,
+.form-select:disabled,
+.form-textarea:disabled {
+  opacity: 0.6;
+  background: var(--panel-3);
+  cursor: not-allowed;
+}
+.form-input[aria-invalid='true'],
+.form-select[aria-invalid='true'] {
+  border-color: var(--red);
+}
+.form-input[aria-invalid='true']:focus-visible {
+  box-shadow: 0 0 0 3px rgba(var(--glow-red-rgb), 0.25);
+}
+.form-input[type='file'] {
+  padding: 6px 10px;
+}
+.form-input::-webkit-search-cancel-button {
+  cursor: pointer;
+}
+
+.form-textarea {
+  min-height: 130px;
+  font-family: var(--font-data);
+  resize: vertical;
+}
+
+/* Ô chọn Radix */
+.form-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  width: 100%;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.form-select[data-size='sm'] {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.form-select[data-placeholder] {
+  color: var(--muted);
+}
+.form-select > [data-slot='select-value'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.form-select-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.select-content {
+  min-width: var(--radix-select-trigger-width);
+  max-height: var(--radix-select-content-available-height);
+  overflow: hidden auto;
+}
+.select-viewport {
+  padding: var(--space-sm);
+}
+.select-viewport[data-position='popper'] {
+  width: 100%;
+  min-width: var(--radix-select-trigger-width);
+}
+.select-item {
+  padding-right: 32px;
+}
+.select-item-check {
+  position: absolute;
+  right: 10px;
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  color: var(--primary);
+}
+.select-item-check svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Checkbox Radix */
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  flex-shrink: 0;
+  background: var(--panel-2);
+  border: 1px solid var(--muted);
+  border-radius: 5px;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+.checkbox:hover:not(:disabled) {
+  border-color: var(--primary);
+}
+.checkbox[data-state='checked'],
+.checkbox[data-state='indeterminate'] {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-text);
+}
+.checkbox:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.checkbox-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.checkbox-indicator svg {
+  width: 14px;
+  height: 14px;
+}
+.checkbox[aria-invalid='true'] {
+  border-color: var(--red);
+}
+
+/* Cảm ứng: ô nhập đủ cao (MASTER 5.5) */
+@media (pointer: coarse), (max-width: 760px) {
+  .form-input,
+  .form-select,
+  .form-select[data-size='sm'] {
+    min-height: 44px;
+    font-size: 16px; /* tránh iOS tự phóng to khi focus */
+  }
+}
