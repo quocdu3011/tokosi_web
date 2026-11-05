@@ -1,0 +1,4 @@
+ALTER TABLE "import_jobs" ADD COLUMN "branch_id" uuid;--> statement-breakpoint
+ALTER TABLE "import_jobs" ADD COLUMN "file_hash" text;--> statement-breakpoint
+ALTER TABLE "import_jobs" ADD CONSTRAINT "import_jobs_branch_id_branches_id_fk" FOREIGN KEY ("branch_id") REFERENCES "public"."branches"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE UNIQUE INDEX "import_jobs_add_file_unique" ON "import_jobs" USING btree ("branch_id","file_hash") WHERE "import_jobs"."mode" = 'add' and "import_jobs"."dry_run" = false and "import_jobs"."status" = 'completed' and "import_jobs"."file_hash" is not null;

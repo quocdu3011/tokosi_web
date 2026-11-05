@@ -1,7 +1,8 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { AppError } from '../../common/app-error.js';
+import { uniqueViolation } from '../../common/pg-errors.js';
 import type { AuthUser } from '../../common/auth-user.js';
 import { describeErrorForLog } from '../../common/all-exceptions.filter.js';
 import { readSheet, writeSheet, type ParsedSheet } from '../../common/excel.js';
@@ -50,7 +51,12 @@ export class ImportsService {
     user: AuthUser,
     type: string,
     file: { originalname: string; size: number; buffer: Buffer } | undefined,
-    opts: { dryRun: boolean; branchId?: string; mode: ImportMode },
+    opts: {
+      dryRun: boolean;
+      branchId?: string;
+      mode: ImportMode;
+      allowDuplicate?: boolean;
+    },
   ): Promise<ImportJobDto> {
     const kind = this.parseType(type);
     if (!file || file.size === 0) {
@@ -75,12 +81,39 @@ export class ImportsService {
       );
     }
 
+    // Import thêm cộng tồn nên KHÔNG idempotent: cùng một file (theo nội dung) chỉ được nhập thật một lần mỗi chi nhánh.
+    // Kiểm tra cả khi chạy thử để người dùng biết trước. Ràng buộc duy nhất ở CSDL chặn hai lần nhập đồng thời.
+    const fileHash =
+      opts.mode === 'add' && opts.branchId
+        ? createHash('sha256').update(file.buffer).digest('hex')
+        : null;
+    if (fileHash && !opts.allowDuplicate) {
+      const [prev] = await this.db
+        .select({
+          id: importJobs.id,
+          fileName: importJobs.fileName,
+          createdAt: importJobs.createdAt,
+        })
+        .from(importJobs)
+        .where(
+          and(
+            eq(importJobs.branchId, opts.branchId!),
+            eq(importJobs.fileHash, fileHash),
+            eq(importJobs.mode, 'add'),
+            eq(importJobs.dryRun, false),
+            eq(importJobs.status, 'completed'),
+          ),
+        );
+      if (prev) throw duplicateFile(prev);
+    }
+
     // Id lần nhập sinh trước để làm chứng từ gốc (`refId`, mã IMP-…) của các dòng cộng/trừ tồn ở chế độ "thêm".
     const jobId = randomUUID();
     const ref = { id: jobId, code: `IMP-${jobId.slice(0, 8).toUpperCase()}` };
 
     let outcome: ImportOutcome;
     let systemError: string | null = null;
+    let savedJob: typeof importJobs.$inferSelect | undefined;
     try {
       outcome = await this.db.transaction(async (tx) => {
         const result = await importProducts(tx, sheet, {
@@ -103,13 +136,43 @@ export class ImportsService {
             rows: sheet.rows.length,
             created: result.created,
             updated: result.updated,
+            ...(opts.allowDuplicate && opts.mode === 'add'
+              ? { allowDuplicate: true }
+              : {}),
           },
         });
+        // Nhập thật thành công: ghi lần nhập NGAY TRONG transaction. Hai lần nhập đồng thời cùng file đụng ràng buộc
+        // duy nhất → lần sau hoàn tác cả phần cộng tồn của nó.
+        [savedJob] = await tx
+          .insert(importJobs)
+          .values({
+            id: jobId,
+            type: kind,
+            mode: opts.mode,
+            status: 'completed',
+            dryRun: false,
+            fileName: file.originalname.slice(0, 255),
+            branchId: opts.branchId ?? null,
+            // Cho phép nạp lại thì không lưu băm: lần sau vẫn bị chặn bởi lần nhập gốc
+            fileHash: opts.allowDuplicate ? null : fileHash,
+            total: sheet.rows.length,
+            created: result.created,
+            updated: result.updated,
+            failed: 0,
+            errors: [],
+            createdBy: user.id,
+            finishedAt: new Date(),
+          })
+          .returning();
         return result;
       });
     } catch (e) {
       if (e instanceof Rollback) {
         outcome = e.outcome;
+      } else if (
+        uniqueViolation(e)?.constraint?.includes('import_jobs_add_file_unique')
+      ) {
+        throw duplicateFile();
       } else {
         // Lỗi ràng buộc/CSDL ngoài dự kiến: không ghi gì (transaction đã hoàn tác), không lộ chi tiết nội bộ
         this.logger.error(`Nhập ${kind} thất bại: ${describeErrorForLog(e)}`);
@@ -124,6 +187,7 @@ export class ImportsService {
       : outcome.errors;
     const failedRows = new Set(errors.map((x) => x.row)).size;
     const failed = errors.length > 0;
+    if (savedJob) return toDto(savedJob);
     const [job] = await this.db
       .insert(importJobs)
       .values({
@@ -133,6 +197,7 @@ export class ImportsService {
         status: failed ? 'failed' : 'completed',
         dryRun: opts.dryRun,
         fileName: file.originalname.slice(0, 255),
+        branchId: opts.branchId ?? null,
         total: sheet.rows.length,
         created: failed ? 0 : outcome.created,
         updated: failed ? 0 : outcome.updated,
@@ -243,3 +308,22 @@ function toDto(j: JobRow): ImportJobDto {
 }
 
 export const IMPORT_FILE_LIMIT = MAX_IMPORT_BYTES;
+
+function duplicateFile(prev?: {
+  id: string;
+  fileName: string | null;
+  createdAt: Date;
+}): AppError {
+  return new AppError(
+    409,
+    'IMPORT_DUPLICATE_FILE',
+    'File này đã được Import thêm vào chi nhánh này rồi; nhập lại sẽ cộng tồn lần nữa. Nếu thật sự muốn nhập lại, gửi allowDuplicate=true.',
+    prev
+      ? {
+          importId: prev.id,
+          fileName: prev.fileName,
+          importedAt: prev.createdAt.toISOString(),
+        }
+      : undefined,
+  );
+}

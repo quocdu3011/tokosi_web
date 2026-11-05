@@ -201,9 +201,15 @@ Công việc import Excel chạy nền.
 | `updated` | integer |  | `0` |  |
 | `failed` | integer |  | `0` |  |
 | `errors` | jsonb | ✔ |  |  |
+| `branch_id` | uuid | ✔ |  | → `branches.id` |
+| `file_hash` | text | ✔ |  |  |
 | `created_by` | uuid | ✔ |  | → `users.id` |
 | `created_at` | timestamptz |  | `now()` |  |
 | `finished_at` | timestamptz | ✔ |  |  |
+
+**Chỉ mục:**
+
+- `import_jobs_add_file_unique` (unique): `branch_id`, `file_hash` WHERE mode = 'add' and dryRun = false and status = 'completed' and fileHash is not null
 
 ### user_branches
 

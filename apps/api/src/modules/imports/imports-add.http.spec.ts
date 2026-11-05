@@ -56,11 +56,16 @@ describe('Import thêm (mode=add) qua HTTP', () => {
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
   };
-  const add = (file: Buffer, branch: string | null = t.sg, dryRun = false) =>
+  const add = (
+    file: Buffer,
+    branch: string | null = t.sg,
+    dryRun = false,
+    extra = '',
+  ) =>
     post(
       'products',
       file,
-      `?mode=add&dryRun=${dryRun}${branch ? `&branchId=${branch}` : ''}`,
+      `?mode=add&dryRun=${dryRun}${branch ? `&branchId=${branch}` : ''}${extra}`,
     );
   const productByCode = async (code: string) =>
     (await t.db.select().from(products).where(eq(products.code, code)))[0];
@@ -175,7 +180,8 @@ describe('Import thêm (mode=add) qua HTTP', () => {
       row({ 'Mã hàng': 'AD1', 'Tồn kho': 10 }),
     ]);
     await add(file);
-    await add(file);
+    // không cho phép thì bị chặn (xem test chống nạp lại); cố ý cho phép thì cộng thêm lần nữa
+    await add(file, t.sg, false, '&allowDuplicate=true');
     expect(await stockOf('AD1', t.sg)).toMatchObject({
       onHand: '70.000',
       costPrice: '1600.0000',
@@ -297,5 +303,81 @@ describe('Import thêm (mode=add) qua HTTP', () => {
     expect(job.body.mode).toBe('overwrite');
     const jobs = await t.db.select().from(importJobs);
     expect(jobs.some((j) => j.mode === 'add')).toBe(true);
+  });
+
+  // ------------------------------------------------------------------ chống nạp lại cùng file
+
+  it('chống nạp lại: cùng file đã nhập thật vào chi nhánh → 409 IMPORT_DUPLICATE_FILE (cả chạy thử), không đổi tồn', async () => {
+    const file = await xlsx(HEADERS, [
+      row({
+        'Mã hàng': 'DUP1',
+        'Tên hàng': 'Hàng dup',
+        'Tồn kho': 8,
+        'Giá vốn': 100,
+      }),
+    ]);
+    // chạy thử không tính là đã nhập, không chặn lần nhập thật sau đó
+    expect((await add(file, t.sg, true)).status).toBe(202);
+    const first = await add(file);
+    expect(first.body.status).toBe('completed');
+    expect(await stockOf('DUP1', t.sg)).toMatchObject({ onHand: '8.000' });
+
+    const again = await add(file);
+    expect(again.status).toBe(409);
+    expect(again.body.code).toBe('IMPORT_DUPLICATE_FILE');
+    expect(again.body.details.importId).toBe(first.body.id);
+    const dry = await add(file, t.sg, true);
+    expect(dry.status).toBe(409);
+    expect(await stockOf('DUP1', t.sg)).toMatchObject({ onHand: '8.000' });
+    expect(await movementsOf('DUP1')).toHaveLength(1);
+
+    // chi nhánh khác: không coi là trùng
+    const other = await add(file, t.hn);
+    expect(other.body.status).toBe('completed');
+    expect(await stockOf('DUP1', t.hn)).toMatchObject({ onHand: '8.000' });
+    // file khác nội dung: được
+    const changed = await xlsx(HEADERS, [
+      row({ 'Mã hàng': 'DUP1', 'Tồn kho': 1 }),
+    ]);
+    expect((await add(changed)).body.status).toBe('completed');
+    expect(await stockOf('DUP1', t.sg)).toMatchObject({ onHand: '9.000' });
+  });
+
+  it('cố ý nhập lại: allowDuplicate=true cộng thêm lần nữa và ghi nhật ký; lần sau vẫn bị chặn nếu thiếu cờ', async () => {
+    const file = await xlsx(HEADERS, [
+      row({ 'Mã hàng': 'DUP2', 'Tên hàng': 'Hàng dup 2', 'Tồn kho': 3 }),
+    ]);
+    expect((await add(file)).body.status).toBe('completed');
+    const forced = await add(file, t.sg, false, '&allowDuplicate=true');
+    expect(forced.body.status).toBe('completed');
+    expect(await stockOf('DUP2', t.sg)).toMatchObject({ onHand: '6.000' });
+    expect((await add(file)).status).toBe(409);
+    const jobs = await t.db
+      .select()
+      .from(importJobs)
+      .where(eq(importJobs.mode, 'add'));
+    expect(jobs.filter((j) => j.fileHash !== null).length).toBeGreaterThan(0);
+    // lần nhập cưỡng chế không giữ băm (lần nhập gốc vẫn là bản chặn)
+    expect(jobs.find((j) => j.id === forced.body.id)!.fileHash).toBeNull();
+  });
+
+  it('file lỗi không bị coi là đã nhập: sửa rồi gửi lại được; chế độ overwrite không bị chặn khi gửi lại', async () => {
+    const bad = await xlsx(HEADERS, [
+      row({ 'Mã hàng': 'DUP3', 'Tồn kho': -5 }), // hàng mới mà trừ → lỗi, không ghi gì
+    ]);
+    expect((await add(bad)).body.status).toBe('failed');
+    expect((await add(bad)).body.status).toBe('failed'); // vẫn là lỗi dòng, không phải 409
+
+    const f = await xlsx(HEADERS, [
+      row({ 'Mã hàng': 'DUP4', 'Tên hàng': 'x', 'Tồn kho': 2 }),
+    ]);
+    for (let i = 0; i < 2; i++) {
+      const r = await post(
+        'products',
+        f,
+        `?mode=overwrite&dryRun=false&branchId=${t.sg}`,
+      );
+      expect(r.status).toBe(202);
+    }
   });
 });

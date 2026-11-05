@@ -580,7 +580,7 @@ export interface paths {
     put?: never;
     /**
      * Tải file Excel lên để nhập (type: products)
-     * @description Mặc định chỉ KIỂM TRA (dryRun=true), không ghi gì; gửi dryRun=false để ghi thật. Xử lý ngay trong yêu cầu nên kết quả (status completed hoặc failed) có sẵn trong phản hồi; vẫn xem lại được qua GET /imports/:id. Tất cả hoặc không gì cả: có dòng lỗi thì không ghi gì. mode=overwrite (mặc định): cập nhật theo mã hàng, chạy lại cùng file không tạo trùng. mode=add: CỘNG tồn kho theo cột Tồn kho nên chạy lại sẽ cộng thêm lần nữa.
+     * @description Mặc định chỉ KIỂM TRA (dryRun=true), không ghi gì; gửi dryRun=false để ghi thật. Xử lý ngay trong yêu cầu nên kết quả (status completed hoặc failed) có sẵn trong phản hồi; vẫn xem lại được qua GET /imports/:id. Tất cả hoặc không gì cả: có dòng lỗi thì không ghi gì. mode=overwrite (mặc định): cập nhật theo mã hàng, chạy lại cùng file không tạo trùng. mode=add: CỘNG tồn kho theo cột Tồn kho; cùng một file (theo nội dung) đã nhập thật vào chi nhánh này sẽ bị từ chối 409 IMPORT_DUPLICATE_FILE, kể cả khi chạy thử, trừ khi gửi allowDuplicate=true.
      */
     post: operations['ImportsController_run'];
     delete?: never;
@@ -2262,6 +2262,8 @@ export interface operations {
   ImportsController_run: {
     parameters: {
       query?: {
+        /** @description Chỉ với mode=add: true = cho phép Import thêm LẠI đúng file đã nhập thật vào chi nhánh này (mặc định bị từ chối `409 IMPORT_DUPLICATE_FILE` vì sẽ cộng tồn lần nữa) */
+        allowDuplicate?: boolean;
         /** @description `overwrite` (mặc định) = Import đè: cùng mã thì ghi thông tin trong file lên bản cũ, ô trống giữ nguyên. `add` = Import thêm: cùng mã thì CỘNG cột Tồn kho vào tồn của chi nhánh (số âm = trừ, không xuống dưới 0), thông tin khác giữ nguyên bản cũ; mã mới được tạo đầy đủ. Bắt buộc có branchId. Chạy lại sẽ cộng thêm lần nữa */
         mode?: 'overwrite' | 'add';
         /** @description true (mặc định) = chỉ kiểm tra, không ghi gì. Phải gửi dryRun=false mới ghi thật */

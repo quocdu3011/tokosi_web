@@ -63,6 +63,14 @@ export class ImportJobDto {
 
 export class ImportQueryDto {
   @ApiPropertyOptional({
+    default: false,
+    description:
+      'Chỉ với mode=add: true = cho phép Import thêm LẠI đúng file đã nhập thật vào chi nhánh này (mặc định bị từ chối `409 IMPORT_DUPLICATE_FILE` vì sẽ cộng tồn lần nữa)',
+  })
+  @QueryBoolean()
+  allowDuplicate?: boolean;
+
+  @ApiPropertyOptional({
     enum: IMPORT_MODES,
     default: 'overwrite',
     description:

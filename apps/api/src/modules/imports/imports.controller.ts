@@ -69,7 +69,7 @@ export class ImportsController {
   @ApiOperation({
     summary: 'Tải file Excel lên để nhập (type: products)',
     description:
-      'Mặc định chỉ KIỂM TRA (dryRun=true), không ghi gì; gửi dryRun=false để ghi thật. Xử lý ngay trong yêu cầu nên kết quả (status completed hoặc failed) có sẵn trong phản hồi; vẫn xem lại được qua GET /imports/:id. Tất cả hoặc không gì cả: có dòng lỗi thì không ghi gì. mode=overwrite (mặc định): cập nhật theo mã hàng, chạy lại cùng file không tạo trùng. mode=add: CỘNG tồn kho theo cột Tồn kho nên chạy lại sẽ cộng thêm lần nữa.',
+      'Mặc định chỉ KIỂM TRA (dryRun=true), không ghi gì; gửi dryRun=false để ghi thật. Xử lý ngay trong yêu cầu nên kết quả (status completed hoặc failed) có sẵn trong phản hồi; vẫn xem lại được qua GET /imports/:id. Tất cả hoặc không gì cả: có dòng lỗi thì không ghi gì. mode=overwrite (mặc định): cập nhật theo mã hàng, chạy lại cùng file không tạo trùng. mode=add: CỘNG tồn kho theo cột Tồn kho; cùng một file (theo nội dung) đã nhập thật vào chi nhánh này sẽ bị từ chối 409 IMPORT_DUPLICATE_FILE, kể cả khi chạy thử, trừ khi gửi allowDuplicate=true.',
   })
   @ApiAcceptedResponse({ type: ImportJobDto })
   run(
@@ -83,6 +83,7 @@ export class ImportsController {
       dryRun: query.dryRun ?? true,
       branchId: query.branchId,
       mode: query.mode ?? 'overwrite',
+      allowDuplicate: query.allowDuplicate ?? false,
     });
   }
 

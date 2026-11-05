@@ -435,9 +435,15 @@ Table import_jobs {
   updated integer [not null, default: 0]
   failed integer [not null, default: 0]
   errors jsonb
+  branch_id uuid
+  file_hash text
   created_by uuid
   created_at timestamptz [not null, default: `now()`]
   finished_at timestamptz
+
+  indexes {
+    (branch_id, file_hash) [name: 'import_jobs_add_file_unique', unique]
+  }
 
   Note: '''Công việc import Excel chạy nền.'''
 }
@@ -965,6 +971,7 @@ Ref: goods_receipts.supplier_id > suppliers.id
 Ref: goods_receipts.received_by > users.id
 Ref: goods_receipts.created_by > users.id
 Ref: idempotency_keys.user_id > users.id
+Ref: import_jobs.branch_id > branches.id
 Ref: import_jobs.created_by > users.id
 Ref: invoice_items.invoice_id > invoices.id [delete: cascade]
 Ref: invoice_items.product_id > products.id

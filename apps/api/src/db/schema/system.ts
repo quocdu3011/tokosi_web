@@ -161,22 +161,37 @@ export const idempotencyKeys = pgTable(
 );
 
 /** Công việc import Excel (chạy nền). */
-export const importJobs = pgTable('import_jobs', {
-  id: pk(),
-  type: importType().notNull(),
-  mode: importMode().notNull().default('overwrite'),
-  status: importStatus().notNull().default('queued'),
-  dryRun: boolean().notNull().default(true),
-  fileName: text(),
-  total: integer().notNull().default(0),
-  created: integer().notNull().default(0),
-  updated: integer().notNull().default(0),
-  failed: integer().notNull().default(0),
-  errors: jsonb(),
-  createdBy: uuid().references(() => users.id),
-  createdAt: tstz().notNull().defaultNow(),
-  finishedAt: tstz(),
-});
+export const importJobs = pgTable(
+  'import_jobs',
+  {
+    id: pk(),
+    type: importType().notNull(),
+    mode: importMode().notNull().default('overwrite'),
+    status: importStatus().notNull().default('queued'),
+    dryRun: boolean().notNull().default(true),
+    fileName: text(),
+    total: integer().notNull().default(0),
+    created: integer().notNull().default(0),
+    updated: integer().notNull().default(0),
+    failed: integer().notNull().default(0),
+    errors: jsonb(),
+    /** Chi nhánh của lần nhập (nếu có). */
+    branchId: uuid().references(() => branches.id),
+    /** SHA-256 của file; chỉ lưu cho lần Import thêm THẬT đã hoàn tất để chặn nạp lại cùng file (cộng tồn lần nữa). */
+    fileHash: text(),
+    createdBy: uuid().references(() => users.id),
+    createdAt: tstz().notNull().defaultNow(),
+    finishedAt: tstz(),
+  },
+  (t) => [
+    // Cùng một file, cùng chi nhánh chỉ được Import thêm thật MỘT lần (trừ khi chủ động cho phép nạp lại)
+    uniqueIndex('import_jobs_add_file_unique')
+      .on(t.branchId, t.fileHash)
+      .where(
+        sql`${t.mode} = 'add' and ${t.dryRun} = false and ${t.status} = 'completed' and ${t.fileHash} is not null`,
+      ),
+  ],
+);
 
 /**
  * Chi nhánh mà người dùng được phép làm việc. Vai trò `manager` luôn thấy mọi chi nhánh (không cần dòng ở đây).

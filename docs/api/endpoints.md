@@ -927,7 +927,7 @@ Dùng cho import hàng loạt (chuyển dữ liệu từ KiotViet và nhập tay
 | GET    | `/imports/:id`            | Kết quả và lỗi từng dòng của một lần nhập                                                      | `import.run` |
 | GET    | `/imports/:type/template` | Tải file Excel mẫu                                                                             | `import.run` |
 
-Tham số query của `POST`: `dryRun` (**mặc định `true`**: chỉ kiểm tra, không ghi gì; gửi `dryRun=false` mới ghi thật), `branchId` (chi nhánh làm việc; **bắt buộc khi `mode=add`** vì cộng/trừ tồn kho của chi nhánh đó, ở chế độ đè có thể bỏ trống), `mode` (`overwrite` mặc định = **Import đè**; `add` = **Import thêm**, xem mục "Hai chế độ nhập"). Giá trị `mode` khác → `400 VALIDATION_ERROR`. Phản hồi có thêm field `mode`.
+Tham số query của `POST`: `allowDuplicate` (xem "Chống nạp lại"), `dryRun` (**mặc định `true`**: chỉ kiểm tra, không ghi gì; gửi `dryRun=false` mới ghi thật), `branchId` (chi nhánh làm việc; **bắt buộc khi `mode=add`** vì cộng/trừ tồn kho của chi nhánh đó, ở chế độ đè có thể bỏ trống), `mode` (`overwrite` mặc định = **Import đè**; `add` = **Import thêm**, xem mục "Hai chế độ nhập"). Giá trị `mode` khác → `400 VALIDATION_ERROR`. Phản hồi có thêm field `mode`.
 
 ```json
 // POST /imports/products?dryRun=false&branchId=…   → 202
@@ -949,13 +949,15 @@ Tham số query của `POST`: `dryRun` (**mặc định `true`**: chỉ kiểm t
 
 **Hai chế độ nhập (`mode`)** — file phải đúng định dạng file mẫu (`GET /imports/products/template`):
 
+**Chống nạp lại (chỉ `mode=add`):** cộng tồn không idempotent nên mỗi file (so theo **nội dung**, SHA-256) chỉ được Import thêm THẬT một lần cho mỗi chi nhánh. Gửi lại đúng file đó — kể cả với `dryRun=true` — trả `409 IMPORT_DUPLICATE_FILE` kèm `details: { importId, fileName, importedAt }` của lần nhập trước. File lỗi hoặc lần chạy thử không tính là đã nhập; chi nhánh khác hoặc file khác nội dung thì không bị chặn. Muốn cố ý nhập lại: thêm `allowDuplicate=true` (lần đó được ghi nhật ký `allowDuplicate`). Chế độ `overwrite` không bị chặn.
+
 | | `overwrite` — Import đè (mặc định) | `add` — Import thêm |
 | --- | --- | --- |
 | Khóa so khớp | `Mã hàng`, không phân biệt hoa thường | như bên trái |
 | Mã đã có | Thông tin trong file **đè** lên bản cũ (ô trống giữ nguyên). Mã không có trong file thì không đổi | **Chỉ CỘNG/TRỪ tồn** theo cột `Tồn kho` của chi nhánh `branchId`; mọi thông tin khác (tên, nhóm, mô tả, trạng thái, trạng thái thanh lý, ảnh, thành phần) **giữ nguyên bản cũ** |
 | Mã mới | Tạo mới | Tạo mới đầy đủ (cần `Tên hàng`) rồi cộng tồn |
 | Cột `Tồn kho`, `Giá vốn` | Bị bỏ qua | Dùng như bên dưới |
-| Chạy lại cùng file | Không đổi gì (idempotent) | **Cộng thêm lần nữa** (không idempotent): luôn chạy `dryRun=true` trước |
+| Chạy lại cùng file | Không đổi gì (idempotent) | Bị **chặn** `409 IMPORT_DUPLICATE_FILE` nếu file đã nhập thật vào chi nhánh này (xem "Chống nạp lại"); luôn chạy `dryRun=true` trước |
 
 Chi tiết `add`: bắt buộc `branchId` và cột `Tồn kho`. `Tồn kho` là số lượng **cộng thêm** (tối đa 3 chữ số thập phân); **số âm = trừ tồn** (không cho tồn xuống dưới 0: dòng đó báo lỗi, `STOCK_NOT_ENOUGH` ở mức dòng); ô trống hoặc `0` = không đổi tồn. `Giá vốn` (không âm, tối đa 4 chữ số thập phân, tùy chọn) là giá nhập của lô cộng thêm → giá vốn bình quân gia quyền của chi nhánh được tính lại; thiếu thì giữ giá vốn hiện tại; khi trừ tồn thì luôn theo giá vốn hiện tại (bỏ qua `Giá vốn` trong file). Combo không có tồn riêng nên dòng combo có `Tồn kho` là lỗi. Tồn đổi qua `InventoryService`, ghi sổ cái loại `adjustment` với chứng từ gốc `IMP-XXXXXXXX` (`refId` = id lần nhập) — hiện ở thẻ kho. Chỉ dòng làm đổi tồn hoặc tạo mới mới được tính vào `updated`/`created`.
 
