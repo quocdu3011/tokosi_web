@@ -398,3 +398,163 @@
   gap: var(--space-xs);
   margin-left: auto;
 }
+
+/* Ngăn kéo hàng hóa, thẻ chuyển nội dung, ảnh, hàng thành phần */
+.sheet-content.sheet-wide {
+  width: min(100%, 760px);
+}
+.drawer {
+  display: grid;
+  gap: var(--space-xl);
+  padding: var(--space-2xl);
+  align-content: start;
+}
+.drawer-header {
+  display: grid;
+  gap: var(--space-md);
+  padding-right: 40px;
+}
+.tabs-list {
+  display: flex;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-xl);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.tabs-trigger {
+  min-height: 44px;
+  padding: 0 var(--space-lg);
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease;
+}
+.tabs-trigger:hover {
+  color: var(--text);
+}
+.tabs-trigger[data-state='active'] {
+  color: var(--text);
+  border-bottom-color: var(--primary);
+}
+.tabs-trigger:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: -2px;
+}
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-md);
+}
+.form-textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-lg);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.image-card {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.image-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+.image-badge {
+  position: absolute;
+  top: var(--space-sm);
+  left: var(--space-sm);
+  padding: 2px 8px;
+  background: var(--primary);
+  color: var(--primary-text);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+}
+.image-actions {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-xs);
+}
+.mini-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.mini-table th,
+.mini-table td {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.mini-table th.num,
+.mini-table td.num {
+  text-align: right;
+}
+.qty-input {
+  width: 96px;
+  margin-left: auto;
+  text-align: right;
+}
+.pick-list {
+  max-height: 200px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.pick-list button {
+  display: flex;
+  gap: var(--space-md);
+  width: 100%;
+  min-height: 40px;
+  padding: var(--space-sm) var(--space-md);
+  align-items: center;
+  background: transparent;
+  color: var(--text);
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pick-list button:hover {
+  background: var(--surface-hover);
+}
+.pick-empty {
+  padding: var(--space-md);
+  color: var(--muted);
+  font-size: 13px;
+}
+.link-button {
+  padding: 0;
+  background: transparent;
+  color: var(--primary);
+  border: 0;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.link-button:hover {
+  text-decoration: underline;
+}

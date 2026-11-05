@@ -1,7 +1,10 @@
 'use client';
 
+import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
+import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { PageHeader } from '@/components/common/coming-soon';
 import { DataTable, type AppColumnDef, type SortState } from '@/components/data-table/data-table';
 import { Pagination } from '@/components/data-table/pagination';
@@ -13,6 +16,7 @@ import {
 } from '@/components/data-table/table-toolbar';
 import { ImportDialog } from '@/components/import/import-dialog';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -32,10 +36,13 @@ import {
   flattenCategories,
   useCategories,
   useProductList,
+  useUpdateProduct,
   type ProductFilterParams,
 } from '@/lib/queries/products';
 import { buildHtmlDocument, exportFilename, saveBlob, type ExportColumn } from '@/lib/table-export';
 import { decimalSortValue, sortRows, type SortValue } from '@/lib/table-sort';
+
+import { ProductDrawer, type DrawerTarget } from './product-drawer';
 
 const ALL = 'all';
 const PAGE_SIZE = 20;
@@ -66,6 +73,7 @@ const DEFAULT_WIDTHS = {
   available: 120,
   location: 120,
   status: 210,
+  actions: 170,
 };
 const COLUMN_LABELS: Record<string, string> = {
   code: 'mã hàng',
@@ -76,6 +84,7 @@ const COLUMN_LABELS: Record<string, string> = {
   available: 'có thể bán',
   location: 'vị trí',
   status: 'trạng thái',
+  actions: 'thao tác',
 };
 
 /** Danh sách hàng hóa theo chi nhánh làm việc (tồn kho, giá vốn riêng từng chi nhánh). */
@@ -83,6 +92,10 @@ export function ProductsScreen() {
   const me = useAuthStore((s) => s.user);
   const canSeeCost = can(me, 'product.cost.view');
   const canImport = can(me, 'import.run');
+  const canEdit = can(me, 'product.edit');
+  const [drawer, setDrawer] = useState<DrawerTarget | null>(null);
+  const [toToggle, setToToggle] = useState<Product | null>(null);
+  const updateProduct = useUpdateProduct();
   const [importOpen, setImportOpen] = useState(false);
 
   const [q, setQ] = useState('');
@@ -117,7 +130,16 @@ export function ProductsScreen() {
       {
         id: 'code',
         header: 'Mã hàng',
-        cell: ({ row }) => <span className="tabular">{row.original.code}</span>,
+        cell: ({ row }) => (
+          <button
+            type="button"
+            className="link-button tabular"
+            onClick={() => setDrawer({ kind: 'view', id: row.original.id })}
+            aria-label={`Xem hàng ${row.original.code}`}
+          >
+            {row.original.code}
+          </button>
+        ),
       },
       {
         id: 'name',
@@ -190,8 +212,21 @@ export function ProductsScreen() {
         ),
       },
     );
+    if (canEdit) {
+      cols.push({
+        id: 'actions',
+        header: () => <span className="sr-only">Thao tác</span>,
+        cell: ({ row }) => (
+          <div className="cell-actions">
+            <Button variant="ghost" size="sm" onClick={() => setToToggle(row.original)}>
+              {row.original.isActive ? 'Ngừng kinh doanh' : 'Kích hoạt lại'}
+            </Button>
+          </div>
+        ),
+      });
+    }
     return cols;
-  }, [canSeeCost]);
+  }, [canSeeCost, canEdit]);
 
   const resetFilters = (fn: () => void) => {
     fn();
@@ -248,7 +283,14 @@ export function ProductsScreen() {
     <div className="page">
       <PageHeader
         title="Danh sách hàng hóa"
-        description="Giá bán, tồn kho và giá vốn hiển thị theo chi nhánh đang làm việc."
+        description="Tồn kho và giá vốn hiển thị theo chi nhánh đang làm việc. Hệ thống không lưu giá bán."
+        actions={
+          canEdit ? (
+            <Button onClick={() => setDrawer({ kind: 'create' })}>
+              <Plus aria-hidden="true" /> Thêm hàng hóa
+            </Button>
+          ) : undefined
+        }
       />
 
       <div className="toolbar">
@@ -302,6 +344,27 @@ export function ProductsScreen() {
         </div>
       </div>
       {importOpen && <ImportDialog type="products" onClose={() => setImportOpen(false)} />}
+      {drawer && <ProductDrawer target={drawer} onClose={() => setDrawer(null)} />}
+      {toToggle && (
+        <ConfirmDialog
+          title={toToggle.isActive ? 'Ngừng kinh doanh hàng này?' : 'Kích hoạt lại hàng này?'}
+          description={
+            toToggle.isActive
+              ? `${toToggle.code} · ${toToggle.name} sẽ không còn được chọn khi lập đơn. Dữ liệu và lịch sử giữ nguyên, có thể kích hoạt lại bất cứ lúc nào.`
+              : `${toToggle.code} · ${toToggle.name} sẽ được kinh doanh trở lại.`
+          }
+          confirmLabel={toToggle.isActive ? 'Ngừng kinh doanh' : 'Kích hoạt lại'}
+          destructive={toToggle.isActive}
+          onConfirm={async () => {
+            await updateProduct.mutateAsync({
+              id: toToggle.id,
+              patch: { isActive: !toToggle.isActive },
+            });
+            toast.success(toToggle.isActive ? 'Đã ngừng kinh doanh' : 'Đã kích hoạt lại');
+          }}
+          onClose={() => setToToggle(null)}
+        />
+      )}
 
       {isError ? (
         <p className="alert alert-error" role="alert">
