@@ -286,6 +286,386 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/categories': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Cây nhóm hàng (không phân trang)
+     * @description productCount của nhóm cha đã gồm hàng của mọi nhóm con. Tối đa 3 cấp.
+     */
+    get: operations['CategoriesController_tree'];
+    put?: never;
+    /** Tạo nhóm hàng */
+    post: operations['CategoriesController_create'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/categories/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Xóa nhóm hàng (xóa mềm)
+     * @description Chỉ khi không còn nhóm con và không còn hàng hóa.
+     */
+    delete: operations['CategoriesController_remove'];
+    options?: never;
+    head?: never;
+    /**
+     * Đổi tên / chuyển nhóm cha
+     * @description Không được chuyển nhóm vào chính nó hoặc nhóm con của nó (INVALID_STATE); tổng không quá 3 cấp.
+     */
+    patch: operations['CategoriesController_update'];
+    trace?: never;
+  };
+  '/api/v1/products': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Danh sách hàng hóa (lọc, tìm không dấu, phân trang)
+     * @description Các trường giá/tồn/vị trí tính cho chi nhánh làm việc (header X-Branch-Id). costPrice và lastPurchasePrice chỉ có khi người gọi có quyền product.cost.view.
+     */
+    get: operations['ProductsController_list'];
+    put?: never;
+    /**
+     * Tạo hàng hóa
+     * @description Chỉ chứa thông tin dùng chung hai chi nhánh. Giá bán đặt qua lưới giá; tồn tối thiểu/tối đa và vị trí đặt qua PUT /products/:id/branches/:branchId; ảnh tải qua POST /products/:id/images (gọi sau khi có id).
+     */
+    post: operations['ProductsController_create'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/products/lookup': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Tìm nhanh cho ô chọn hàng (tối đa 20 dòng, không phân trang) */
+    get: operations['ProductsController_lookup'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/products/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Chi tiết một hàng hóa (theo chi nhánh làm việc) */
+    get: operations['ProductsController_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Sửa hàng hóa (gồm ngưng bán isActive=false)
+     * @description Người chỉ có quyền "Sửa mô tả, ảnh hàng hóa" chỉ được gửi description. Mã hàng chỉ đổi được khi hàng chưa có giao dịch (INVALID_STATE).
+     */
+    patch: operations['ProductsController_update'];
+    trace?: never;
+  };
+  '/api/v1/products/{id}/branches': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Chi tiết theo từng chi nhánh người dùng được phép
+     * @description Tồn, giá vốn (theo quyền), tồn tối thiểu/tối đa, vị trí kho và giá của cả 7 bảng giá.
+     */
+    get: operations['ProductsController_branches'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/products/{id}/branches/{branchId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Đặt tồn tối thiểu/tối đa và vị trí kho của một chi nhánh
+     * @description Không thay đổi số tồn hay giá vốn (chỉ nhập/xuất/chuyển kho mới đổi được).
+     */
+    put: operations['ProductsController_setBranchSettings'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/products/{id}/stock-card': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Thẻ kho: lịch sử nhập-xuất của hàng tại chi nhánh làm việc
+     * @description from/to theo ngày giờ Việt Nam (cả hai đầu đều tính). openingQty là tồn trước from; balance cộng dồn theo từng dòng.
+     */
+    get: operations['ProductsController_stockCard'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/products/{id}/images': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Danh sách ảnh của hàng (theo thứ tự hiển thị) */
+    get: operations['ProductImagesController_list'];
+    put?: never;
+    /**
+     * Tải NHIỀU ảnh lên cùng lúc (multipart/form-data, field "files")
+     * @description Ảnh lưu trên kho file riêng và mỗi ảnh có URL riêng. Tất cả hoặc không gì cả: một ảnh lỗi thì không lưu ảnh nào. Định dạng kiểm tra theo nội dung file, không theo đuôi. Mỗi hàng tối đa 10 ảnh. Trả về TOÀN BỘ ảnh của hàng sau khi thêm.
+     */
+    post: operations['ProductImagesController_add'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/products/{id}/images/order': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Sắp lại thứ tự ảnh (ảnh đầu là ảnh đại diện) */
+    put: operations['ProductImagesController_reorder'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/products/{id}/images/{imageId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Xóa một ảnh
+     * @description Xóa cả file trên kho file (nếu ảnh do hệ thống lưu). Ảnh nhập từ Excel chỉ bị gỡ khỏi hàng.
+     */
+    delete: operations['ProductImagesController_remove'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/price-books': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Danh sách 7 bảng giá */
+    get: operations['PricingController_list'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/price-books/grid': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Lưới giá: mỗi dòng một sản phẩm, mỗi cột một bảng giá, theo MỘT chi nhánh
+     * @description Chi nhánh lấy từ tham số branchId hoặc header X-Branch-Id. Ô chưa có giá là null (khi bán sẽ lùi về Bảng giá chung của CÙNG chi nhánh).
+     */
+    get: operations['PricingController_grid'];
+    /**
+     * Lưu nhiều ô giá cùng lúc (chỉ gửi các ô thay đổi)
+     * @description Giá là số nguyên đồng; price = null xóa giá ô đó. Tối đa 500 ô; tất cả hoặc không gì cả.
+     */
+    put: operations['PricingController_saveGrid'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/price-books/bulk-adjust': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Tăng/giảm giá hàng loạt (có chế độ xem trước)
+     * @description dryRun bắt buộc: true = chỉ xem trước. Chỉ áp dụng cho ô ĐÃ có giá; giá mới âm thì bỏ qua; luôn làm tròn ra số nguyên đồng.
+     */
+    post: operations['PricingController_bulkAdjust'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/price-books/copy-branch': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Sao chép giá từ chi nhánh này sang chi nhánh kia
+     * @description Dùng để khởi tạo giá chi nhánh mới. overwrite=false (mặc định) chỉ chép ô đích chưa có giá.
+     */
+    post: operations['PricingController_copyBranch'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/price-books/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Đổi tên / bật tắt bảng giá
+     * @description Không tắt được Bảng giá chung.
+     */
+    patch: operations['PricingController_update'];
+    trace?: never;
+  };
+  '/api/v1/imports/{type}/template': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Tải file Excel mẫu */
+    get: operations['ImportsController_template'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/imports/{type}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Tải file Excel lên để nhập (type: products | price-books)
+     * @description Mặc định chỉ KIỂM TRA (dryRun=true), không ghi gì; gửi dryRun=false để ghi thật. Xử lý ngay trong yêu cầu nên kết quả (status completed hoặc failed) có sẵn trong phản hồi; vẫn xem lại được qua GET /imports/:id. Tất cả hoặc không gì cả: có dòng lỗi thì không ghi gì. Chạy lại cùng file không tạo trùng (cập nhật theo mã hàng).
+     */
+    post: operations['ImportsController_run'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/imports/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Kết quả và lỗi từng dòng của một lần nhập */
+    get: operations['ImportsController_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -531,6 +911,357 @@ export interface components {
       branchIds: string[];
       /** @description Chi nhánh mặc định mới. Bỏ qua = giữ nếu vẫn còn được gán, ngược lại bỏ */
       defaultBranchId?: Record<string, never> | null;
+    };
+    CategoryNodeDto: {
+      id: string;
+      /** @example NHÀ BẾP */
+      name: string;
+      parentId: string | null;
+      /** @description Số hàng hóa chưa xóa thuộc nhóm này VÀ mọi nhóm con (nhóm cha cộng dồn từ nhóm con) */
+      productCount: number;
+      children: components['schemas']['CategoryNodeDto'][];
+    };
+    CreateCategoryDto: {
+      /**
+       * @description Tên nhóm, 1-100 ký tự; không trùng trong cùng nhóm cha (không phân biệt hoa thường và dấu)
+       * @example Dao kéo
+       */
+      name: string;
+      /** @description Nhóm cha; bỏ trống = nhóm gốc. Tối đa 3 cấp */
+      parentId?: string;
+    };
+    UpdateCategoryDto: {
+      name?: string;
+      /** @description Nhóm cha mới; null = chuyển ra nhóm gốc */
+      parentId?: string | null;
+    };
+    ProductImageDto: {
+      id: string;
+      /** @example https://files.example.vn/products/…/a.jpg */
+      url: string;
+      sortOrder: number;
+    };
+    ProductDto: {
+      id: string;
+      /** @example QKBSP */
+      code: string;
+      name: string;
+      categoryId: string | null;
+      /** @example ĐIỆN GIA DỤNG > Quạt điện */
+      categoryPath: string | null;
+      /** @example Cái */
+      unit: string;
+      /** @description Chi nhánh mà các trường giá/tồn/vị trí bên dưới tính cho (= chi nhánh làm việc, header X-Branch-Id) */
+      branchId: string;
+      /**
+       * @description Giá Bảng giá chung TẠI chi nhánh này (số nguyên đồng); null nếu chưa có giá
+       * @example 33500
+       */
+      basePrice: string | null;
+      /**
+       * @description Giá vốn bình quân của chi nhánh này. VẮNG MẶT nếu thiếu quyền product.cost.view
+       * @example 21800.5000
+       */
+      costPrice?: string;
+      /** @description Giá nhập cuối của chi nhánh này; như costPrice */
+      lastPurchasePrice?: string | null;
+      /** @example 515.000 */
+      onHand: string;
+      /** @description Đang giữ cho các đơn đặt hàng chưa chốt (phiếu tạm) */
+      reserved: string;
+      /** @description onHand − reserved */
+      available: string;
+      /** @description Đang đặt nhà cung cấp. Chưa có phân hệ Đặt hàng nhập nên luôn "0" */
+      onOrder: string;
+      minStock: string | null;
+      maxStock: string | null;
+      location: string | null;
+      description: string | null;
+      weightG: string | null;
+      images: components['schemas']['ProductImageDto'][];
+      isActive: boolean;
+      isSellable: boolean;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    ProductListMetaDto: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+    ProductListDto: {
+      data: components['schemas']['ProductDto'][];
+      meta: components['schemas']['ProductListMetaDto'];
+    };
+    ProductLookupDto: {
+      id: string;
+      code: string;
+      name: string;
+      unit: string;
+      basePrice: string | null;
+      available: string;
+      imageUrl: string | null;
+    };
+    CreateProductDto: {
+      /**
+       * @description Chữ, số, "-", "_", "."; 1-30 ký tự; không dấu cách; không trùng (kể cả khác hoa thường); không đổi được sau khi đã có giao dịch
+       * @example QKBSP
+       */
+      code: string;
+      /** @example Quạt kẹp bàn Super MST-A1 */
+      name: string;
+      /** @description Nhóm hàng (GET /categories) */
+      categoryId?: string;
+      /**
+       * @default Cái
+       * @example Cái
+       */
+      unit: string;
+      description?: string;
+      /**
+       * @description Trọng lượng gram
+       * @example 850
+       */
+      weightG?: string;
+      /** @default true */
+      isSellable: boolean;
+    };
+    UpdateProductDto: {
+      /** @description Chỉ đổi được khi hàng chưa có giao dịch nào */
+      code?: string;
+      name?: string;
+      categoryId?: string | null;
+      unit?: string;
+      /** @description Người chỉ có quyền "Sửa mô tả, ảnh hàng hóa" (product.content.edit) chỉ được sửa trường này */
+      description?: string | null;
+      weightG?: string | null;
+      /** @description false = ngưng kinh doanh */
+      isActive?: boolean;
+      isSellable?: boolean;
+    };
+    ProductBranchPriceDto: {
+      priceBookId: string;
+      /** @example LON */
+      priceBookCode: string;
+      /** @example 33000 */
+      price: string | null;
+    };
+    ProductBranchDto: {
+      branchId: string;
+      /** @example HN */
+      branchCode: string;
+      branchName: string;
+      onHand: string;
+      reserved: string;
+      available: string;
+      /** @description Vắng mặt nếu thiếu product.cost.view */
+      costPrice?: string;
+      /** @description Vắng mặt nếu thiếu product.cost.view */
+      lastPurchasePrice?: string | null;
+      minStock: string | null;
+      maxStock: string | null;
+      location: string | null;
+      /** @description Giá của cả 7 bảng giá TẠI chi nhánh này (null = chưa có giá) */
+      prices: components['schemas']['ProductBranchPriceDto'][];
+    };
+    SetProductBranchSettingsDto: {
+      /**
+       * @description Tồn tối thiểu (>= 0); null = bỏ. Phải <= tồn tối đa
+       * @example 10
+       */
+      minStock?: string | null;
+      /** @example 2000 */
+      maxStock?: string | null;
+      /** @description Vị trí kho; null hoặc rỗng = bỏ */
+      location?: string | null;
+    };
+    StockCardMovementDto: {
+      /** Format: date-time */
+      occurredAt: string;
+      /** @example goods_receipt */
+      refType: string;
+      refId: string | null;
+      /** @example PN000948 */
+      refCode: string | null;
+      /** @example 600.000 */
+      qtyDelta: string;
+      /** @example 1000.000 */
+      balance: string;
+      /** @description Vắng mặt nếu thiếu product.cost.view */
+      unitCost?: Record<string, never>;
+    };
+    StockCardDto: {
+      branchId: string;
+      /** @example 400.000 */
+      openingQty: string;
+      movements: components['schemas']['StockCardMovementDto'][];
+      /** @example 485.000 */
+      closingQty: string;
+    };
+    ReorderImagesDto: {
+      /** @description Id của TẤT CẢ ảnh hiện có của hàng theo thứ tự mới; ảnh đầu là ảnh đại diện */
+      imageIds: string[];
+    };
+    PriceBookDto: {
+      id: string;
+      /** @example CHUNG */
+      code: string;
+      /** @example Bảng giá chung */
+      name: string;
+      withVat: boolean;
+      /** @description Bảng giá chung: dùng khi bảng khác thiếu giá */
+      isDefault: boolean;
+      isActive: boolean;
+    };
+    GridBookDto: {
+      id: string;
+      code: string;
+      name: string;
+    };
+    GridRowDto: {
+      productId: string;
+      code: string;
+      name: string;
+      /** @description Giá vốn của chi nhánh. VẮNG MẶT nếu thiếu product.cost.view */
+      costPrice?: string;
+      /** @description Khóa = priceBookId, giá trị = giá bán (số nguyên đồng) hoặc null nếu chưa có giá */
+      prices: {
+        [key: string]: string | null;
+      };
+    };
+    GridMetaDto: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+    GridDto: {
+      branchId: string;
+      books: components['schemas']['GridBookDto'][];
+      data: components['schemas']['GridRowDto'][];
+      meta: components['schemas']['GridMetaDto'];
+    };
+    GridChangeDto: {
+      productId: string;
+      priceBookId: string;
+      /**
+       * @description Giá mới (số nguyên đồng); null = xóa giá, lùi về bảng chung
+       * @example 33000
+       */
+      price: string | null;
+    };
+    SaveGridDto: {
+      /** @description Chi nhánh được sửa giá */
+      branchId: string;
+      /** @description Tối đa 500 ô mỗi lần */
+      changes: components['schemas']['GridChangeDto'][];
+    };
+    SaveGridResultDto: {
+      /** @description Số ô thực sự thay đổi (bỏ qua ô giữ nguyên giá) */
+      updated: number;
+    };
+    BulkAdjustDto: {
+      branchId: string;
+      priceBookId: string;
+      /** @description Chỉ điều chỉnh hàng của nhóm này (gồm nhóm con) */
+      categoryId?: string;
+      /**
+       * @description percent = theo %, amount = cộng/trừ số tiền cố định mỗi ô
+       * @enum {string}
+       */
+      mode: 'percent' | 'amount';
+      /**
+       * @description Số có dấu: dương = tăng, âm = giảm. Ví dụ 5 với percent = tăng 5%
+       * @example 5
+       */
+      value: string;
+      /**
+       * @description Làm tròn đến bội số này (số nguyên >= 1, nửa lên). Giá bán luôn là số nguyên đồng
+       * @default 1
+       * @example 100
+       */
+      roundTo: string;
+      /** @description true = chỉ xem trước, KHÔNG lưu; false = lưu thật. Bắt buộc gửi rõ để không lưu nhầm */
+      dryRun: boolean;
+    };
+    BulkAdjustPreviewDto: {
+      productId: string;
+      code: string;
+      /** @example 33000 */
+      oldPrice: string;
+      /** @example 34700 */
+      newPrice: string;
+    };
+    BulkAdjustResultDto: {
+      dryRun: boolean;
+      /** @description Số ô đổi giá */
+      affected: number;
+      /** @description Số ô bỏ qua vì giá mới âm */
+      skipped: number;
+      /** @description Số ô giá không đổi sau khi làm tròn */
+      unchanged: number;
+      /** @description Tối đa 200 dòng đầu */
+      preview: components['schemas']['BulkAdjustPreviewDto'][];
+    };
+    CopyBranchDto: {
+      fromBranchId: string;
+      toBranchId: string;
+      /** @description Chỉ chép bảng giá này; bỏ trống = mọi bảng giá */
+      priceBookId?: string;
+      /**
+       * @description false = chỉ chép ô chi nhánh đích CHƯA có giá; true = ghi đè ô đã có
+       * @default false
+       */
+      overwrite: boolean;
+    };
+    CopyBranchResultDto: {
+      /** @description Số ô được chép / cập nhật */
+      copied: number;
+      /** @description Số ô bỏ qua (đã có giá hoặc giá giống nhau) */
+      skipped: number;
+    };
+    UpdatePriceBookDto: {
+      name?: string;
+      /** @description false = tắt bảng giá. Không tắt được Bảng giá chung */
+      isActive?: boolean;
+    };
+    ImportErrorDto: {
+      /** @description Số dòng trong file Excel (dòng 1 là tiêu đề) */
+      row: number;
+      /** @example Mã hàng */
+      field: string;
+      /** @example Mã hàng trùng với dòng 12 trong file */
+      message: string;
+    };
+    ImportJobDto: {
+      id: string;
+      /** @enum {string} */
+      type: 'products' | 'price-books' | 'customers' | 'suppliers';
+      /**
+       * @description Hiện nhập xử lý ngay trong yêu cầu nên chỉ gặp completed hoặc failed. failed = có dòng lỗi hoặc lỗi hệ thống, KHÔNG ghi gì
+       * @enum {string}
+       */
+      status: 'queued' | 'running' | 'completed' | 'failed';
+      /** @description true = chỉ kiểm tra, không ghi dữ liệu */
+      dryRun: boolean;
+      fileName: string | null;
+      /** @description Số dòng dữ liệu trong file */
+      total: number;
+      /** @description Sẽ tạo / đã tạo (hàng hóa mới; với price-books là số ô giá mới). Bằng 0 khi có lỗi */
+      created: number;
+      /** @description Sẽ sửa / đã sửa, chỉ tính bản ghi có thay đổi thật nên chạy lại cùng file cho kết quả 0 */
+      updated: number;
+      /** @description Số dòng có lỗi */
+      failed: number;
+      /** @description Lỗi từng dòng (tối đa 500 lỗi đầu) */
+      errors: components['schemas']['ImportErrorDto'][];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      finishedAt: string | null;
     };
   };
   responses: never;
@@ -1088,6 +1819,690 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  CategoriesController_tree: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CategoryNodeDto'][];
+        };
+      };
+    };
+  };
+  CategoriesController_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateCategoryDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CategoryNodeDto'];
+        };
+      };
+      /** @description DUPLICATE_NAME */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  CategoriesController_remove: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Không tìm thấy nhóm hàng */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  CategoriesController_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateCategoryDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CategoryNodeDto'];
+        };
+      };
+      /** @description Không tìm thấy nhóm hàng */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description DUPLICATE_NAME */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  ProductsController_list: {
+    parameters: {
+      query?: {
+        page?: number;
+        limit?: number;
+        /** @description Tên cột cần sắp xếp; thêm `-` phía trước để giảm dần. Chỉ nhận các cột endpoint cho phép */
+        sort?: string;
+        /** @description Tìm không dấu theo mã và tên (mọi từ đều phải có mặt) */
+        q?: string;
+        /** @description Lọc theo nhóm hàng, GỒM cả hàng của các nhóm con */
+        categoryId?: string;
+        isActive?: boolean;
+        /** @description true = chỉ hàng còn tồn tại chi nhánh làm việc */
+        inStock?: boolean;
+        /** @description xlsx = tải file Excel theo đúng bộ lọc hiện tại (bỏ qua page/limit, tối đa 10.000 dòng) */
+        format?: 'xlsx';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProductListDto'];
+        };
+      };
+    };
+  };
+  ProductsController_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateProductDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProductDto'];
+        };
+      };
+      /** @description DUPLICATE_CODE */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  ProductsController_lookup: {
+    parameters: {
+      query?: {
+        /** @description Tìm không dấu theo mã và tên; bỏ trống = 20 hàng đầu theo mã */
+        q?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProductLookupDto'][];
+        };
+      };
+    };
+  };
+  ProductsController_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProductDto'];
+        };
+      };
+      /** @description Không tìm thấy hàng hóa */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  ProductsController_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateProductDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProductDto'];
+        };
+      };
+      /** @description Không tìm thấy hàng hóa */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description DUPLICATE_CODE */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  ProductsController_branches: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProductBranchDto'][];
+        };
+      };
+      /** @description Không tìm thấy hàng hóa */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  ProductsController_setBranchSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        branchId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetProductBranchSettingsDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProductBranchDto'];
+        };
+      };
+    };
+  };
+  ProductsController_stockCard: {
+    parameters: {
+      query?: {
+        /** @description Từ ngày (giờ Việt Nam, tính cả ngày này); bỏ trống = từ đầu. Dạng YYYY-MM-DD */
+        from?: string;
+        /** @description Đến ngày (giờ Việt Nam, tính cả ngày này); bỏ trống = đến hiện tại */
+        to?: string;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StockCardDto'];
+        };
+      };
+    };
+  };
+  ProductImagesController_list: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProductImageDto'][];
+        };
+      };
+    };
+  };
+  ProductImagesController_add: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': {
+          /** @description Tối đa 10 ảnh mỗi lần, mỗi ảnh tối đa 5 MB, định dạng JPEG, PNG hoặc WebP */
+          files: string[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProductImageDto'][];
+        };
+      };
+      /** @description Không tìm thấy hàng hóa */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  ProductImagesController_reorder: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReorderImagesDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProductImageDto'][];
+        };
+      };
+    };
+  };
+  ProductImagesController_remove: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        imageId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Không tìm thấy ảnh */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  PricingController_list: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PriceBookDto'][];
+        };
+      };
+    };
+  };
+  PricingController_grid: {
+    parameters: {
+      query?: {
+        /** @description Chi nhánh của lưới giá; bỏ trống = chi nhánh làm việc (X-Branch-Id). Phải là chi nhánh người dùng được phép */
+        branchId?: string;
+        /** @description Tìm không dấu theo mã và tên */
+        q?: string;
+        /** @description Gồm cả hàng của các nhóm con */
+        categoryId?: string;
+        page?: number;
+        limit?: number;
+        /** @description xlsx = tải Excel theo bộ lọc (bỏ qua page/limit) */
+        format?: 'xlsx';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GridDto'];
+        };
+      };
+    };
+  };
+  PricingController_saveGrid: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SaveGridDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SaveGridResultDto'];
+        };
+      };
+    };
+  };
+  PricingController_bulkAdjust: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BulkAdjustDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BulkAdjustResultDto'];
+        };
+      };
+    };
+  };
+  PricingController_copyBranch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CopyBranchDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CopyBranchResultDto'];
+        };
+      };
+    };
+  };
+  PricingController_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdatePriceBookDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PriceBookDto'];
+        };
+      };
+      /** @description Không tìm thấy bảng giá */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description DUPLICATE_NAME */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  ImportsController_template: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        type: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  ImportsController_run: {
+    parameters: {
+      query?: {
+        /** @description true (mặc định) = chỉ kiểm tra, không ghi gì. Phải gửi dryRun=false mới ghi thật */
+        dryRun?: boolean;
+        /** @description Chi nhánh cho giá bán, tồn tối thiểu/tối đa, vị trí kho. Bắt buộc nếu file có các cột đó */
+        branchId?: string;
+      };
+      header?: never;
+      path: {
+        type: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': {
+          /** Format: binary */
+          file: string;
+        };
+      };
+    };
+    responses: {
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ImportJobDto'];
+        };
+      };
+    };
+  };
+  ImportsController_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ImportJobDto'];
+        };
       };
     };
   };
