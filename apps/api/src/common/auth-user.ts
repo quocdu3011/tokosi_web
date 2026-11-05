@@ -1,11 +1,11 @@
 import { createParamDecorator, type ExecutionContext } from '@nestjs/common';
-import type { PermissionCode, PermissionScope, Role } from '@kiot/shared';
+import type { PermissionCode, PermissionScope, UserRole } from '@kiot/shared';
 import type { Request } from 'express';
 
 /** Người dùng đã xác thực, do AuthGuard gắn vào `request.user` (vai trò đọc từ CSDL, không từ token). */
 export interface AuthUser {
   id: string;
-  role: Role;
+  role: UserRole;
 }
 
 /** Request sau khi qua xác thực, kiểm tra quyền và (nếu có) xác định chi nhánh làm việc. */

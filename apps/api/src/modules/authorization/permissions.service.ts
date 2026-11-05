@@ -11,6 +11,8 @@ import {
   type PermissionCode,
   type PermissionScope,
   type Role,
+  type UserRole,
+  PENDING_ROLE,
 } from '@kiot/shared';
 import { count, eq } from 'drizzle-orm';
 import { AppError } from '../../common/app-error.js';
@@ -41,7 +43,9 @@ export class PermissionsService {
   constructor(@Inject(DB) private readonly db: Database) {}
 
   /** Danh sách quyền đang có của một vai trò (đã sắp theo danh mục). */
-  async getGrants(role: Role): Promise<Grant[]> {
+  async getGrants(role: UserRole): Promise<Grant[]> {
+    // Tài khoản chờ cấp quyền: không có quyền nào, bất kể dữ liệu trong role_permissions
+    if (role === PENDING_ROLE) return [];
     if (role === ADMIN_ROLE) return defaultGrantsFor(ADMIN_ROLE);
     const cached = this.cache.get(role);
     if (cached) return cached;
@@ -65,12 +69,12 @@ export class PermissionsService {
     return grants;
   }
 
-  async getGrant(role: Role, code: PermissionCode): Promise<Grant | undefined> {
+  async getGrant(role: UserRole, code: PermissionCode): Promise<Grant | undefined> {
     return (await this.getGrants(role)).find((g) => g.code === code);
   }
 
   /** Vai trò có quyền này không (Quản lý luôn có). Dùng để ẩn trường nhạy cảm như giá vốn khỏi phản hồi. */
-  async has(role: Role, code: PermissionCode): Promise<boolean> {
+  async has(role: UserRole, code: PermissionCode): Promise<boolean> {
     return (await this.getGrant(role, code)) !== undefined;
   }
 

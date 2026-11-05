@@ -116,6 +116,7 @@ enum user_role {
   "driver"
   "sales"
   "marketing"
+  "pending"
 }
 
 Table audit_logs {
@@ -884,6 +885,15 @@ Table suppliers {
   Note: '''Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng khác; group_name là nhóm NCC (chuỗi tự do, có thể để trống).'''
 }
 
+Table system_settings {
+  key text [pk]
+  value jsonb [not null]
+  updated_by uuid
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: '''Cài đặt hệ thống dạng khóa → JSON do Quản lý chỉnh (vd mở/tắt tự đăng ký bằng Google).'''
+}
+
 Table user_branches {
   user_id uuid [not null]
   branch_id uuid [not null]
@@ -895,6 +905,22 @@ Table user_branches {
   }
 
   Note: '''Chi nhánh người dùng được làm việc (Quản lý thấy tất cả, không cần dòng ở đây).'''
+}
+
+Table user_identities {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  provider text [not null]
+  provider_subject text [not null]
+  email text [not null]
+  linked_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (provider, provider_subject) [name: 'user_identities_provider_subject_unique', unique]
+    (user_id) [name: 'user_identities_user_idx']
+  }
+
+  Note: '''Danh tính đăng nhập bên ngoài (Google qua Supabase) gắn với người dùng; khớp theo provider_subject, không theo email.'''
 }
 
 Table users {
@@ -1005,8 +1031,10 @@ Ref: stocks.branch_id > branches.id
 Ref: stocks.product_id > products.id
 Ref: suppliers.linked_branch_id > branches.id
 Ref: suppliers.created_by > users.id
+Ref: system_settings.updated_by > users.id [delete: set null]
 Ref: user_branches.user_id > users.id [delete: cascade]
 Ref: user_branches.branch_id > branches.id
+Ref: user_identities.user_id > users.id [delete: cascade]
 Ref: users.default_branch_id > branches.id
 
 TableGroup "Hệ thống" {
@@ -1020,6 +1048,8 @@ TableGroup "Hệ thống" {
   import_jobs
   user_branches
   role_permissions
+  user_identities
+  system_settings
 }
 
 TableGroup "Hàng hóa & giá" {

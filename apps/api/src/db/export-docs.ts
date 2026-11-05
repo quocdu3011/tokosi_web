@@ -43,6 +43,8 @@ const GROUPS: Record<string, string[]> = {
     'import_jobs',
     'user_branches',
     'role_permissions',
+    'user_identities',
+    'system_settings',
   ],
   'Hàng hóa & giá': [
     'categories',
@@ -94,6 +96,10 @@ const TABLE_NOTES: Record<string, string> = {
     'Chi nhánh người dùng được làm việc (Quản lý thấy tất cả, không cần dòng ở đây).',
   role_permissions:
     'Quyền của từng vai trò do Quản lý cấu hình (vai trò manager luôn đủ quyền, không lưu ở đây).',
+  user_identities:
+    'Danh tính đăng nhập bên ngoài (Google qua Supabase) gắn với người dùng; khớp theo provider_subject, không theo email.',
+  system_settings:
+    'Cài đặt hệ thống dạng khóa → JSON do Quản lý chỉnh (vd mở/tắt tự đăng ký bằng Google).',
   customer_branch_terms:
     'Hạn mức và kỳ hạn công nợ của khách, riêng từng chi nhánh.',
   stock_transfers:

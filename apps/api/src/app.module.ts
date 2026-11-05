@@ -11,6 +11,7 @@ import { ImportsModule } from './modules/imports/imports.module.js';
 import { FilesModule } from './modules/files/files.module.js';
 import { PricingModule } from './modules/pricing/pricing.module.js';
 import { UsersModule } from './modules/users/users.module.js';
+import { GoogleAuthModule } from './modules/google-auth/google-auth.module.js';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { UsersModule } from './modules/users/users.module.js';
     BranchesModule,
     AuthModule,
     UsersModule,
+    GoogleAuthModule,
     FilesModule,
     CatalogModule,
     PricingModule,

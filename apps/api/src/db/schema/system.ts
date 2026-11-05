@@ -215,3 +215,37 @@ export const rolePermissions = pgTable(
     index('role_permissions_role_idx').on(t.role),
   ],
 );
+
+/**
+ * Danh tính bên ngoài gắn với người dùng (hiện chỉ Google qua Supabase). Khớp đăng nhập theo
+ * `provider_subject` cố định (email có thể đổi), không theo email.
+ */
+export const userIdentities = pgTable(
+  'user_identities',
+  {
+    id: pk(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    provider: text().notNull(),
+    providerSubject: text().notNull(),
+    /** Email lúc liên kết (chỉ để hiển thị/đối chiếu, không dùng để đăng nhập). */
+    email: text().notNull(),
+    linkedAt: tstz().notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('user_identities_provider_subject_unique').on(
+      t.provider,
+      t.providerSubject,
+    ),
+    index('user_identities_user_idx').on(t.userId),
+  ],
+);
+
+/** Cài đặt hệ thống dạng khóa → giá trị JSON, do Quản lý chỉnh (vd mở/tắt tự đăng ký bằng Google). */
+export const systemSettings = pgTable('system_settings', {
+  key: text().primaryKey(),
+  value: jsonb().notNull(),
+  updatedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+  updatedAt: tstz().notNull().defaultNow(),
+});

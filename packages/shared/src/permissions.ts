@@ -19,6 +19,14 @@ export const ROLES = [
 ] as const;
 export type Role = (typeof ROLES)[number];
 
+/**
+ * Vai trò của tài khoản tự đăng ký bằng Google, đang chờ Quản lý cấp quyền: KHÔNG có quyền nào,
+ * không cấu hình được (không nằm trong ROLES) và không có chi nhánh. Quản lý đổi sang vai trò thật.
+ */
+export const PENDING_ROLE = 'pending' as const;
+export const USER_ROLES = [...ROLES, PENDING_ROLE] as const;
+export type UserRole = (typeof USER_ROLES)[number];
+
 export const ROLE_LABELS: Record<Role, string> = {
   manager: 'Quản lý',
   assistant: 'Trợ lý',

@@ -21,6 +21,7 @@ describe('loadConfig', () => {
       loginMaxFailures: 5,
       loginWindowSeconds: 900,
       storage: null,
+      supabase: null,
     });
   });
 
@@ -130,6 +131,29 @@ describe('loadConfig', () => {
       expect(
         loadConfig({ ...FULL, NODE_ENV: 'production' }).storage,
       ).not.toBeNull();
+    });
+  });
+
+  describe('Supabase (đăng nhập Google)', () => {
+    const base = { JWT_ACCESS_SECRET: SECRET };
+    it('không đặt → null; đặt https → lấy origin, bỏ đường dẫn thừa', () => {
+      expect(loadConfig(base).supabase).toBeNull();
+      expect(
+        loadConfig({ ...base, SUPABASE_URL: 'https://abcd.supabase.co/' })
+          .supabase,
+      ).toEqual({ url: 'https://abcd.supabase.co' });
+    });
+    it('từ chối địa chỉ sai hoặc http ngoài localhost', () => {
+      expect(() => loadConfig({ ...base, SUPABASE_URL: 'abc' })).toThrow(
+        /SUPABASE_URL/,
+      );
+      expect(() =>
+        loadConfig({ ...base, SUPABASE_URL: 'http://abcd.supabase.co' }),
+      ).toThrow(/https/);
+      expect(
+        loadConfig({ ...base, SUPABASE_URL: 'http://localhost:54321' })
+          .supabase,
+      ).toEqual({ url: 'http://localhost:54321' });
     });
   });
 });

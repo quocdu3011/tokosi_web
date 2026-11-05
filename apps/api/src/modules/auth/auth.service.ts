@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNull, lt } from 'drizzle-orm';
-import type { Grant, Role } from '@kiot/shared';
+import type { Grant, UserRole } from '@kiot/shared';
 import { AppError } from '../../common/app-error.js';
 import { hashPassword, verifyPassword } from '../../common/password.js';
 import { passwordProblems } from '../../common/password-policy.js';
@@ -31,7 +31,7 @@ export interface AuthUserView {
   code: string;
   username: string;
   fullName: string;
-  role: Role;
+  role: UserRole;
   mustChangePassword: boolean;
   permissions: Grant[];
   defaultBranchId: string | null;
@@ -306,7 +306,7 @@ export class AuthService {
 
   // ------------------------------------------------------------------ nội bộ
 
-  private async createSession(
+  async createSession(
     userId: string,
     ctx: RequestContext,
     db: Pick<Database, 'insert'> = this.db,

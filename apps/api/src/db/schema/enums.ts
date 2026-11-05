@@ -3,7 +3,7 @@ import { pgEnum } from 'drizzle-orm/pg-core';
 /**
  * Vai trò theo cơ cấu thực tế của công ty:
  * manager = Quản lý · assistant = Trợ lý · accountant = Kế toán · warehouse = Kho ·
- * driver = Lái xe · sales = Sale · marketing = Marketing.
+ * driver = Lái xe · sales = Sale · marketing = Marketing · pending = chờ cấp quyền (tự đăng ký bằng Google).
  */
 export const userRole = pgEnum('user_role', [
   'manager',
@@ -13,6 +13,7 @@ export const userRole = pgEnum('user_role', [
   'driver',
   'sales',
   'marketing',
+  'pending',
 ]);
 export const customerType = pgEnum('customer_type', ['individual', 'company']);
 export const supplierKind = pgEnum('supplier_kind', [

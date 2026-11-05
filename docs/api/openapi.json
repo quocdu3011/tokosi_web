@@ -450,6 +450,7 @@
             "name": "role",
             "required": false,
             "in": "query",
+            "description": "`pending` = tài khoản tự đăng ký bằng Google, chờ cấp quyền",
             "schema": {
               "type": "string",
               "enum": [
@@ -459,7 +460,8 @@
                 "warehouse",
                 "driver",
                 "sales",
-                "marketing"
+                "marketing",
+                "pending"
               ]
             }
           },
@@ -763,6 +765,135 @@
         "summary": "Gán chi nhánh cho người dùng (thay thế toàn bộ danh sách)",
         "tags": [
           "Người dùng"
+        ]
+      }
+    },
+    "/api/v1/auth/google": {
+      "post": {
+        "description": "Gửi access token Supabase sau khi đăng nhập Google. Đã có tài khoản → 200 như `/auth/login` (cookie refresh + access token). Chưa có tài khoản: nếu Quản lý cho phép tự đăng ký và tên miền email được phép → 202 `signup_required` kèm `signupToken` (chưa tạo gì); ngược lại 403 `SIGNUP_DISABLED`.",
+        "operationId": "GoogleAuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleLoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Đăng nhập bằng Google (qua Supabase)",
+        "tags": [
+          "Xác thực"
+        ]
+      }
+    },
+    "/api/v1/auth/google/signup": {
+      "post": {
+        "description": "Tạo tài khoản nội bộ (tên đăng nhập + mật khẩu + họ tên + SĐT) và đăng nhập luôn. Tài khoản mới có vai trò `pending`: KHÔNG có quyền nào và không có chi nhánh cho tới khi Quản lý cấp. Mỗi tài khoản Google đăng ký được một lần.",
+        "operationId": "GoogleAuthController_signup",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleSignupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Hoàn tất đăng ký tài khoản từ Google",
+        "tags": [
+          "Xác thực"
+        ]
+      }
+    },
+    "/api/v1/settings/auth": {
+      "get": {
+        "operationId": "AuthSettingsController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSettingsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cài đặt tự đăng ký bằng Google",
+        "tags": [
+          "Cài đặt"
+        ]
+      },
+      "patch": {
+        "description": "Mặc định tắt. Bật mà chưa có tên miền nào → 400. Ghi nhật ký giá trị trước và sau.",
+        "operationId": "AuthSettingsController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAuthSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSettingsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Bật/tắt tự đăng ký bằng Google và đặt tên miền email được phép",
+        "tags": [
+          "Cài đặt"
         ]
       }
     },
@@ -2323,7 +2454,8 @@
               "warehouse",
               "driver",
               "sales",
-              "marketing"
+              "marketing",
+              "pending"
             ]
           },
           "mustChangePassword": {
@@ -2443,7 +2575,8 @@
               "warehouse",
               "driver",
               "sales",
-              "marketing"
+              "marketing",
+              "pending"
             ]
           },
           "phone": {
@@ -2613,7 +2746,8 @@
               "warehouse",
               "driver",
               "sales",
-              "marketing"
+              "marketing",
+              "pending"
             ]
           },
           "phone": {
@@ -2730,6 +2864,88 @@
         "required": [
           "branchIds"
         ]
+      },
+      "GoogleLoginDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "Access token (JWT) Supabase nhận được sau khi đăng nhập Google (`session.access_token`)"
+          }
+        },
+        "required": [
+          "accessToken"
+        ]
+      },
+      "GoogleSignupDto": {
+        "type": "object",
+        "properties": {
+          "signupToken": {
+            "type": "string",
+            "description": "`signupToken` nhận từ `POST /auth/google`"
+          },
+          "username": {
+            "type": "string",
+            "example": "nguyenvana",
+            "description": "Chữ thường không dấu, số, `.` `_` `-`; 3–32 ký tự"
+          },
+          "password": {
+            "type": "string",
+            "description": "10–128 ký tự, không chứa tên đăng nhập"
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Nguyễn Văn A"
+          },
+          "phone": {
+            "type": "string",
+            "example": "0901234567"
+          }
+        },
+        "required": [
+          "signupToken",
+          "username",
+          "password",
+          "fullName",
+          "phone"
+        ]
+      },
+      "AuthSettingsDto": {
+        "type": "object",
+        "properties": {
+          "googleSignupEnabled": {
+            "type": "boolean",
+            "description": "Cho phép người lạ tự đăng ký bằng Google"
+          },
+          "googleSignupDomains": {
+            "example": [
+              "congty.vn"
+            ],
+            "description": "Tên miền email được tự đăng ký; bật mà để rỗng là không hợp lệ",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "googleSignupEnabled",
+          "googleSignupDomains"
+        ]
+      },
+      "UpdateAuthSettingsDto": {
+        "type": "object",
+        "properties": {
+          "googleSignupEnabled": {
+            "type": "boolean"
+          },
+          "googleSignupDomains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
       },
       "CategoryNodeDto": {
         "type": "object",

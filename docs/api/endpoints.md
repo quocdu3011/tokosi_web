@@ -23,21 +23,25 @@ Ký hiệu: `?` = tùy chọn · `[]` = mảng · tiền/giá/số lượng là 
 
 > **Trạng thái: đã triển khai** (có trong Swagger `/api/docs` và `openapi.json`) — `/health`, `/auth/*`, `/branches`, `/users…`, `/roles…`, `/permissions/catalog`.
 
-| Method | Đường dẫn                   | Mô tả                                                              | Quyền                   | Mốc |
-| ------ | --------------------------- | ------------------------------------------------------------------ | ----------------------- | --- |
-| GET    | `/health`                   | Kiểm tra sống                                                      | công khai               | ✔   |
-| POST   | `/auth/login`               | Đăng nhập                                                          | công khai               | ✔   |
-| POST   | `/auth/refresh`             | Lấy access token mới (dùng cookie `refresh_token`)                 | công khai (cần cookie)  | ✔   |
-| POST   | `/auth/logout`              | Đăng xuất: thu hồi phiên hiện tại, xóa cookie                      | công khai (dùng cookie) | ✔   |
-| GET    | `/auth/me`                  | Thông tin người dùng + quyền + chi nhánh hiện tại                  | đã đăng nhập            | ✔   |
-| POST   | `/auth/change-password`     | Đổi mật khẩu (thu hồi mọi phiên cũ, cấp phiên mới)                 | đã đăng nhập            | ✔   |
-| GET    | `/branches`                 | Chi nhánh người dùng được phép làm việc (Quản lý: tất cả)          | đã đăng nhập            | ✔   |
-| GET    | `/users`                    | Danh sách người dùng (`q`, `role`, `isActive`, `page`, `limit`)    | `user.manage`           | ✔   |
-| GET    | `/users/:id`                | Chi tiết một người dùng                                            | `user.manage`           | ✔   |
-| POST   | `/users`                    | Tạo người dùng                                                     | `user.manage`           | ✔   |
-| PATCH  | `/users/:id`                | Sửa thông tin / vai trò / khóa-mở tài khoản                        | `user.manage`           | ✔   |
-| POST   | `/users/:id/reset-password` | Đặt lại mật khẩu (bắt đổi ở lần đăng nhập kế tiếp)                 | `user.manage`           | ✔   |
-| PUT    | `/users/:id/branches`       | Gán chi nhánh `{ branchIds, defaultBranchId? }` (thay thế toàn bộ) | `user.manage`           | ✔   |
+| Method | Đường dẫn                   | Mô tả                                                                            | Quyền                         | Mốc |
+| ------ | --------------------------- | -------------------------------------------------------------------------------- | ----------------------------- | --- |
+| GET    | `/health`                   | Kiểm tra sống                                                                    | công khai                     | ✔   |
+| POST   | `/auth/login`               | Đăng nhập                                                                        | công khai                     | ✔   |
+| POST   | `/auth/refresh`             | Lấy access token mới (dùng cookie `refresh_token`)                               | công khai (cần cookie)        | ✔   |
+| POST   | `/auth/logout`              | Đăng xuất: thu hồi phiên hiện tại, xóa cookie                                    | công khai (dùng cookie)       | ✔   |
+| GET    | `/auth/me`                  | Thông tin người dùng + quyền + chi nhánh hiện tại                                | đã đăng nhập                  | ✔   |
+| POST   | `/auth/change-password`     | Đổi mật khẩu (thu hồi mọi phiên cũ, cấp phiên mới)                               | đã đăng nhập                  | ✔   |
+| POST   | `/auth/google`              | Đăng nhập bằng Google (token Supabase): 200 phiên, hoặc 202 cần hoàn tất đăng ký | công khai                     | ✔   |
+| POST   | `/auth/google/signup`       | Hoàn tất tự đăng ký từ Google (tên đăng nhập, mật khẩu, họ tên, SĐT)             | công khai (cần `signupToken`) | ✔   |
+| GET    | `/settings/auth`            | Cài đặt tự đăng ký bằng Google                                                   | `user.manage`                 | ✔   |
+| PATCH  | `/settings/auth`            | Bật/tắt tự đăng ký, đặt tên miền email được phép                                 | `user.manage`                 | ✔   |
+| GET    | `/branches`                 | Chi nhánh người dùng được phép làm việc (Quản lý: tất cả)                        | đã đăng nhập                  | ✔   |
+| GET    | `/users`                    | Danh sách người dùng (`q`, `role`, `isActive`, `page`, `limit`)                  | `user.manage`                 | ✔   |
+| GET    | `/users/:id`                | Chi tiết một người dùng                                                          | `user.manage`                 | ✔   |
+| POST   | `/users`                    | Tạo người dùng                                                                   | `user.manage`                 | ✔   |
+| PATCH  | `/users/:id`                | Sửa thông tin / vai trò / khóa-mở tài khoản                                      | `user.manage`                 | ✔   |
+| POST   | `/users/:id/reset-password` | Đặt lại mật khẩu (bắt đổi ở lần đăng nhập kế tiếp)                               | `user.manage`                 | ✔   |
+| PUT    | `/users/:id/branches`       | Gán chi nhánh `{ branchIds, defaultBranchId? }` (thay thế toàn bộ)               | `user.manage`                 | ✔   |
 
 **POST `/auth/login`**
 
@@ -103,6 +107,29 @@ Ký hiệu: `?` = tùy chọn · `[]` = mảng · tiền/giá/số lượng là 
 - Thu hồi **mọi phiên cũ ở mọi thiết bị**; thiết bị đang đổi mật khẩu nhận phiên mới ngay.
 
 **Tài khoản bị bắt đổi mật khẩu (`mustChangePassword = true`)** — gặp ở tài khoản Quản lý khởi tạo và tài khoản vừa được đặt lại mật khẩu. Mọi endpoint khác ngoài `/auth/me`, `/auth/change-password`, `/auth/logout` trả `403 PASSWORD_CHANGE_REQUIRED`. Frontend: sau khi đăng nhập, nếu `user.mustChangePassword` là true thì chuyển thẳng sang màn hình đổi mật khẩu.
+
+**Đăng nhập bằng Google (Supabase)**
+
+Luồng: web gọi `supabase.auth.signInWithOAuth({ provider: 'google' })` (PKCE) → lấy `session.access_token` của Supabase → gửi cho API. Google/Supabase chỉ chứng minh danh tính; **vai trò và quyền vẫn do hệ thống quyết định**.
+
+**POST `/auth/google`** body `{ "accessToken": "<token Supabase>" }`
+
+- Đã có tài khoản gắn với Google này → `200` giống `/auth/login` (`accessToken`, `expiresIn`, `user`; cookie refresh). Tài khoản bị khóa → `401 UNAUTHENTICATED`.
+- Chưa có tài khoản: nếu Quản lý đang **bật** tự đăng ký và tên miền email nằm trong danh sách → `202 { "status": "signup_required", "signupToken": "…", "email": "…", "suggestedName": "…" }`. **Chưa tạo gì.** Frontend hiện form hồ sơ (điền sẵn `suggestedName`).
+- Ngược lại (tắt, hoặc tên miền không được phép) → `403 SIGNUP_DISABLED` ("liên hệ Quản lý").
+- Token Supabase sai/hết hạn/không phải Google/email chưa xác minh → `401 UNAUTHENTICATED`. Chưa cấu hình `SUPABASE_URL` → `503 GOOGLE_NOT_CONFIGURED`.
+
+**POST `/auth/google/signup`** body `{ signupToken, username, password, fullName, phone }`
+
+- `signupToken` sống **15 phút**, chỉ dùng cho endpoint này (không phải access token). Hết hạn/sai → `401 SIGNUP_TOKEN_INVALID` → cho người dùng đăng nhập Google lại.
+- Quy tắc như tạo người dùng: tên đăng nhập `[a-z0-9._-]{3,32}`; mật khẩu 10–128 ký tự, không chứa tên đăng nhập; SĐT Việt Nam hợp lệ. Sai → `400 VALIDATION_ERROR` (`details[].field`), token **vẫn dùng lại được**.
+- Thành công → `201` + phiên đăng nhập như `/auth/login`. Tài khoản mới có **`role: "pending"`**, `permissions: []`, `branches: []`.
+- Lỗi: `409 DUPLICATE_USERNAME`, `409 GOOGLE_ALREADY_REGISTERED` (Google này đã đăng ký, hãy đăng nhập), `403 SIGNUP_DISABLED` (công tắc vừa bị tắt), `429 SIGNUP_LIMIT` (đang có quá nhiều tài khoản chờ cấp quyền, tối đa 50).
+- Tài khoản này vẫn đăng nhập bằng tên đăng nhập + mật khẩu được.
+
+**Vai trò `pending` ("Chờ cấp quyền")**: không có quyền nào; mọi endpoint nghiệp vụ trả `403 FORBIDDEN`; chỉ dùng được `/auth/me`, `/auth/change-password`, `/auth/logout`. Frontend: nếu `user.role === "pending"` thì chỉ hiện màn "Tài khoản đang chờ Quản lý cấp quyền". Quản lý gán chi nhánh (`PUT /users/:id/branches`) rồi đổi vai trò (`PATCH /users/:id`) — có hiệu lực ngay. `GET /users?role=pending` liệt kê người đang chờ. `pending` không có trong `/roles…` (không cấu hình được) và không gán được khi tạo/sửa người dùng.
+
+**GET/PATCH `/settings/auth`** (chỉ Quản lý) — `{ "googleSignupEnabled": false, "googleSignupDomains": ["congty.vn"] }`. Mặc định **tắt**. Bật mà `googleSignupDomains` rỗng → `400`. Tên miền được chuẩn hóa chữ thường. Mọi thay đổi ghi nhật ký (`settings.auth_update`).
 
 **GET `/branches`** → `[ { "id": "…", "code": "SG", "name": "Chi nhánh Sài Gòn", "isDefault": true } ]` — chỉ các chi nhánh người dùng được phép (đã sắp theo mã).
 

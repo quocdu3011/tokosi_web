@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ROLES } from '@kiot/shared';
+import { USER_ROLES } from '@kiot/shared';
 import { IsString, MaxLength, MinLength } from 'class-validator';
 import { GrantDto } from '../authorization/roles.dto.js';
 
@@ -47,7 +47,7 @@ export class AuthUserDto {
   @ApiProperty({ example: 'NV0001' }) code!: string;
   @ApiProperty({ example: 'quanly' }) username!: string;
   @ApiProperty({ example: 'Quản lý' }) fullName!: string;
-  @ApiProperty({ enum: ROLES }) role!: string;
+  @ApiProperty({ enum: USER_ROLES }) role!: string;
   @ApiProperty({
     description:
       'true → chỉ gọi được /auth/me, /auth/change-password, /auth/logout cho tới khi đổi mật khẩu',

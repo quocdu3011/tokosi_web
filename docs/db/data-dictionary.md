@@ -2,11 +2,11 @@
 
 > **Sinh tự động** từ `apps/api/src/db/schema` bằng `pnpm db:docs` — không sửa tay. Tổng quan và cách xem sơ đồ: [`README.md`](README.md).
 
-**39 bảng · 17 kiểu liệt kê (enum)**
+**41 bảng · 17 kiểu liệt kê (enum)**
 
 ## Mục lục
 
-- **Hệ thống**: [`branches`](#branches), [`users`](#users), [`refresh_tokens`](#refresh_tokens), [`audit_logs`](#audit_logs), [`code_sequences`](#code_sequences), [`company_profile`](#company_profile), [`idempotency_keys`](#idempotency_keys), [`import_jobs`](#import_jobs), [`user_branches`](#user_branches), [`role_permissions`](#role_permissions)
+- **Hệ thống**: [`branches`](#branches), [`users`](#users), [`refresh_tokens`](#refresh_tokens), [`audit_logs`](#audit_logs), [`code_sequences`](#code_sequences), [`company_profile`](#company_profile), [`idempotency_keys`](#idempotency_keys), [`import_jobs`](#import_jobs), [`user_branches`](#user_branches), [`role_permissions`](#role_permissions), [`user_identities`](#user_identities), [`system_settings`](#system_settings)
 - **Hàng hóa & giá**: [`categories`](#categories), [`products`](#products), [`product_images`](#product_images), [`price_books`](#price_books), [`price_book_items`](#price_book_items)
 - **Tồn kho & chuyển kho**: [`stocks`](#stocks), [`stock_movements`](#stock_movements), [`stock_transfers`](#stock_transfers), [`stock_transfer_items`](#stock_transfer_items)
 - **Đối tác**: [`customers`](#customers), [`customer_branch_terms`](#customer_branch_terms), [`customer_invoice_profiles`](#customer_invoice_profiles), [`suppliers`](#suppliers)
@@ -34,7 +34,7 @@
 | `stock_ref_type` | `opening`, `goods_receipt`, `invoice`, `sales_return`, `purchase_return`, `adjustment`, `transfer_out`, `transfer_in`, `transfer_cancel` |
 | `supplier_kind` | `goods`, `driver`, `other` |
 | `transfer_status` | `in_transit`, `received`, `cancelled` |
-| `user_role` | `manager`, `assistant`, `accountant`, `warehouse`, `driver`, `sales`, `marketing` |
+| `user_role` | `manager`, `assistant`, `accountant`, `warehouse`, `driver`, `sales`, `marketing`, `pending` |
 
 ## Hệ thống
 
@@ -234,6 +234,35 @@ Quyền của từng vai trò do Quản lý cấu hình (vai trò manager luôn 
 **Chỉ mục:**
 
 - `role_permissions_role_idx`: `role`
+
+### user_identities
+
+Danh tính đăng nhập bên ngoài (Google qua Supabase) gắn với người dùng; khớp theo provider_subject, không theo email.
+
+| Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
+| --- | --- | :-: | --- | --- |
+| `id` | uuid |  | `gen_random_uuid()` | **PK** |
+| `user_id` | uuid |  |  | → `users.id` (on delete cascade) |
+| `provider` | text |  |  |  |
+| `provider_subject` | text |  |  |  |
+| `email` | text |  |  |  |
+| `linked_at` | timestamptz |  | `now()` |  |
+
+**Chỉ mục:**
+
+- `user_identities_provider_subject_unique` (unique): `provider`, `provider_subject`
+- `user_identities_user_idx`: `user_id`
+
+### system_settings
+
+Cài đặt hệ thống dạng khóa → JSON do Quản lý chỉnh (vd mở/tắt tự đăng ký bằng Google).
+
+| Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
+| --- | --- | :-: | --- | --- |
+| `key` | text |  |  | **PK** |
+| `value` | jsonb |  |  |  |
+| `updated_by` | uuid | ✔ |  | → `users.id` (on delete set null) |
+| `updated_at` | timestamptz |  | `now()` |  |
 
 ## Hàng hóa & giá
 
