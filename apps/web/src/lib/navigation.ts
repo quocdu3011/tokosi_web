@@ -47,7 +47,7 @@ export const NAV_SECTIONS: NavSection[] = [
         href: '/products',
         label: 'Danh sách hàng hóa',
         permissions: ['product.view'],
-        ready: false,
+        ready: true,
       },
     ],
   },

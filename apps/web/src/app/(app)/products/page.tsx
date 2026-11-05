@@ -1,10 +1,15 @@
 import type { Metadata } from 'next';
 
-import { PlaceholderPage } from '@/components/common/placeholder-page';
+import { RequirePermission } from '@/components/common/require-permission';
+
+import { ProductsScreen } from './products-screen';
 
 export const metadata: Metadata = { title: 'Danh sách hàng hóa' };
 
-// Backend chưa có API cho phân hệ này → để trống (không dùng dữ liệu giả).
 export default function Page() {
-  return <PlaceholderPage href="/products" />;
+  return (
+    <RequirePermission anyOf={['product.view']}>
+      <ProductsScreen />
+    </RequirePermission>
+  );
 }

@@ -45,6 +45,15 @@ export interface SetUserBranchesInput {
 }
 export type RoleCode = Schemas['RoleSummaryDto']['role'];
 
+/** Phân hệ Hàng hóa (docs/api/endpoints.md mục 2). */
+export type Product = Schemas['ProductDto'];
+export type ProductList = Schemas['ProductListDto'];
+export type CategoryNode = Schemas['CategoryNodeDto'];
+
+/** Nhập dữ liệu từ Excel (docs/api/endpoints.md mục 9). */
+export type ImportJob = Schemas['ImportJobDto'];
+export type ImportRowError = Schemas['ImportErrorDto'];
+
 /** Phân trang chuẩn của mọi danh sách (docs/api/README.md mục 4). */
 export interface PageMeta {
   page: number;
