@@ -12,7 +12,7 @@ export type ImportType = 'products';
  * - `overwrite` (Import đè): cùng khóa (mã) thì ghi thông tin trong file lên bản ghi cũ; ô trống hoặc
  *   mã không có trong file thì giữ nguyên. Cột Tồn kho/Giá vốn bị bỏ qua.
  * - `add` (Import thêm): cùng khóa thì CỘNG cột Tồn kho vào tồn của chi nhánh đang chọn (số âm = trừ),
- *   thông tin khác giữ nguyên bản cũ; mã mới được tạo. KHÔNG idempotent: chạy lại sẽ cộng thêm lần nữa.
+ *   thông tin khác giữ nguyên bản cũ; mã mới được tạo. File trùng bị chặn, trừ khi xác nhận nhập lại.
  */
 export type ImportMode = 'overwrite' | 'add';
 

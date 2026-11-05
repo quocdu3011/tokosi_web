@@ -25,7 +25,7 @@ export class UserDto {
   @ApiProperty({ example: 'ketoan01' }) username!: string;
   @ApiProperty({ example: 'Nguyễn Văn A' }) fullName!: string;
   @ApiProperty({ enum: USER_ROLES }) role!: UserRole;
-  @ApiProperty({ nullable: true }) phone!: string | null;
+  @ApiProperty({ nullable: true, type: String }) phone!: string | null;
   @ApiProperty() isActive!: boolean;
   @ApiProperty({
     description: 'true = phải đổi mật khẩu ở lần đăng nhập kế tiếp',
@@ -33,7 +33,8 @@ export class UserDto {
   mustChangePassword!: boolean;
   @ApiProperty({ nullable: true, type: String, format: 'date-time' })
   lastLoginAt!: string | null;
-  @ApiProperty({ nullable: true }) defaultBranchId!: string | null;
+  @ApiProperty({ nullable: true, type: String }) defaultBranchId!:
+    string | null;
   @ApiProperty({
     type: [String],
     description:
@@ -171,6 +172,7 @@ export class UpdateUserDto {
 
   @ApiPropertyOptional({
     nullable: true,
+    type: String,
     description:
       'null hoặc chuỗi rỗng = xóa số; còn lại phải là số điện thoại hợp lệ (được chuẩn hóa)',
   })
@@ -197,6 +199,7 @@ export class UpdateUserDto {
 
   @ApiPropertyOptional({
     nullable: true,
+    type: String,
     description: 'Chi nhánh mặc định; null = bỏ',
   })
   @IsOptional()
@@ -227,6 +230,7 @@ export class SetUserBranchesDto {
 
   @ApiPropertyOptional({
     nullable: true,
+    type: String,
     description:
       'Chi nhánh mặc định mới. Bỏ qua = giữ nếu vẫn còn được gán, ngược lại bỏ',
   })

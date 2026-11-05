@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import {
   Dialog,
   DialogContent,
@@ -13,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { errorMessage } from '@/lib/api';
+import { errorMessage, isApiError } from '@/lib/api';
 import type { ImportJob } from '@/lib/api/types';
 import { useAuthStore } from '@/lib/auth/store';
 import { useBranchStore } from '@/lib/branch';
@@ -40,6 +41,11 @@ const MAX_ERRORS_SHOWN = 50;
  * Đổi file hoặc đổi chế độ thì kết quả kiểm tra cũ bị bỏ, phải kiểm tra lại.
  */
 export function ImportDialog({ type, onClose }: { type: ImportType; onClose: () => void }) {
+  const branchId = useBranchStore((s) => s.branchId);
+  return <ImportForm key={`${type}-${branchId}`} type={type} onClose={onClose} />;
+}
+
+function ImportForm({ type, onClose }: { type: ImportType; onClose: () => void }) {
   const config = IMPORT_TYPES[type];
   const branchId = useBranchStore((s) => s.branchId);
   const branchName = useAuthStore((s) => s.user?.branches.find((b) => b.id === branchId)?.name);
@@ -51,6 +57,8 @@ export function ImportDialog({ type, onClose }: { type: ImportType; onClose: () 
   const [fileError, setFileError] = useState<string | null>(null);
   const [checked, setChecked] = useState<ImportJob | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [allowDuplicate, setAllowDuplicate] = useState(false);
+  const [duplicateFound, setDuplicateFound] = useState(false);
 
   const busy = mutation.isPending;
   const checkedOk = checked !== null && importOutcome(checked) === 'ok';
@@ -58,6 +66,8 @@ export function ImportDialog({ type, onClose }: { type: ImportType; onClose: () 
 
   const resetResult = () => {
     setChecked(null);
+    setAllowDuplicate(false);
+    setDuplicateFound(false);
     mutation.reset();
   };
 
@@ -67,10 +77,17 @@ export function ImportDialog({ type, onClose }: { type: ImportType; onClose: () 
     setFile(next);
   };
 
-  const run = async (dryRun: boolean) => {
+  const run = async (dryRun: boolean, duplicate = allowDuplicate) => {
     if (!file || fileError || missingBranch) return;
     try {
-      const job = await mutation.mutateAsync({ type, mode, file, dryRun, branchId });
+      const job = await mutation.mutateAsync({
+        type,
+        mode,
+        file,
+        dryRun,
+        branchId,
+        allowDuplicate: duplicate,
+      });
       if (dryRun) {
         setChecked(job);
         return;
@@ -84,6 +101,11 @@ export function ImportDialog({ type, onClose }: { type: ImportType; onClose: () 
         toast.error('Không có gì được ghi. Sửa các dòng lỗi rồi nhập lại.');
       }
     } catch (e) {
+      setChecked(null);
+      if (mode === 'add' && isApiError(e, 'IMPORT_DUPLICATE_FILE')) {
+        setDuplicateFound(true);
+        return;
+      }
       toast.error(errorMessage(e));
     }
   };
@@ -201,11 +223,30 @@ export function ImportDialog({ type, onClose }: { type: ImportType; onClose: () 
                 hàng).
               </li>
               <li>
-                <strong>Chạy lại cùng file sẽ cộng thêm lần nữa.</strong> Hãy bấm &quot;Kiểm tra
-                file&quot; rồi nhập đúng một lần.
+                <strong>File đã nhập vào chi nhánh này sẽ bị chặn.</strong> Chỉ xác nhận nhập lại
+                khi bạn muốn cộng/trừ tồn thêm một lần nữa.
               </li>
             </ul>
           </div>
+        )}
+
+        {allowDuplicate && (
+          <p className="alert alert-warning">
+            Bạn đã cho phép nhập lại file: tồn kho sẽ được cộng/trừ thêm một lần nữa.
+          </p>
+        )}
+        {duplicateFound && (
+          <ConfirmDialog
+            title="File này đã được nhập"
+            description="Nhập lại sẽ cộng/trừ tồn kho thêm một lần nữa tại chi nhánh đang chọn. Bạn có muốn cho phép nhập lại và kiểm tra file không?"
+            confirmLabel="Cho phép nhập lại và kiểm tra"
+            destructive
+            onConfirm={async () => {
+              setAllowDuplicate(true);
+              await run(true, true);
+            }}
+            onClose={() => setDuplicateFound(false)}
+          />
         )}
 
         {checked && <ImportResult job={checked} />}
@@ -222,7 +263,11 @@ export function ImportDialog({ type, onClose }: { type: ImportType; onClose: () 
             {busy && !checkedOk ? 'Đang kiểm tra…' : 'Kiểm tra file'}
           </Button>
           <Button onClick={() => void run(false)} disabled={!checkedOk || busy}>
-            {busy && checkedOk ? 'Đang nhập…' : 'Nhập dữ liệu'}
+            {busy && checkedOk
+              ? 'Đang nhập…'
+              : allowDuplicate
+                ? 'Nhập lại dữ liệu'
+                : 'Nhập dữ liệu'}
           </Button>
         </DialogFooter>
       </DialogContent>

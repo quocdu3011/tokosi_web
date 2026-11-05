@@ -55,7 +55,7 @@ const schema = z
   .object({
     isNew: z.boolean(),
     username: z.string().trim(),
-    fullName: z.string().trim().min(1, 'Nhập họ tên').max(100, 'Họ tên quá dài'),
+    fullName: z.string().trim().min(1, 'Nhập họ tên').max(120, 'Họ tên tối đa 120 ký tự'),
     role: z.enum(ROLES, { error: 'Chọn vai trò' }),
     phone: z.string().trim(),
     branchIds: z.array(z.string()),

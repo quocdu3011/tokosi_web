@@ -2296,7 +2296,7 @@
             ]
           },
           "phone": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "isActive": {
@@ -2312,7 +2312,7 @@
             "format": "date-time"
           },
           "defaultBranchId": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "branchIds": {
@@ -2467,7 +2467,7 @@
             ]
           },
           "phone": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "isActive": {
@@ -2483,7 +2483,7 @@
             "format": "date-time"
           },
           "defaultBranchId": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "branchIds": {
@@ -2524,7 +2524,7 @@
             "type": "string"
           },
           "phone": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "description": "null hoặc chuỗi rỗng = xóa số; còn lại phải là số điện thoại hợp lệ (được chuẩn hóa)"
           },
@@ -2546,7 +2546,7 @@
             "description": "false = khóa tài khoản (thu hồi mọi phiên ngay). Không tự khóa mình; không khóa Quản lý cuối cùng"
           },
           "defaultBranchId": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "description": "Chi nhánh mặc định; null = bỏ"
           }
@@ -2572,7 +2572,7 @@
             }
           },
           "defaultBranchId": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "description": "Chi nhánh mặc định mới. Bỏ qua = giữ nếu vẫn còn được gán, ngược lại bỏ"
           }
@@ -3149,8 +3149,9 @@
             "example": "1000.000"
           },
           "unitCost": {
-            "type": "object",
-            "description": "Vắng mặt nếu thiếu product.cost.view"
+            "type": "string",
+            "description": "Vắng mặt nếu thiếu product.cost.view",
+            "nullable": true
           }
         },
         "required": [

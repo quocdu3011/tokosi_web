@@ -1,6 +1,7 @@
 'use client';
 
 import { Plus } from 'lucide-react';
+import { LIQUIDATION_STATUSES, LIQUIDATION_STATUS_LABELS } from '@kiot/shared';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -99,6 +100,8 @@ export function ProductsScreen() {
   const [categoryId, setCategoryId] = useState<string>(ALL);
   const [status, setStatus] = useState<string>('active');
   const [stock, setStock] = useState<string>(ALL);
+  const [productType, setProductType] = useState<string>(ALL);
+  const [liquidationStatus, setLiquidationStatus] = useState<string>(ALL);
   const [sort, setSort] = useState<SortState | null>(null);
   const [page, setPage] = useState(1);
   const debouncedQ = useDebouncedValue(q.trim());
@@ -109,6 +112,9 @@ export function ProductsScreen() {
     categoryId: categoryId === ALL ? undefined : categoryId,
     isActive: status === ALL ? undefined : status === 'active',
     inStock: stock === 'in' ? true : undefined,
+    productType: productType === ALL ? undefined : (productType as Product['productType']),
+    liquidationStatus:
+      liquidationStatus === ALL ? undefined : (liquidationStatus as Product['liquidationStatus']),
     sort:
       sort && SERVER_SORT_IDS.includes(sort.id) ? `${sort.desc ? '-' : ''}${sort.id}` : undefined,
   };
@@ -315,6 +321,32 @@ export function ProductsScreen() {
           <SelectContent>
             <SelectItem value={ALL}>Mọi tồn kho</SelectItem>
             <SelectItem value="in">Còn hàng</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={productType} onValueChange={(v) => resetFilters(() => setProductType(v))}>
+          <SelectTrigger aria-label="Lọc theo loại hàng" className="toolbar-select">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>Mọi loại hàng</SelectItem>
+            <SelectItem value="goods">Hàng hóa</SelectItem>
+            <SelectItem value="combo">Combo</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          value={liquidationStatus}
+          onValueChange={(v) => resetFilters(() => setLiquidationStatus(v))}
+        >
+          <SelectTrigger aria-label="Lọc theo thanh lý" className="toolbar-select">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>Mọi trạng thái thanh lý</SelectItem>
+            {LIQUIDATION_STATUSES.map((value) => (
+              <SelectItem key={value} value={value}>
+                {LIQUIDATION_STATUS_LABELS[value]}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <div className="toolbar-end">

@@ -775,13 +775,13 @@ export interface components {
         | 'sales'
         | 'marketing'
         | 'pending';
-      phone: Record<string, never> | null;
+      phone: string | null;
       isActive: boolean;
       /** @description true = phải đổi mật khẩu ở lần đăng nhập kế tiếp */
       mustChangePassword: boolean;
       /** Format: date-time */
       lastLoginAt: string | null;
-      defaultBranchId: Record<string, never> | null;
+      defaultBranchId: string | null;
       /** @description Chi nhánh được gán. Quản lý luôn làm việc được ở mọi chi nhánh bất kể danh sách này */
       branchIds: string[];
       /** Format: date-time */
@@ -837,13 +837,13 @@ export interface components {
         | 'sales'
         | 'marketing'
         | 'pending';
-      phone: Record<string, never> | null;
+      phone: string | null;
       isActive: boolean;
       /** @description true = phải đổi mật khẩu ở lần đăng nhập kế tiếp */
       mustChangePassword: boolean;
       /** Format: date-time */
       lastLoginAt: string | null;
-      defaultBranchId: Record<string, never> | null;
+      defaultBranchId: string | null;
       /** @description Chi nhánh được gán. Quản lý luôn làm việc được ở mọi chi nhánh bất kể danh sách này */
       branchIds: string[];
       /** Format: date-time */
@@ -854,7 +854,7 @@ export interface components {
     UpdateUserDto: {
       fullName?: string;
       /** @description null hoặc chuỗi rỗng = xóa số; còn lại phải là số điện thoại hợp lệ (được chuẩn hóa) */
-      phone?: Record<string, never> | null;
+      phone?: string | null;
       /**
        * @description Không đổi được vai trò của chính mình
        * @enum {string}
@@ -864,7 +864,7 @@ export interface components {
       /** @description false = khóa tài khoản (thu hồi mọi phiên ngay). Không tự khóa mình; không khóa Quản lý cuối cùng */
       isActive?: boolean;
       /** @description Chi nhánh mặc định; null = bỏ */
-      defaultBranchId?: Record<string, never> | null;
+      defaultBranchId?: string | null;
     };
     ResetPasswordDto: {
       /** @description Mật khẩu mới do quản trị đặt. Bỏ trống để hệ thống tự sinh và trả `temporaryPassword` */
@@ -874,7 +874,7 @@ export interface components {
       /** @description Danh sách chi nhánh MỚI (thay thế toàn bộ) */
       branchIds: string[];
       /** @description Chi nhánh mặc định mới. Bỏ qua = giữ nếu vẫn còn được gán, ngược lại bỏ */
-      defaultBranchId?: Record<string, never> | null;
+      defaultBranchId?: string | null;
     };
     GoogleLoginDto: {
       /** @description Access token (JWT) Supabase nhận được sau khi đăng nhập Google (`session.access_token`) */
@@ -1099,7 +1099,7 @@ export interface components {
       /** @example 1000.000 */
       balance: string;
       /** @description Vắng mặt nếu thiếu product.cost.view */
-      unitCost?: Record<string, never>;
+      unitCost?: string | null;
     };
     StockCardDto: {
       branchId: string;

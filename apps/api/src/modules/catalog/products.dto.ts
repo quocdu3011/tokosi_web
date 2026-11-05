@@ -360,7 +360,11 @@ export class StockCardMovementDto {
   refCode!: string | null;
   @ApiProperty({ example: '600.000' }) qtyDelta!: string;
   @ApiProperty({ example: '1000.000' }) balance!: string;
-  @ApiPropertyOptional({ description: 'Vắng mặt nếu thiếu product.cost.view' })
+  @ApiPropertyOptional({
+    description: 'Vắng mặt nếu thiếu product.cost.view',
+    type: String,
+    nullable: true,
+  })
   unitCost?: string | null;
 }
 

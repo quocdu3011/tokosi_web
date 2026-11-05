@@ -15,10 +15,18 @@ export interface RunImportArgs {
   dryRun: boolean;
   /** Chi nhánh cho tồn tối thiểu-tối đa / vị trí và tồn kho của Import thêm. */
   branchId: string | null;
+  allowDuplicate?: boolean;
 }
 
 /** Tải file lên. Chế độ chưa được API hỗ trợ bị chặn TẠI ĐÂY để không bao giờ gửi nhầm thành "đè". */
-export function runImport({ type, mode, file, dryRun, branchId }: RunImportArgs) {
+export function runImport({
+  type,
+  mode,
+  file,
+  dryRun,
+  branchId,
+  allowDuplicate = false,
+}: RunImportArgs) {
   if (!isModeSupported(type, mode)) {
     return Promise.reject(new Error('Chế độ nhập này chưa được hệ thống hỗ trợ.'));
   }
@@ -26,7 +34,7 @@ export function runImport({ type, mode, file, dryRun, branchId }: RunImportArgs)
   body.append('file', file);
   return api.post<ImportJob>(`/imports/${type}`, body, {
     // `mode` luôn gửi rõ ràng (không dựa vào mặc định của API) để không bao giờ nhầm đè với thêm.
-    query: { dryRun, branchId, mode },
+    query: { dryRun, branchId, mode, allowDuplicate },
   });
 }
 

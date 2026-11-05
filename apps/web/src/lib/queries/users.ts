@@ -55,22 +55,29 @@ export function useCreateUser() {
 }
 
 /** Sửa thông tin + (nếu đổi) gán lại chi nhánh. Hai lệnh gọi tuần tự; lỗi ở bước nào báo bước đó. */
+export async function updateUser(args: {
+  id: string;
+  patch: UpdateUserInput;
+  branches?: SetUserBranchesInput;
+}) {
+  // Vai trò nhân viên cần có chi nhánh sẵn; Quản lý mới được bỏ hết chi nhánh.
+  const branchesFirst = !!args.branches?.branchIds.length;
+  if (branchesFirst) {
+    await api.put<User>(`/users/${args.id}/branches`, args.branches, { branchId: null });
+  }
+  let user = await api.patch<User>(`/users/${args.id}`, args.patch, { branchId: null });
+  if (args.branches && !branchesFirst) {
+    user = await api.put<User>(`/users/${args.id}/branches`, args.branches, {
+      branchId: null,
+    });
+  }
+  return user;
+}
+
 export function useUpdateUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (args: {
-      id: string;
-      patch: UpdateUserInput;
-      branches?: SetUserBranchesInput;
-    }) => {
-      let user = await api.patch<User>(`/users/${args.id}`, args.patch, { branchId: null });
-      if (args.branches) {
-        user = await api.put<User>(`/users/${args.id}/branches`, args.branches, {
-          branchId: null,
-        });
-      }
-      return user;
-    },
+    mutationFn: updateUser,
     onSettled: () => qc.invalidateQueries({ queryKey: userKeys.all }),
   });
 }

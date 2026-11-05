@@ -569,6 +569,33 @@ describe('Quản lý người dùng qua HTTP', () => {
       .where(eq(codeSequences.prefix, 'NV'));
   });
 
+  it('duyệt tài khoản pending chưa có chi nhánh bằng cách gán chi nhánh trước khi đổi vai trò', async () => {
+    const created = await asAdmin
+      .post('/api/v1/users')
+      .send({
+        username: 'pending-approve',
+        fullName: 'Chờ duyệt',
+        role: 'manager',
+        branchIds: [],
+      })
+      .expect(201);
+    const id = created.body.id as string;
+    await db.update(users).set({ role: 'pending' }).where(eq(users.id, id));
+    await asAdmin
+      .put(`/api/v1/users/${id}/branches`)
+      .send({ branchIds: [sg], defaultBranchId: sg })
+      .expect(200);
+    const approved = await asAdmin
+      .patch(`/api/v1/users/${id}`)
+      .send({ role: 'sales' })
+      .expect(200);
+    expect(approved.body).toMatchObject({
+      role: 'sales',
+      branchIds: [sg],
+      defaultBranchId: sg,
+    });
+  });
+
   // ------------------------------------------------------------------ phòng thủ ở tầng service
 
   it('không thể khóa hoặc hạ Quản lý hoạt động cuối cùng (kiểm tra ở tầng service, kể cả khi người gọi không phải Quản lý)', async () => {

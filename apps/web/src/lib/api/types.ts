@@ -18,31 +18,12 @@ export type PermissionDef = Schemas['PermissionDefDto'];
 export type RoleSummary = Schemas['RoleSummaryDto'];
 export type RolePermissions = Schemas['RolePermissionsDto'];
 export type SetRolePermissionsResult = Schemas['SetRolePermissionsResultDto'];
-/**
- * openapi.json hiện khai báo `phone` / `defaultBranchId` là `Record<string, never> | null`
- * (swagger thiếu `type` cho field nullable). Theo docs/api/endpoints.md hai field này là
- * `string | null` → sửa kiểu ở đây cho đúng hợp đồng (đã ghi để báo backend).
- */
-type FixNullableStrings<T, K extends keyof T> = Omit<T, K> & { [P in K]: string | null };
-
-export type User = FixNullableStrings<Schemas['UserDto'], 'phone' | 'defaultBranchId'>;
-export type UserWithPassword = FixNullableStrings<
-  Schemas['UserWithPasswordDto'],
-  'phone' | 'defaultBranchId'
->;
-export interface UserList {
-  data: User[];
-  meta: PageMeta;
-}
+export type User = Schemas['UserDto'];
+export type UserWithPassword = Schemas['UserWithPasswordDto'];
+export type UserList = Schemas['UserListDto'];
 export type CreateUserInput = Schemas['CreateUserDto'];
-export type UpdateUserInput = Omit<Schemas['UpdateUserDto'], 'phone' | 'defaultBranchId'> & {
-  phone?: string | null;
-  defaultBranchId?: string | null;
-};
-export interface SetUserBranchesInput {
-  branchIds: string[];
-  defaultBranchId?: string | null;
-}
+export type UpdateUserInput = Schemas['UpdateUserDto'];
+export type SetUserBranchesInput = Schemas['SetUserBranchesDto'];
 export type RoleCode = Schemas['RoleSummaryDto']['role'];
 
 /** Phân hệ Hàng hóa (docs/api/endpoints.md mục 2). */
@@ -56,13 +37,8 @@ export type ProductImage = Schemas['ProductImageDto'];
 export type ProductLookup = Schemas['ProductLookupDto'];
 export type CreateCategoryInput = Schemas['CreateCategoryDto'];
 export type UpdateCategoryInput = Schemas['UpdateCategoryDto'];
-/** openapi.json khai `unitCost` sai kiểu (`Record<string, never>`); theo docs/api đó là chuỗi thập phân. */
-export type StockCardMovement = Omit<Schemas['StockCardMovementDto'], 'unitCost'> & {
-  unitCost?: string;
-};
-export type StockCard = Omit<Schemas['StockCardDto'], 'movements'> & {
-  movements: StockCardMovement[];
-};
+export type StockCardMovement = Schemas['StockCardMovementDto'];
+export type StockCard = Schemas['StockCardDto'];
 
 /** Nhập dữ liệu từ Excel (docs/api/endpoints.md mục 9). */
 export type ImportJob = Schemas['ImportJobDto'];

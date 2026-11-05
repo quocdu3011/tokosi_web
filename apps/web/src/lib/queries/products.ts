@@ -20,6 +20,8 @@ export interface ProductListParams {
   categoryId?: string;
   isActive?: boolean;
   inStock?: boolean;
+  productType?: Product['productType'];
+  liquidationStatus?: Product['liquidationStatus'];
   /** `code`, `name`, `onHand`, `createdAt`; thêm `-` phía trước để giảm dần (endpoints.md mục 2.1). */
   sort?: string;
   page: number;
