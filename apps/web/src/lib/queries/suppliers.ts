@@ -19,10 +19,12 @@ export interface SupplierParams {
   page: number;
   limit: number;
 }
-export function useSupplierList(params: SupplierParams) {
+/** `enabled` = false để chờ tùy chỉnh bảng (cỡ trang) sẵn sàng. */
+export function useSupplierList(params: SupplierParams, enabled = true) {
   const branchId = useBranchStore((s) => s.branchId);
   return useQuery({
     queryKey: ['suppliers', branchId, params],
+    enabled,
     queryFn: ({ signal }) =>
       api.get<SupplierList>('/suppliers', { query: { ...params }, branchId, signal }),
     placeholderData: keepPreviousData,

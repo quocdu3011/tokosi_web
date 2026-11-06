@@ -479,22 +479,6 @@
   color: var(--text);
   box-shadow: 0 1px 4px rgb(0 0 0 / 20%);
 }
-.mini-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.mini-table th,
-.mini-table td {
-  padding: var(--space-sm) var(--space-md);
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-}
-.mini-table th.num,
-.mini-table td.num {
-  display: table-cell; /* `.num` toàn cục là display:block, sẽ làm vỡ ô bảng */
-  text-align: right;
-}
 .qty-input {
   width: 96px;
   margin-left: auto;

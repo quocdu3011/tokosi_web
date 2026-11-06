@@ -97,9 +97,6 @@
 .purchase-workspace .data-table {
   min-width: 600px;
 }
-.purchase-workspace .data-table-frame {
-  overflow-x: auto;
-}
 .purchase-workspace .stack-md,
 .purchase-workspace .tabs-content {
   min-width: 0;

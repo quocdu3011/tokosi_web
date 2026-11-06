@@ -1,72 +1,47 @@
 import { FileSpreadsheet } from 'lucide-react';
+import { StatusBadge, statusTone, type StatusTone } from '@/components/common/status-badge';
 import { Button } from '@/components/ui/button';
-import {
-  TableSearch,
-  ColumnPicker,
-  type ColumnOption,
-} from '@/components/data-table/table-toolbar';
 import type { PurchaseDocument } from '@/lib/api/types';
-import { PURCHASE_STATUS } from '@/lib/purchasing';
+import { PURCHASE_STATUS, RECEIVE_STATUS } from '@/lib/purchasing';
 
-// FilterSelect đã chuyển về components/data-table/table-toolbar; re-export để màn mua hàng cũ không vỡ.
-export { FilterSelect } from '@/components/data-table/table-toolbar';
+/** Sắc thái tình trạng nhập của phiếu đặt hàng: chưa nhập → một phần → đủ. */
+const RECEIVE_STATUS_TONES: Record<keyof typeof RECEIVE_STATUS, StatusTone> = {
+  none: 'neutral',
+  partial: 'warning',
+  full: 'success',
+};
+
+/** Trạng thái chứng từ mua hàng (phiếu tạm / đã xác nhận / hoàn thành / hủy). */
 export function PurchaseStatus({ status }: { status: PurchaseDocument['status'] }) {
-  const variant =
-    status === 'completed'
-      ? 'success'
-      : status === 'cancelled'
-        ? 'danger'
-        : status === 'confirmed'
-          ? 'info'
-          : 'neutral';
-  return <span className={`badge badge-${variant}`}>{PURCHASE_STATUS[status]}</span>;
+  return <StatusBadge tone={statusTone(status)}>{PURCHASE_STATUS[status]}</StatusBadge>;
 }
-export function PurchaseToolbar({
-  search,
-  setSearch,
-  placeholder,
-  children,
-  total,
-  columns,
-  hidden,
-  onToggle,
-  onReset,
-  onExport,
+
+/** Tình trạng nhập hàng của phiếu đặt hàng. */
+export function ReceiveStatus({ state }: { state: keyof typeof RECEIVE_STATUS }) {
+  return (
+    <StatusBadge tone={RECEIVE_STATUS_TONES[state] ?? 'neutral'}>
+      {RECEIVE_STATUS[state]}
+    </StatusBadge>
+  );
+}
+
+/**
+ * Nút "Xuất Excel" tải thẳng file theo bộ lọc hiện tại (không chọn cột). Dùng thay `ExportMenu`
+ * vì hộp thoại đó hiện cố định tiêu đề "Hàng hóa".
+ */
+export function ExportExcelButton({
   exporting,
+  disabled,
+  onExport,
 }: {
-  search: string;
-  setSearch: (value: string) => void;
-  placeholder: string;
-  children: React.ReactNode;
-  total?: number;
-  columns: readonly ColumnOption[];
-  hidden: ReadonlySet<string>;
-  onToggle: (id: string, visible: boolean) => void;
-  onReset: () => void;
-  onExport: () => void;
   exporting: boolean;
+  disabled?: boolean;
+  onExport: () => void;
 }) {
   return (
-    <div className="toolbar purchase-toolbar">
-      <TableSearch
-        value={search}
-        onChange={setSearch}
-        placeholder={placeholder}
-        label={placeholder}
-      />
-      {children}
-      <div className="toolbar-end">
-        {total !== undefined && (
-          <span className="toolbar-count tabular" aria-live="polite">
-            {total.toLocaleString('vi-VN')} kết quả
-          </span>
-        )}
-        <ColumnPicker options={columns} hidden={hidden} onToggle={onToggle} onReset={onReset} />
-        <Button variant="outline" disabled={exporting || !total} onClick={onExport}>
-          <FileSpreadsheet aria-hidden="true" />
-          {exporting ? 'Đang xuất…' : 'Xuất Excel'}
-        </Button>
-      </div>
-    </div>
+    <Button variant="outline" disabled={exporting || disabled} onClick={onExport}>
+      <FileSpreadsheet aria-hidden="true" />
+      {exporting ? 'Đang xuất…' : 'Xuất Excel'}
+    </Button>
   );
 }

@@ -25,7 +25,7 @@ export function PurchaseLines({
     isActive: returns ? undefined : true,
     productType: returns ? 'goods' : undefined,
     page: 1,
-    limit: 20,
+    limit: 20, // cố ý: kết quả tìm nhanh trong ô thả xuống, không phải trang danh sách
   });
   const update = (index: number, field: 'qty' | 'unitCost', value: string) =>
     onChange(rows.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
@@ -66,66 +66,70 @@ export function PurchaseLines({
           </div>
         ))}
       <div className="data-table-frame">
-        <table className="data-table purchase-lines">
-          <thead>
-            <tr>
-              <th>Hàng hóa</th>
-              <th>Số lượng</th>
-              <th>{returns ? 'Giá trả' : 'Giá nhập'}</th>
-              <th>
-                <span className="sr-only">Xóa dòng</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr key={row.productId}>
-                <td>
-                  <b>{row.code}</b>
-                  <div>{row.name}</div>
-                </td>
-                <td>
-                  <Input
-                    aria-label={`Số lượng ${row.code}`}
-                    inputMode="decimal"
-                    required
-                    pattern="[0-9]+([.][0-9]{1,3})?"
-                    value={row.qty}
-                    disabled={disabled}
-                    onChange={(e) => update(i, 'qty', e.target.value)}
-                  />
-                </td>
-                <td>
-                  <Input
-                    aria-label={`Đơn giá ${row.code}`}
-                    inputMode="decimal"
-                    required
-                    pattern="[0-9]+([.][0-9]{1,4})?"
-                    value={row.unitCost}
-                    disabled={disabled}
-                    onChange={(e) => update(i, 'unitCost', e.target.value)}
-                  />
-                </td>
-                <td>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    disabled={disabled}
-                    aria-label={`Xóa ${row.code}`}
-                    onClick={() => onChange(rows.filter((_, index) => index !== i))}
-                  >
-                    Xóa
-                  </Button>
-                </td>
-              </tr>
-            ))}
-            {!rows.length && (
+        <div className="data-table-scroll">
+          <table className="data-table purchase-lines">
+            <thead>
               <tr>
-                <td colSpan={4}>Tìm và chọn hàng để thêm vào phiếu.</td>
+                <th scope="col">Hàng hóa</th>
+                <th scope="col">Số lượng</th>
+                <th scope="col">{returns ? 'Giá trả' : 'Giá nhập'}</th>
+                <th scope="col">
+                  <span className="sr-only">Xóa dòng</span>
+                </th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr key={row.productId}>
+                  <td>
+                    <span className="cell-title">{row.code}</span>{' '}
+                    <span className="cell-sub">{row.name}</span>
+                  </td>
+                  <td>
+                    <Input
+                      aria-label={`Số lượng ${row.code}`}
+                      inputMode="decimal"
+                      required
+                      pattern="[0-9]+([.][0-9]{1,3})?"
+                      value={row.qty}
+                      disabled={disabled}
+                      onChange={(e) => update(i, 'qty', e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <Input
+                      aria-label={`Đơn giá ${row.code}`}
+                      inputMode="decimal"
+                      required
+                      pattern="[0-9]+([.][0-9]{1,4})?"
+                      value={row.unitCost}
+                      disabled={disabled}
+                      onChange={(e) => update(i, 'unitCost', e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={disabled}
+                      aria-label={`Xóa ${row.code}`}
+                      onClick={() => onChange(rows.filter((_, index) => index !== i))}
+                    >
+                      Xóa
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+              {!rows.length && (
+                <tr>
+                  <td colSpan={4} className="data-table-empty">
+                    Tìm và chọn hàng để thêm vào phiếu.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
       <p className="field-hint">
         Số lượng tối đa 3 số lẻ; giá tối đa 4 số lẻ. Dùng dấu chấm thập phân. Tổng tiền được cập

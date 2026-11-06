@@ -21,7 +21,7 @@ export function SupplierPicker({
     q: term,
     isActive: activeOnly ? true : undefined,
     page: 1,
-    limit: 20,
+    limit: 20, // cố ý: danh sách chọn nhanh trong ô thả xuống, không phải trang danh sách
   });
   if (value)
     return (

@@ -27,8 +27,9 @@ export const userKeys = {
   list: (p: UserListParams) => ['users', 'list', p] as const,
 };
 
-export function useUserList(params: UserListParams) {
+export function useUserList(params: UserListParams, options: { enabled?: boolean } = {}) {
   return useQuery({
+    enabled: options.enabled ?? true,
     queryKey: userKeys.list(params),
     queryFn: ({ signal }) =>
       api.get<UserList>('/users', { query: { ...params }, signal, branchId: null }),

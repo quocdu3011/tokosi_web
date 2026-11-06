@@ -60,7 +60,7 @@ export function StockCardTab({ product }: { product: Product }) {
             <p className="muted">Không có phát sinh trong khoảng ngày này.</p>
           ) : (
             <div className="data-table-frame">
-              <table className="mini-table">
+              <table className="data-table data-table-compact">
                 <thead>
                   <tr>
                     <th>Thời gian</th>

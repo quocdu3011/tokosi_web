@@ -1,11 +1,20 @@
 'use client';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Plus, Filter, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DataTable, type AppColumnDef } from '@/components/data-table/data-table';
+import { sortableIdsOf } from '@/components/data-table/column-meta';
 import { Pagination } from '@/components/data-table/pagination';
+import {
+  ColumnPicker,
+  FilterSelect,
+  TableSearch,
+  TableToolbar,
+  ToolbarCount,
+  ToolbarEnd,
+} from '@/components/data-table/table-toolbar';
 import { RequirePermission } from '@/components/common/require-permission';
 import { useAuthStore } from '@/lib/auth/store';
 import { useBranchStore } from '@/lib/branch';
@@ -18,30 +27,27 @@ import {
   documentDate,
   PURCHASE_CONFIG,
   PURCHASE_STATUS,
-  RECEIVE_STATUS,
   type PurchaseKind,
 } from '@/lib/purchasing';
 import { usePurchaseList } from '@/lib/queries/purchasing';
-import { useDebouncedValue } from '@/hooks/use-debounced-value';
-import { useColumnVisibility } from '@/hooks/use-column-visibility';
+import { useListState } from '@/hooks/use-list-state';
+import { useTablePrefs } from '@/hooks/use-table-prefs';
 import { PageHeader } from '@/components/common/coming-soon';
-import { FilterSelect, PurchaseStatus, PurchaseToolbar } from './purchase-ui';
+import { ExportExcelButton, PurchaseStatus, ReceiveStatus } from './purchase-ui';
 import { PurchaseDetail } from './purchase-detail';
 import { PurchaseForm, type PurchaseFormTarget } from './purchase-form';
 import { SupplierPicker } from './supplier-picker';
 import { QueryError } from './query-feedback';
 
-const DEFAULT_HIDDEN = ['qty', 'note'];
-const WIDTHS = {
-  code: 145,
-  date: 180,
-  supplier: 290,
-  qty: 145,
-  total: 180,
-  status: 180,
-  receive: 170,
-  note: 260,
+/** Mỗi loại chứng từ một khóa riêng để bố cục cột lưu tách nhau. */
+const TABLE_KEYS: Record<PurchaseKind, string> = {
+  orders: 'purchase-orders',
+  receipts: 'goods-receipts',
+  returns: 'purchase-returns',
 };
+// '' = không lọc.
+const INITIAL_FILTERS = { status: '', from: '', to: '', supplierId: '' };
+const EMPTY: PurchaseDocument[] = [];
 
 export function PurchaseScreen({ kind }: { kind: PurchaseKind }) {
   const branchId = useBranchStore((s) => s.branchId);
@@ -53,70 +59,117 @@ export function PurchaseScreen({ kind }: { kind: PurchaseKind }) {
 }
 function PurchaseWorkspace({ kind }: { kind: PurchaseKind }) {
   const config = PURCHASE_CONFIG[kind];
-  const [q, setQ] = useState('');
-  const term = useDebouncedValue(q, 250);
-  const [supplier, setSupplier] = useState<{ id: string; name: string } | null>(null);
+  const defaultSort = `-${config.date}`;
+  const [supplierName, setSupplierName] = useState('');
   const [filterSupplier, setFilterSupplier] = useState(false);
-  const [status, setStatus] = useState('');
-  const [range, setRange] = useState({ from: '', to: '' });
-  const [page, setPage] = useState(1);
-  const [sort, setSort] = useState(`-${config.date}`);
   const [detail, setDetail] = useState<{ kind: PurchaseKind; id: string } | null>(null);
   const [form, setForm] = useState<PurchaseFormTarget | null>(null);
   const [exporting, setExporting] = useState(false);
   const [advanced, setAdvanced] = useState(false);
-  const { hidden, setVisible, reset } = useColumnVisibility(
-    `table:purchase-${kind}:hidden`,
-    DEFAULT_HIDDEN,
-  );
   const me = useAuthStore((s) => s.user);
   const edit = can(me, 'purchase.edit');
-  const filters = { q: term, supplierId: supplier?.id, status, ...range, sort };
-  const invalidRange = !!(range.from && range.to && range.from > range.to);
-  const query = usePurchaseList(kind, { ...filters, page, limit: 20 }, !invalidRange);
-  const columns: AppColumnDef<PurchaseDocument>[] = [
-    {
-      id: 'code',
-      header: 'Mã phiếu',
-      cell: ({ row }) => (
-        <Button variant="link" onClick={() => setDetail({ kind, id: row.original.id })}>
-          {row.original.code}
-        </Button>
-      ),
-    },
-    {
-      id: 'date',
-      header: 'Ngày chứng từ',
-      cell: ({ row }) => formatDateTime(documentDate(row.original)),
-    },
-    { id: 'supplier', header: 'Nhà cung cấp', cell: ({ row }) => row.original.supplier.name },
-    {
-      id: 'qty',
-      header: 'Tổng số lượng',
-      cell: ({ row }) => <span className="num">{formatDecimal(row.original.totalQty)}</span>,
-    },
-    {
-      id: 'total',
-      header: 'Tổng tiền',
-      cell: ({ row }) => <span className="num">{formatMoney(row.original.total)}</span>,
-    },
-    {
-      id: 'status',
-      header: 'Trạng thái',
-      cell: ({ row }) => <PurchaseStatus status={row.original.status} />,
-    },
-    ...(kind === 'orders'
-      ? [
-          {
-            id: 'receive',
-            header: 'Tình trạng nhập',
-            cell: ({ row }: { row: { original: PurchaseDocument } }) =>
-              'receiveState' in row.original ? RECEIVE_STATUS[row.original.receiveState] : '',
-          },
-        ]
-      : []),
-    { id: 'note', header: 'Ghi chú', cell: ({ row }) => row.original.note ?? '—' },
-  ];
+  const columns = useMemo<AppColumnDef<PurchaseDocument>[]>(() => {
+    const cols: AppColumnDef<PurchaseDocument>[] = [
+      {
+        id: 'code',
+        header: 'Mã phiếu',
+        meta: { label: 'Mã phiếu', width: 145, locked: true, sort: 'server' },
+        cell: ({ row }) => (
+          <button
+            type="button"
+            className="link-button tabular"
+            aria-label={`Xem phiếu ${row.original.code}`}
+            onClick={() => setDetail({ kind, id: row.original.id })}
+          >
+            {row.original.code}
+          </button>
+        ),
+      },
+      {
+        id: 'date',
+        header: 'Ngày chứng từ',
+        meta: { label: 'Ngày chứng từ', width: 180, sort: 'server' },
+        cell: ({ row }) => formatDateTime(documentDate(row.original)),
+      },
+      {
+        id: 'supplier',
+        header: 'Nhà cung cấp',
+        meta: { label: 'Nhà cung cấp', width: 290, locked: true },
+        cell: ({ row }) => <span className="cell-title">{row.original.supplier.name}</span>,
+      },
+      {
+        id: 'qty',
+        header: () => <span className="num">Tổng số lượng</span>,
+        meta: { label: 'Tổng số lượng', width: 145, hiddenByDefault: true },
+        cell: ({ row }) => <span className="num">{formatDecimal(row.original.totalQty)}</span>,
+      },
+      {
+        id: 'total',
+        header: () => <span className="num">Tổng tiền</span>,
+        meta: { label: 'Tổng tiền', width: 180, sort: 'server' },
+        cell: ({ row }) => <span className="num">{formatMoney(row.original.total)}</span>,
+      },
+      {
+        id: 'status',
+        header: 'Trạng thái',
+        meta: { label: 'Trạng thái', width: 180 },
+        cell: ({ row }) => <PurchaseStatus status={row.original.status} />,
+      },
+    ];
+    if (kind === 'orders') {
+      cols.push({
+        id: 'receive',
+        header: 'Tình trạng nhập',
+        meta: { label: 'Tình trạng nhập', width: 170 },
+        cell: ({ row }) =>
+          'receiveState' in row.original ? (
+            <ReceiveStatus state={row.original.receiveState} />
+          ) : null,
+      });
+    }
+    cols.push({
+      id: 'note',
+      header: 'Ghi chú',
+      meta: { label: 'Ghi chú', width: 260, hiddenByDefault: true },
+      cell: ({ row }) => row.original.note ?? '—',
+    });
+    return cols;
+  }, [kind]);
+  const prefs = useTablePrefs(TABLE_KEYS[kind], columns);
+  const list = useListState({
+    initialFilters: INITIAL_FILTERS,
+    initialSort: { id: 'date', desc: true },
+    prefs,
+  });
+  const { from, to } = list.filters;
+  const serverSortIds = sortableIdsOf(columns, 'server');
+  // Cột `date` trên bảng ứng với trường ngày riêng của từng loại chứng từ (config.date) ở API.
+  const sortField = list.sort && serverSortIds.includes(list.sort.id) ? list.sort : null;
+  const filters = {
+    q: list.debouncedQ,
+    supplierId: list.filters.supplierId || undefined,
+    status: list.filters.status,
+    from,
+    to,
+    sort: sortField
+      ? `${sortField.desc ? '-' : ''}${sortField.id === 'date' ? config.date : sortField.id}`
+      : defaultSort,
+  };
+  const invalidRange = !!(from && to && from > to);
+  const query = usePurchaseList(
+    kind,
+    { ...filters, page: list.page, limit: list.pageSize },
+    !invalidRange && prefs.isReady,
+  );
+  const rows = query.data?.data ?? EMPTY;
+  const clearAdvanced = () => {
+    list.setFilter('supplierId', '');
+    list.setFilter('from', '');
+    list.setFilter('to', '');
+    list.setFilter('status', '');
+    setSupplierName('');
+    setFilterSupplier(false);
+  };
   return (
     <div className="page">
       <PageHeader
@@ -131,40 +184,17 @@ function PurchaseWorkspace({ kind }: { kind: PurchaseKind }) {
           )
         }
       />
-      <PurchaseToolbar
-        search={q}
-        setSearch={(value) => {
-          setQ(value);
-          setPage(1);
-        }}
-        placeholder="Tìm mã phiếu hoặc nhà cung cấp"
-        total={invalidRange ? undefined : query.data?.meta.total}
-        columns={columns
-          .filter((c) => c.id !== 'code' && c.id !== 'supplier')
-          .map((c) => ({ id: c.id!, label: String(c.header) }))}
-        hidden={hidden}
-        onToggle={setVisible}
-        onReset={reset}
-        exporting={exporting}
-        onExport={async () => {
-          setExporting(true);
-          try {
-            const file = await api.download(config.path, { query: { ...filters, format: 'xlsx' } });
-            saveBlob(file.blob, file.filename ?? 'mua-hang.xlsx');
-          } catch (err) {
-            toast.error(errorMessage(err));
-          } finally {
-            setExporting(false);
-          }
-        }}
-      >
+      <TableToolbar>
+        <TableSearch
+          value={list.q}
+          onChange={list.setQ}
+          placeholder="Tìm mã phiếu hoặc nhà cung cấp"
+          label="Tìm chứng từ"
+        />
         <FilterSelect
           label="Trạng thái phiếu"
-          value={status}
-          onChange={(v) => {
-            setStatus(v);
-            setPage(1);
-          }}
+          value={list.filters.status}
+          onChange={(v) => list.setFilter('status', v)}
           options={[
             { value: '', label: 'Mọi trạng thái' },
             ...Object.entries(PURCHASE_STATUS)
@@ -176,47 +206,53 @@ function PurchaseWorkspace({ kind }: { kind: PurchaseKind }) {
         />
         <Button variant="outline" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>
           <Filter aria-hidden="true" />
-          Bộ lọc{range.from || range.to || supplier ? ' · Đang áp dụng' : ''}
+          Bộ lọc{from || to || list.filters.supplierId ? ' · Đang áp dụng' : ''}
         </Button>
-      </PurchaseToolbar>
+        <ToolbarEnd>
+          {!invalidRange && query.data && <ToolbarCount total={query.data.meta.total} />}
+          <ColumnPicker prefs={prefs} />
+          <ExportExcelButton
+            exporting={exporting}
+            disabled={invalidRange || !query.data?.meta.total}
+            onExport={async () => {
+              setExporting(true);
+              try {
+                const file = await api.download(config.path, {
+                  query: { ...filters, format: 'xlsx' },
+                });
+                saveBlob(file.blob, file.filename ?? 'mua-hang.xlsx');
+              } catch (err) {
+                toast.error(errorMessage(err));
+              } finally {
+                setExporting(false);
+              }
+            }}
+          />
+        </ToolbarEnd>
+      </TableToolbar>
       {advanced && (
         <div className="purchase-filters purchase-filter-panel">
           <label>
             Từ ngày
             <Input
               type="date"
-              value={range.from}
-              onChange={(e) => {
-                setRange({ ...range, from: e.target.value });
-                setPage(1);
-              }}
+              value={from}
+              onChange={(e) => list.setFilter('from', e.target.value)}
             />
           </label>
           <label>
             Đến ngày
             <Input
               type="date"
-              min={range.from}
-              value={range.to}
-              onChange={(e) => {
-                setRange({ ...range, to: e.target.value });
-                setPage(1);
-              }}
+              min={from}
+              value={to}
+              onChange={(e) => list.setFilter('to', e.target.value)}
             />
           </label>
           <Button variant="outline" onClick={() => setFilterSupplier(!filterSupplier)}>
-            {supplier ? supplier.name : 'Chọn nhà cung cấp'}
+            {list.filters.supplierId ? supplierName : 'Chọn nhà cung cấp'}
           </Button>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setSupplier(null);
-              setRange({ from: '', to: '' });
-              setStatus('');
-              setPage(1);
-              setFilterSupplier(false);
-            }}
-          >
+          <Button variant="ghost" onClick={clearAdvanced}>
             <X aria-hidden="true" />
             Xóa bộ lọc
           </Button>
@@ -224,10 +260,12 @@ function PurchaseWorkspace({ kind }: { kind: PurchaseKind }) {
       )}
       {filterSupplier && (
         <SupplierPicker
-          value={supplier}
+          value={
+            list.filters.supplierId ? { id: list.filters.supplierId, name: supplierName } : null
+          }
           onChange={(s) => {
-            setSupplier(s);
-            setPage(1);
+            list.setFilter('supplierId', s?.id ?? '');
+            setSupplierName(s?.name ?? '');
             setFilterSupplier(false);
           }}
         />
@@ -242,28 +280,21 @@ function PurchaseWorkspace({ kind }: { kind: PurchaseKind }) {
         <>
           <DataTable
             columns={columns}
-            data={query.data?.data ?? []}
-            isLoading={query.isLoading}
+            data={rows}
+            isLoading={query.isLoading || !prefs.isReady}
             getRowId={(d) => d.id}
             onRowClick={(d) => setDetail({ kind, id: d.id })}
-            hiddenColumns={hidden}
-            sort={{
-              id: sort.replace(/^-/, '') === config.date ? 'date' : sort.replace(/^-/, ''),
-              desc: sort.startsWith('-'),
-            }}
-            onSortChange={(s) => {
-              setSort(
-                s
-                  ? `${s.desc ? '-' : ''}${s.id === 'date' ? config.date : s.id}`
-                  : `-${config.date}`,
-              );
-              setPage(1);
-            }}
-            sortableIds={['code', 'date', 'total']}
-            resizable={{ storageKey: `table:purchase-${kind}`, defaultWidths: WIDTHS }}
+            prefs={prefs}
+            sort={list.sort}
+            onSortChange={list.onSortChange}
             emptyText="Không có chứng từ phù hợp"
           />
-          <Pagination meta={query.data?.meta} onPageChange={setPage} />
+          <Pagination
+            meta={query.data?.meta}
+            onPageChange={list.setPage}
+            pageSize={list.pageSize}
+            onPageSizeChange={list.onPageSizeChange}
+          />
         </>
       )}
       {detail && !form && (

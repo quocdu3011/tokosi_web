@@ -13,12 +13,11 @@ import {
   documentDate,
   purchaseActions,
   PURCHASE_CONFIG,
-  PURCHASE_STATUS,
-  RECEIVE_STATUS,
   type PurchaseKind,
 } from '@/lib/purchasing';
 import { usePurchaseDocument, usePurchaseMutation } from '@/lib/queries/purchasing';
 import { QueryError } from './query-feedback';
+import { PurchaseStatus, ReceiveStatus } from './purchase-ui';
 import type { PurchaseFormTarget } from './purchase-form';
 
 export function PurchaseDetail({
@@ -75,9 +74,9 @@ export function PurchaseDetail({
               </div>
               <div>
                 <span className="muted">Trạng thái</span>
-                <p>
-                  {PURCHASE_STATUS[doc.status]}
-                  {'receiveState' in doc ? ` · ${RECEIVE_STATUS[doc.receiveState]}` : ''}
+                <p className="cell-badges">
+                  <PurchaseStatus status={doc.status} />
+                  {'receiveState' in doc && <ReceiveStatus state={doc.receiveState} />}
                 </p>
               </div>
               <div>
@@ -114,43 +113,63 @@ export function PurchaseDetail({
                 ))}
             </div>
             <div className="data-table-frame">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Hàng hóa</th>
-                    <th>Số lượng</th>
-                    <th>Đơn giá</th>
-                    <th>Thành tiền</th>
-                    {kind === 'orders' && (
-                      <>
-                        <th>Đã nhập</th>
-                        <th>Còn nhập</th>
-                      </>
-                    )}
-                    {kind === 'receipts' && <th>Đã trả</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {doc.items?.map((r) => (
-                    <tr key={r.productId}>
-                      <td>
-                        <b>{r.code}</b>
-                        <div>{r.name}</div>
-                      </td>
-                      <td>{formatDecimal(r.qty)}</td>
-                      <td>{formatMoney('unitCost' in r ? r.unitCost : r.returnPrice)}</td>
-                      <td>{formatMoney(r.lineTotal)}</td>
-                      {'receivedQty' in r && (
+              <div className="data-table-scroll">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Hàng hóa</th>
+                      <th scope="col" className="col-numeric">
+                        Số lượng
+                      </th>
+                      <th scope="col" className="col-numeric">
+                        Đơn giá
+                      </th>
+                      <th scope="col" className="col-numeric">
+                        Thành tiền
+                      </th>
+                      {kind === 'orders' && (
                         <>
-                          <td>{formatDecimal(r.receivedQty)}</td>
-                          <td>{formatDecimal(r.remainingQty)}</td>
+                          <th scope="col" className="col-numeric">
+                            Đã nhập
+                          </th>
+                          <th scope="col" className="col-numeric">
+                            Còn nhập
+                          </th>
                         </>
                       )}
-                      {'returnedQty' in r && <td>{formatDecimal(r.returnedQty)}</td>}
+                      {kind === 'receipts' && (
+                        <th scope="col" className="col-numeric">
+                          Đã trả
+                        </th>
+                      )}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {doc.items?.map((r) => (
+                      <tr key={r.productId}>
+                        <td>
+                          <span className="cell-title">{r.code}</span>{' '}
+                          <span className="cell-sub">{r.name}</span>
+                        </td>
+                        <td className="col-numeric">{formatDecimal(r.qty)}</td>
+                        <td className="col-numeric">
+                          {formatMoney('unitCost' in r ? r.unitCost : r.returnPrice)}
+                        </td>
+                        <td className="col-numeric">{formatMoney(r.lineTotal)}</td>
+                        {'receivedQty' in r && (
+                          <>
+                            <td className="col-numeric">{formatDecimal(r.receivedQty)}</td>
+                            <td className="col-numeric">{formatDecimal(r.remainingQty)}</td>
+                          </>
+                        )}
+                        {'returnedQty' in r && (
+                          <td className="col-numeric">{formatDecimal(r.returnedQty)}</td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
             <p>
               {doc.itemCount} mặt hàng · Tổng số lượng {formatDecimal(doc.totalQty)}

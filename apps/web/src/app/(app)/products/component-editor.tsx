@@ -50,48 +50,50 @@ export function ComponentEditor({
   return (
     <div className="stack-sm">
       {rows.length > 0 ? (
-        <table className="mini-table">
-          <thead>
-            <tr>
-              <th>Mã hàng</th>
-              <th>Tên hàng</th>
-              <th className="num">Số lượng / combo</th>
-              <th>
-                <span className="sr-only">Gỡ</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => (
-              <tr key={r.code}>
-                <td className="tabular">{r.code}</td>
-                <td>{r.name}</td>
-                <td className="num">
-                  <Input
-                    inputMode="numeric"
-                    className="qty-input"
-                    aria-label={`Số lượng ${r.code} trong một combo`}
-                    value={r.qty === 0 ? '' : String(r.qty)}
-                    onChange={(e) => setQty(i, e.target.value)}
-                    disabled={disabled}
-                  />
-                </td>
-                <td>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Gỡ ${r.code} khỏi combo`}
-                    onClick={() => onChange(rows.filter((_, j) => j !== i))}
-                    disabled={disabled}
-                  >
-                    <Trash2 aria-hidden="true" />
-                  </Button>
-                </td>
+        <div className="data-table-frame">
+          <table className="data-table data-table-compact">
+            <thead>
+              <tr>
+                <th>Mã hàng</th>
+                <th>Tên hàng</th>
+                <th className="num">Số lượng / combo</th>
+                <th>
+                  <span className="sr-only">Gỡ</span>
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={r.code}>
+                  <td className="tabular">{r.code}</td>
+                  <td>{r.name}</td>
+                  <td className="num">
+                    <Input
+                      inputMode="numeric"
+                      className="qty-input"
+                      aria-label={`Số lượng ${r.code} trong một combo`}
+                      value={r.qty === 0 ? '' : String(r.qty)}
+                      onChange={(e) => setQty(i, e.target.value)}
+                      disabled={disabled}
+                    />
+                  </td>
+                  <td>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Gỡ ${r.code} khỏi combo`}
+                      onClick={() => onChange(rows.filter((_, j) => j !== i))}
+                      disabled={disabled}
+                    >
+                      <Trash2 aria-hidden="true" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <p className="field-hint">Chưa có hàng thành phần nào.</p>
       )}

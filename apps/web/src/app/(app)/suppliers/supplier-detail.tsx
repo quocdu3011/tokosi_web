@@ -15,11 +15,36 @@ import { QueryError } from '@/components/purchasing/query-feedback';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 const columns: AppColumnDef<SupplierLedger['entries'][number]>[] = [
-  { id: 'date', header: 'Ngày', cell: ({ row }) => formatDateTime(row.original.occurredAt) },
-  { id: 'ref', header: 'Chứng từ', cell: ({ row }) => row.original.refCode ?? '—' },
-  { id: 'amount', header: 'Tăng/giảm nợ', cell: ({ row }) => formatMoney(row.original.amount) },
-  { id: 'balance', header: 'Số dư', cell: ({ row }) => formatMoney(row.original.balance) },
-  { id: 'note', header: 'Ghi chú', cell: ({ row }) => row.original.note ?? '—' },
+  {
+    id: 'date',
+    header: 'Ngày',
+    meta: { label: 'Ngày', width: 170 },
+    cell: ({ row }) => formatDateTime(row.original.occurredAt),
+  },
+  {
+    id: 'ref',
+    header: 'Chứng từ',
+    meta: { label: 'Chứng từ', width: 150 },
+    cell: ({ row }) => row.original.refCode ?? '—',
+  },
+  {
+    id: 'amount',
+    header: () => <span className="num">Tăng/giảm nợ</span>,
+    meta: { label: 'Tăng/giảm nợ', width: 150 },
+    cell: ({ row }) => <span className="num">{formatMoney(row.original.amount)}</span>,
+  },
+  {
+    id: 'balance',
+    header: () => <span className="num">Số dư</span>,
+    meta: { label: 'Số dư', width: 150 },
+    cell: ({ row }) => <span className="num">{formatMoney(row.original.balance)}</span>,
+  },
+  {
+    id: 'note',
+    header: 'Ghi chú',
+    meta: { label: 'Ghi chú', width: 220 },
+    cell: ({ row }) => row.original.note ?? '—',
+  },
 ];
 export function SupplierDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const [range, setRange] = useState({ from: '', to: '' });

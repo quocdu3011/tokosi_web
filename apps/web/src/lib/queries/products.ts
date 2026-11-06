@@ -66,9 +66,10 @@ export const productKeys = {
   lookup: (branchId: string | null, q: string) => ['products', 'lookup', branchId, q] as const,
 };
 
-export function useProductList(params: ProductListParams) {
+export function useProductList(params: ProductListParams, options: { enabled?: boolean } = {}) {
   const branchId = useBranchStore((s) => s.branchId);
   return useQuery({
+    enabled: options.enabled ?? true,
     queryKey: productKeys.list(branchId, params),
     queryFn: ({ signal }) => api.get<ProductList>('/products', { query: { ...params }, signal }),
     placeholderData: keepPreviousData,

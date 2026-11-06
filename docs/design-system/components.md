@@ -105,7 +105,7 @@ Bảng ánh xạ trạng thái nghiệp vụ → sắc thái:
 | Tình trạng nhập (đề xuất; hiện là chữ thường) | `none` / `partial` / `full` | Chưa nhập / Nhập một phần / Đã nhập đủ | `neutral` / `warning` / `success` |
 | Loại hàng (không phải trạng thái) | `combo`        | Combo (`<Badge variant="info">`) | —  |
 
-Hiện NCC "Ngưng giao dịch" đang hiện xám (`neutral`) ở `suppliers-screen.tsx`; theo `ACTIVE_STATUS_TONES` phải là `danger` — thống nhất khi chuyển màn đó sang `StatusBadge`.
+Ngoại lệ có chủ đích: `suppliers-screen.tsx` hiện NCC "Ngưng giao dịch" màu xám (`neutral`), không theo `ACTIVE_STATUS_TONES` (`danger`), vì ngừng giao dịch không phải lỗi/khóa. Màn mới có trạng thái tương tự thì chọn tone theo nghĩa nghiệp vụ.
 
 Vai trò **không** dùng `Badge`: dùng `RoleBadge` (`components/common/role-badge.tsx`, lớp `.role-badge` + `.role-<slug>`, token `--role-*`). Nhãn "Chờ cấp quyền" cho vai trò `pending`.
 

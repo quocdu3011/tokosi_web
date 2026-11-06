@@ -20,7 +20,7 @@ import { usePurchaseMutation } from '@/lib/queries/purchasing';
 import { SupplierPicker } from './supplier-picker';
 import { PurchaseLines } from './purchase-lines';
 import { ReferencePicker } from './reference-picker';
-import { FilterSelect } from './purchase-ui';
+import { FilterSelect } from '@/components/data-table/table-toolbar';
 
 export interface PurchaseFormTarget {
   kind: PurchaseKind;

@@ -27,12 +27,13 @@ export function ReferencePicker({
       supplierId,
       status: kind === 'receipts' ? 'completed' : 'confirmed',
       page: 1,
-      limit: 20,
+      limit: 20, // cố ý: danh sách chọn nhanh trong ô thả xuống
     },
     !!supplierId,
   );
   const drafts = usePurchaseList(
     'orders',
+    // limit 20 cố ý (ô chọn nhanh)
     { q: term, supplierId, status: 'draft', page: 1, limit: 20 },
     kind === 'orders' && !!supplierId,
   );

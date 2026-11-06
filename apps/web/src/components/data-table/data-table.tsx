@@ -48,10 +48,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  useColumnWidths,
-  type ColumnWidths as LegacyColumnWidths,
-} from '@/hooks/use-column-widths';
 import type { TablePrefsController } from '@/hooks/use-table-prefs';
 import { cn } from '@/lib/utils';
 
@@ -78,8 +74,6 @@ export type { TableColumnMeta } from './column-meta';
  *
  * Tùy chọn cũ (giữ nguyên để màn hình chưa chuyển vẫn chạy; sẽ gỡ sau):
  * - `sort` + `onSortChange` + `sortableIds`: bấm tiêu đề để sắp xếp (tăng → giảm → bỏ), do màn hình đẩy lên server.
- * - `resizable`: kéo mép tiêu đề để đổi độ rộng cột (nhớ theo trình duyệt), kèm kẻ cột.
- * - `hiddenColumns`: id các cột ẩn (hook `useColumnVisibility` cũ).
  */
 const features = tableFeatures({ columnMeta: metaHelper<TableColumnMeta>() });
 export type AppColumnDef<TData extends RowData> = ColumnDef<typeof features, TData, unknown>;
@@ -88,15 +82,6 @@ export interface SortState {
   id: string;
   desc: boolean;
 }
-
-export interface ResizableOptions {
-  /** Khóa lưu độ rộng trong localStorage, vd. `table:products`. */
-  storageKey: string;
-  /** Độ rộng mặc định (px) theo id cột; cột thiếu dùng 160. */
-  defaultWidths: LegacyColumnWidths;
-}
-
-const NO_WIDTHS: LegacyColumnWidths = {};
 
 /** Kéo thả đổi thứ tự cột: tiêu đề không dịch chỗ, chỉ cột đang kéo đi theo con trỏ + vạch báo nơi thả. */
 const noShiftStrategy: SortingStrategy = () => null;
@@ -118,12 +103,10 @@ export function DataTable<TData extends RowData>({
   sort,
   onSortChange,
   sortableIds,
-  resizable,
   columnLabels,
   sortHints,
   cellClassNames,
   onRowClick,
-  hiddenColumns,
   prefs,
 }: {
   columns: AppColumnDef<TData>[];
@@ -136,7 +119,6 @@ export function DataTable<TData extends RowData>({
   /** Thêm vào các cột có `meta.sort`; mặc định chỉ dùng `meta.sort`. */
   sortableIds?: readonly string[];
   /** (Cũ) độ rộng nhớ theo trình duyệt. Có `prefs` thì dùng `prefs.widths`. */
-  resizable?: ResizableOptions;
   /** (Cũ) tên cột (chữ thường) cho nhãn trợ năng của tay nắm kéo; mặc định lấy từ `meta.label`. */
   columnLabels?: Record<string, string>;
   /** Gợi ý (tooltip) riêng cho nút sắp xếp từng cột; ghi đè `meta.sortHint`. */
@@ -145,11 +127,9 @@ export function DataTable<TData extends RowData>({
   cellClassNames?: Record<string, string>;
   /** Bấm vào chỗ trống bất kỳ của dòng (không phải nút/liên kết) để mở chi tiết. */
   onRowClick?: (row: TData) => void;
-  /** (Cũ) id các cột đang ẩn (hook `useColumnVisibility`). Gộp với `prefs.hidden` nếu có cả hai. */
-  hiddenColumns?: ReadonlySet<string>;
   /**
    * Tùy chỉnh cột theo tài khoản (`useTablePrefs`): ẩn cột theo `prefs.hidden`, xếp theo `prefs.order`,
-   * độ rộng từ `prefs.widths`, kéo thả tiêu đề để đổi chỗ, kéo mép để đổi độ rộng. Bật bố cục cột cố định như `resizable`.
+   * độ rộng từ `prefs.widths`, kéo thả tiêu đề để đổi chỗ, kéo mép để đổi độ rộng. Bật bố cục cột cố định.
    */
   prefs?: TablePrefsController;
 }) {
@@ -169,28 +149,18 @@ export function DataTable<TData extends RowData>({
       const placed = new Set(prefsOrder);
       list = [...ordered, ...allColumns.filter((c) => !placed.has(c.id ?? ''))];
     }
-    const isHidden = (id: string) =>
-      (prefsHidden?.has(id) ?? false) || (hiddenColumns?.has(id) ?? false);
+    const isHidden = (id: string) => prefsHidden?.has(id) ?? false;
     return list.some((c) => isHidden(c.id ?? ''))
       ? list.filter((c) => !isHidden(c.id ?? ''))
       : list;
-  }, [allColumns, prefsOrder, prefsHidden, hiddenColumns]);
+  }, [allColumns, prefsOrder, prefsHidden]);
 
   const table = useTable({ features, columns, data, getRowId });
-  const legacy = useColumnWidths(
-    resizable?.storageKey ?? 'table:unused',
-    resizable?.defaultWidths ?? NO_WIDTHS,
-  );
-
-  const fixedLayout = !!prefs || !!resizable;
+  const fixedLayout = !!prefs;
   const metaWidth = (id: string) => specById.get(id)?.width ?? DEFAULT_COLUMN_WIDTH;
-  const widthOf = (id: string) =>
-    prefs
-      ? (prefs.widths[id] ?? metaWidth(id))
-      : (legacy.widths[id] ?? resizable?.defaultWidths[id] ?? metaWidth(id));
-  const changeWidth = (id: string, width: number) =>
-    prefs ? prefs.setWidth(id, width) : legacy.setWidth(id, width);
-  const restoreWidth = (id: string) => (prefs ? prefs.resetWidth(id) : legacy.resetWidth(id));
+  const widthOf = (id: string) => prefs?.widths[id] ?? metaWidth(id);
+  const changeWidth = (id: string, width: number) => prefs?.setWidth(id, width);
+  const restoreWidth = (id: string) => prefs?.resetWidth(id);
   const labelOf = useCallback(
     (id: string) => columnLabels?.[id] ?? specById.get(id)?.label.toLocaleLowerCase('vi-VN') ?? id,
     [columnLabels, specById],
@@ -412,6 +382,7 @@ function SortableHeaderCell({
   } = useSortable({
     id,
     disabled: { draggable: locked, droppable: false },
+    attributes: { roleDescription: 'cột có thể đổi chỗ' },
     transition: null,
     animateLayoutChanges: () => false,
   });

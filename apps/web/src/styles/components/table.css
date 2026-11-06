@@ -256,6 +256,23 @@ body.is-col-resizing {
   border-top-color: var(--primary);
 }
 
+/* ---------- Bảng tĩnh gọn (thẻ kho, thành phần combo…): dùng cùng `.data-table`, không cuộn/sắp xếp/kéo cột ---------- */
+.data-table.data-table-compact {
+  font-size: 13px;
+}
+.data-table-compact th {
+  position: static; /* nằm trong khung cuộn khác (hộp chi tiết) nên không dính tiêu đề */
+  padding: var(--space-sm) var(--space-md);
+}
+.data-table-compact td {
+  padding: var(--space-sm) var(--space-md);
+}
+.data-table-compact th.num,
+.data-table-compact td.num {
+  display: table-cell; /* `.num` toàn cục là display:block, sẽ làm vỡ ô bảng */
+  text-align: right;
+}
+
 /* ---------- Kéo thả đổi thứ tự cột (DataTable có `prefs`) ---------- */
 
 /* Tiêu đề kéo được: con trỏ "nắm"; nút sắp xếp bên trong vẫn là con trỏ bấm */
@@ -264,11 +281,15 @@ body.is-col-resizing {
   user-select: none;
 }
 /* Cột đang được kéo: nổi lên trên các tiêu đề khác, viền xanh tiêu điểm */
+/* hơi trong suốt để vẫn thấy vạch báo nơi thả nằm dưới nó */
 .data-table th.is-col-dragging {
   z-index: 30;
   cursor: grabbing;
+  opacity: 0.88;
   background: var(--panel-3);
-  box-shadow: inset 0 0 0 2px var(--border-focus);
+  box-shadow:
+    inset 0 0 0 2px var(--border-focus),
+    var(--shadow-toast);
 }
 /* Vạch báo nơi cột sẽ được thả: bên trái nếu kéo sang trái, bên phải nếu kéo sang phải */
 .data-table th[data-drop='before'] {
