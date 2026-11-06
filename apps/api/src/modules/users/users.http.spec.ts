@@ -21,6 +21,7 @@ import { createTestDb } from '../../db/test-db.js';
 import { configureApp } from '../../app.setup.js';
 import { AuthorizationModule } from '../authorization/authorization.module.js';
 import { AuthModule } from '../auth/auth.module.js';
+import { TokenService } from '../auth/token.service.js';
 import { BranchesModule } from '../branches/branches.module.js';
 import { UsersModule } from './users.module.js';
 import { UsersService } from './users.service.js';
@@ -35,6 +36,7 @@ describe('Quản lý người dùng qua HTTP', () => {
   let db: Database;
   let app: INestApplication<App>;
   let service: UsersService;
+  let tokens: TokenService;
   let sg: string;
   let hn: string;
   let adminToken: string;
@@ -69,6 +71,7 @@ describe('Quản lý người dùng qua HTTP', () => {
     configureApp(app);
     await app.init();
     service = moduleRef.get(UsersService);
+    tokens = moduleRef.get(TokenService);
     adminToken = (await login('quanly2', USER_PW).expect(200)).body.accessToken;
   }, 60_000);
 
@@ -397,6 +400,11 @@ describe('Quản lý người dùng qua HTTP', () => {
   it('đặt lại mật khẩu: mật khẩu cũ mất hiệu lực, phiên bị thu hồi, bắt đổi mật khẩu; không áp dụng cho chính mình', async () => {
     const id = await idOf('kho01');
     const before = await login('kho01', 'Mat-khau-ban-dau-kho1').expect(200);
+    // Cấp token trước lần đặt lại ít nhất một giây, tránh phụ thuộc ranh giới giây của JWT.
+    const oldAccessToken = (
+      await tokens.signAccessToken(id, new Date(Date.now() - 5000))
+    ).token;
+    await http().get('/api/v1/auth/me').set(bearer(oldAccessToken)).expect(200);
 
     const res = await asAdmin
       .post(`/api/v1/users/${id}/reset-password`)
@@ -405,17 +413,18 @@ describe('Quản lý người dùng qua HTTP', () => {
     expect(res.headers['cache-control']).toBe('no-store');
     expect(res.body.temporaryPassword).toEqual(expect.any(String));
 
-    await http()
+    const revoked = await http()
       .get('/api/v1/auth/me')
-      .set(bearer(before.body.accessToken))
-      .expect(200); // access token còn hạn (JWT không trạng thái) nhưng...
+      .set(bearer(oldAccessToken))
+      .expect(401); // đặt lại mật khẩu vô hiệu cả access token cũ chưa hết hạn
+    expect(revoked.body.code).toBe('UNAUTHENTICATED');
     const cookie = (before.headers['set-cookie'] as unknown as string[]).find(
       (c) => c.startsWith('refresh_token='),
     )!;
     await http()
       .post('/api/v1/auth/refresh')
       .set('Cookie', cookie.split(';')[0]!)
-      .expect(401); // ...không làm mới được nữa
+      .expect(401); // refresh token cũng bị thu hồi
     await login('kho01', 'Mat-khau-ban-dau-kho1').expect(401);
     const [afterReset] = await db.select().from(users).where(eq(users.id, id));
     expect(afterReset!.passwordChangedAt).toBeInstanceOf(Date); // mốc để token cũ bị từ chối ngay
