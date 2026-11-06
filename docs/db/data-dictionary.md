@@ -2,14 +2,14 @@
 
 > **Sinh tự động** từ `apps/api/src/db/schema` bằng `pnpm db:docs` — không sửa tay. Tổng quan và cách xem sơ đồ: [`README.md`](README.md).
 
-**42 bảng · 20 kiểu liệt kê (enum)**
+**44 bảng · 19 kiểu liệt kê (enum)**
 
 ## Mục lục
 
-- **Hệ thống**: [`branches`](#branches), [`users`](#users), [`refresh_tokens`](#refresh_tokens), [`audit_logs`](#audit_logs), [`code_sequences`](#code_sequences), [`company_profile`](#company_profile), [`idempotency_keys`](#idempotency_keys), [`import_jobs`](#import_jobs), [`user_branches`](#user_branches), [`role_permissions`](#role_permissions), [`user_identities`](#user_identities), [`system_settings`](#system_settings)
+- **Hệ thống**: [`branches`](#branches), [`users`](#users), [`refresh_tokens`](#refresh_tokens), [`audit_logs`](#audit_logs), [`code_sequences`](#code_sequences), [`company_profile`](#company_profile), [`idempotency_keys`](#idempotency_keys), [`import_jobs`](#import_jobs), [`user_branches`](#user_branches), [`role_permissions`](#role_permissions), [`user_identities`](#user_identities), [`system_settings`](#system_settings), [`user_table_prefs`](#user_table_prefs)
 - **Hàng hóa & giá**: [`products`](#products), [`product_images`](#product_images), [`product_components`](#product_components), [`price_books`](#price_books), [`price_book_items`](#price_book_items)
 - **Tồn kho & chuyển kho**: [`stocks`](#stocks), [`stock_movements`](#stock_movements), [`stock_transfers`](#stock_transfers), [`stock_transfer_items`](#stock_transfer_items)
-- **Đối tác**: [`customers`](#customers), [`customer_branch_terms`](#customer_branch_terms), [`customer_invoice_profiles`](#customer_invoice_profiles), [`suppliers`](#suppliers), [`supplier_branch_history`](#supplier_branch_history)
+- **Đối tác**: [`customers`](#customers), [`customer_branch_terms`](#customer_branch_terms), [`customer_profiles`](#customer_profiles), [`customer_visits`](#customer_visits), [`suppliers`](#suppliers), [`supplier_branch_history`](#supplier_branch_history)
 - **Đơn hàng**: [`orders`](#orders), [`order_items`](#order_items), [`invoices`](#invoices), [`invoice_items`](#invoice_items), [`invoice_payments`](#invoice_payments), [`sales_returns`](#sales_returns), [`sales_return_items`](#sales_return_items)
 - **Mua hàng**: [`purchase_orders`](#purchase_orders), [`purchase_order_items`](#purchase_order_items), [`goods_receipts`](#goods_receipts), [`goods_receipt_items`](#goods_receipt_items), [`purchase_returns`](#purchase_returns), [`purchase_return_items`](#purchase_return_items)
 - **Sổ quỹ & công nợ**: [`cash_accounts`](#cash_accounts), [`cash_categories`](#cash_categories), [`cash_transactions`](#cash_transactions), [`debt_ledger`](#debt_ledger), [`payment_allocations`](#payment_allocations)
@@ -20,7 +20,7 @@
 | --- | --- |
 | `cash_account_type` | `cash`, `bank` |
 | `cash_direction` | `in`, `out` |
-| `customer_type` | `individual`, `company` |
+| `customer_price_level` | `new`, `medium`, `large`, `vip` |
 | `doc_status` | `completed`, `cancelled` |
 | `import_mode` | `overwrite`, `add` |
 | `import_status` | `queued`, `running`, `completed`, `failed` |
@@ -33,7 +33,6 @@
 | `permission_scope` | `all`, `own` |
 | `product_type` | `goods`, `combo` |
 | `purchase_order_status` | `draft`, `confirmed`, `completed`, `cancelled` |
-| `return_settlement` | `offset_debt`, `refund` |
 | `shipping_payer` | `sender`, `receiver` |
 | `stock_ref_type` | `opening`, `goods_receipt`, `invoice`, `sales_return`, `purchase_return`, `adjustment`, `transfer_out`, `transfer_in`, `transfer_cancel` |
 | `transfer_status` | `in_transit`, `received`, `cancelled` |
@@ -274,6 +273,20 @@ Cài đặt hệ thống dạng khóa → JSON do Quản lý chỉnh (vd mở/t�
 | `updated_by` | uuid | ✔ |  | → `users.id` (on delete set null) |
 | `updated_at` | timestamptz |  | `now()` |  |
 
+### user_table_prefs
+
+Tùy chỉnh bảng theo từng tài khoản (cột ẩn, thứ tự, độ rộng, số dòng/trang); mỗi (người dùng, khóa bảng) một dòng, settings là JSON.
+
+| Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
+| --- | --- | :-: | --- | --- |
+| `user_id` | uuid |  |  | **PK**; → `users.id` (on delete cascade) |
+| `table_key` | text |  |  | **PK** |
+| `settings` | jsonb |  |  |  |
+| `created_at` | timestamptz |  | `now()` |  |
+| `updated_at` | timestamptz |  | `now()` |  |
+
+**Khóa chính ghép:** (`user_id`, `table_key`)
+
 ## Hàng hóa & giá
 
 ### products
@@ -459,11 +472,12 @@ Khách hàng. Công nợ không lưu ở đây: số dư = tổng debt_ledger (c
 | `id` | uuid |  | `gen_random_uuid()` | **PK** |
 | `code` | text |  |  | unique |
 | `name` | text |  |  |  |
-| `type` | customer_type |  | `'individual'` |  |
 | `phone` | text | ✔ |  | unique |
 | `address` | text | ✔ |  |  |
-| `facebook` | text | ✔ |  |  |
 | `sales_owner_id` | uuid | ✔ |  | → `users.id`; Nhân viên phụ trách (ở KiotViet là "Nhóm khách hàng") |
+| `price_level` | customer_price_level |  | `'new'` | Level giá (Mới/Vừa/Lớn/Vip) để nhân viên tham chiếu khi báo giá; hệ thống không có bảng giá |
+| `new_since` | date | ✔ |  | Tháng trở thành khách mới (ngày đầu tháng); trống = khách cũ hoặc không rõ |
+| `acquisition_source` | text | ✔ |  | Nguồn khách mới (vd Page) |
 | `linked_branch_id` | uuid | ✔ |  | unique; → `branches.id`; Khách hàng hệ thống đại diện một chi nhánh (chuyển kho nội bộ) |
 | `note` | text | ✔ |  |  |
 | `is_active` | boolean |  | `true` |  |
@@ -491,21 +505,38 @@ Hạn mức và kỳ hạn công nợ của khách, riêng từng chi nhánh.
 
 **Khóa chính ghép:** (`customer_id`, `branch_id`)
 
-### customer_invoice_profiles
+### customer_profiles
 
-Thông tin xuất hóa đơn VAT/điện tử của khách.
+Hồ sơ kinh doanh của khách (kho, đối thủ, hình thức bán, quy mô) từ file TKS; quan hệ 1-1, hầu hết khách không có.
 
 | Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
 | --- | --- | :-: | --- | --- |
 | `customer_id` | uuid |  |  | **PK**; → `customers.id` (on delete cascade) |
-| `buyer_name` | text | ✔ |  |  |
-| `company_name` | text | ✔ |  |  |
-| `tax_code` | text | ✔ |  |  |
-| `address` | text | ✔ |  |  |
-| `email` | text | ✔ |  |  |
-| `phone` | text | ✔ |  |  |
-| `bank_name` | text | ✔ |  |  |
-| `bank_account` | text | ✔ |  |  |
+| `warehouse_location` | text | ✔ |  |  |
+| `warehouse_count` | integer | ✔ |  |  |
+| `warehouse_area` | text | ✔ |  |  |
+| `warehouse_photo_url` | text | ✔ |  | Đường link ảnh kho từ file TKS |
+| `competitors` | text | ✔ |  |  |
+| `sales_methods` | text[] | ✔ |  | Hình thức bán hàng (nhiều giá trị): Bán cửa hàng, FB live, Kho buôn, Bán sàn, Sang tay, FB ads, Khác |
+| `scale` | text | ✔ |  |  |
+| `updated_at` | timestamptz |  | `now()` |  |
+
+### customer_visits
+
+Lịch tiếp khách: mỗi dòng một ngày; ngày tiếp khách gần nhất = ngày lớn nhất.
+
+| Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
+| --- | --- | :-: | --- | --- |
+| `id` | uuid |  | `gen_random_uuid()` | **PK** |
+| `customer_id` | uuid |  |  | → `customers.id` (on delete cascade) |
+| `visited_on` | date |  |  |  |
+| `note` | text | ✔ |  |  |
+| `created_by` | uuid | ✔ |  | → `users.id` |
+| `created_at` | timestamptz |  | `now()` |  |
+
+**Chỉ mục:**
+
+- `customer_visits_uq` (unique): `customer_id`, `visited_on`
 
 ### suppliers
 
@@ -555,17 +586,15 @@ Tổng mua / mua thuần lịch sử (chuyển từ KiotViet) của NCC tại t�
 | `branch_id` | uuid |  |  | → `branches.id` |
 | `customer_id` | uuid |  |  | → `customers.id` |
 | `status` | order_status |  | `'draft'` |  |
-| `seller_id` | uuid | ✔ |  | → `users.id` |
+| `seller_id` | uuid | ✔ |  | → `users.id`; Người nhận đặt (khác người tạo) |
 | `ordered_at` | timestamptz |  |  |  |
-| `subtotal` | numeric(18,0) |  | `0` |  |
+| `subtotal` | numeric(18,0) |  | `0` | Σ line_total của các dòng |
 | `discount` | numeric(18,0) |  | `0` |  |
-| `total` | numeric(18,0) |  | `0` |  |
-| `deposit_amount` | numeric(18,0) |  | `0` | Tiền đặt cọc đã thu |
+| `total` | numeric(18,0) |  | `0` | subtotal − discount (Khách cần trả) |
+| `pickup_address` | text | ✔ |  | Địa chỉ lấy hàng (file KiotViet) |
 | `ship_name` | text | ✔ |  |  |
 | `ship_phone` | text | ✔ |  |  |
 | `ship_address` | text | ✔ |  |  |
-| `package_count` | integer | ✔ |  |  |
-| `weight_g` | numeric(12,2) | ✔ |  |  |
 | `note` | text | ✔ |  |  |
 | `created_by` | uuid | ✔ |  | → `users.id` |
 | `cancelled_at` | timestamptz | ✔ |  |  |
@@ -589,11 +618,9 @@ Dòng hàng của đơn đặt hàng.
 | `line_no` | integer |  |  |  |
 | `product_id` | uuid |  |  | → `products.id` |
 | `qty` | numeric(14,3) |  |  |  |
-| `list_price` | numeric(18,4) |  |  |  |
 | `discount_per_unit` | numeric(18,4) |  | `0` | Giảm giá tính trên 1 đơn vị (số tiền, không phải %) |
-| `unit_price` | numeric(18,4) |  |  |  |
+| `unit_price` | numeric(18,4) |  |  | Giá bán sau giảm; giá trước giảm = unit_price + discount_per_unit |
 | `line_total` | numeric(18,0) |  |  |  |
-| `is_gift` | boolean |  | `false` |  |
 | `note` | text | ✔ |  |  |
 
 **Chỉ mục:**
@@ -625,9 +652,6 @@ Hóa đơn bán. Không sửa sau khi tạo (hủy và tạo lại). root_invoic
 | `total` | numeric(18,0) |  |  |  |
 | `paid_total` | numeric(18,0) |  | `0` | Đã thu khi tạo + đã cấn trừ về sau (cache của sổ cái) |
 | `status` | doc_status |  | `'completed'` |  |
-| `ship_name` | text | ✔ |  |  |
-| `ship_phone` | text | ✔ |  |  |
-| `ship_address` | text | ✔ |  |  |
 | `note` | text | ✔ |  |  |
 | `created_by` | uuid | ✔ |  | → `users.id` |
 | `cancelled_at` | timestamptz | ✔ |  |  |
@@ -655,12 +679,10 @@ Dòng hóa đơn; lưu bản sao mã/tên/đơn vị/giá vốn tại thời đi
 | `product_code` | text |  |  |  |
 | `product_name` | text |  |  |  |
 | `qty` | numeric(14,3) |  |  |  |
-| `list_price` | numeric(18,4) |  |  |  |
 | `discount_per_unit` | numeric(18,4) |  | `0` | Giảm giá tính trên 1 đơn vị (số tiền, không phải %) |
-| `unit_price` | numeric(18,4) |  |  | list_price − discount_per_unit |
+| `unit_price` | numeric(18,4) |  |  | Giá bán sau giảm; giá trước giảm = unit_price + discount_per_unit |
 | `line_total` | numeric(18,0) |  |  |  |
 | `unit_cost` | numeric(18,4) |  | `0` | Giá vốn tại thời điểm bán (tính lãi gộp) |
-| `is_gift` | boolean |  | `false` |  |
 | `note` | text | ✔ |  |  |
 
 **Chỉ mục:**
@@ -708,8 +730,6 @@ Trả hàng bán. Có thể không tham chiếu hóa đơn; mặc định bù tr
 | `status` | doc_status |  | `'completed'` |  |
 | `returned_at` | timestamptz |  |  |  |
 | `total` | numeric(18,0) |  |  |  |
-| `settlement` | return_settlement |  | `'offset_debt'` |  |
-| `refund_account_id` | uuid | ✔ |  | → `cash_accounts.id` |
 | `received_by` | uuid | ✔ |  | → `users.id` |
 | `note` | text | ✔ |  |  |
 | `created_by` | uuid | ✔ |  | → `users.id` |
@@ -736,8 +756,8 @@ Dòng hàng trả lại của khách.
 | `return_price` | numeric(18,4) |  |  |  |
 | `line_total` | numeric(18,0) |  |  |  |
 | `restock` | boolean |  | `true` | true = nhập lại kho |
-| `restock_cost` | numeric(18,4) | ✔ |  |  |
-| `reason` | text | ✔ |  |  |
+| `restock_price` | numeric(18,4) | ✔ |  | Giá nhập lại (file KiotViet), có thể khác giá bán; không đổi giá vốn bình quân, chênh lệch (giá bán − giá nhập lại) × SL tính vào lợi nhuận |
+| `note` | text | ✔ |  |  |
 
 **Chỉ mục:**
 

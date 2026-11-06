@@ -16,7 +16,7 @@ Tài liệu thiết kế gốc: [`docs/TAI_LIEU_THIET_KE.md`](docs/TAI_LIEU_THIE
 
 ```
 apps/api        NestJS (modular monolith) — backend
-apps/web        Next.js (App Router) + Tailwind — giao diện quản trị
+apps/web        Next.js (App Router) + CSS thuần theo token (không Tailwind) — giao diện quản trị
 packages/shared Kiểu dữ liệu, hằng số, tiện ích dùng chung (build ra dist/)
 infra/          docker-compose (PostgreSQL) và hạ tầng
 docs/           Tài liệu thiết kế, ERD, ADR
@@ -113,6 +113,7 @@ Mọi PR phải qua: `lint`, `typecheck`, `test`, `build`, và `openapi.json` + 
 ## Ghi chú về phiên bản (kiểm tra 11/2026)
 
 - Next.js 16 (có thay đổi lớn): xem `apps/web/AGENTS.md` và tài liệu trong `node_modules/next/dist/docs/` trước khi viết code Next.
+- **Giao diện `apps/web` là CSS thuần theo token (KHÔNG Tailwind/shadcn):** đọc [`docs/design-system/README.md`](docs/design-system/README.md) trước khi làm UI (token, component, checklist PR). **Trang danh sách mới PHẢI theo [`docs/design-system/list-page.md`](docs/design-system/list-page.md)**: `DataTable` + `useTablePrefs` (ẩn/hiện, thứ tự, độ rộng cột, số dòng/trang lưu theo tài khoản) và `Pagination` có chọn cỡ trang; không hard-code `PAGE_SIZE`/`limit: 20`; trạng thái dùng `StatusBadge`, không viết `<span class="badge …">`.
 - NestJS 12 chạy ESM (`"type": "module"`, `nodenext`): import tương đối phải có đuôi `.js`. Test dùng Vitest, lint dùng Oxlint.
 - ORM: **Drizzle** (`drizzle-orm` 0.45.x, `drizzle-kit` 0.31.x — bản ổn định; bản 1.0 còn beta/RC, không dùng). Lược đồ ở `apps/api/src/db/schema/`, migration ở `apps/api/drizzle/`. Chọn Drizzle vì là SQL gần như thuần, kiểu dữ liệu chặt, AI agent viết và rà soát ổn định hơn.
 - Lệnh CSDL (chạy trong `apps/api`): `pnpm db:generate` (sinh migration từ schema), `pnpm db:migrate` (áp dụng), `pnpm db:studio`. Sau khi đổi lược đồ chạy thêm `pnpm db:docs` để sinh lại `docs/db/` (DBML, từ điển dữ liệu, schema.sql) và commit kèm; xem `docs/db/README.md`. Lược đồ hiện có 44 bảng (đã kiểm chứng migration chạy được trên PostgreSQL). **Tìm kiếm theo tên/mã/SĐT** luôn dùng `searchWhere()` (`apps/api/src/db/search.ts`) — không tự viết `LIKE` (xem `docs/db/README.md`). **Luôn đọc file SQL migration được sinh ra trước khi chạy**; không sửa tay CSDL production.

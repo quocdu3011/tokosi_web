@@ -2096,6 +2096,137 @@
         ]
       }
     },
+    "/api/v1/me/table-prefs": {
+      "get": {
+        "description": "Trả `{ data: { [tableKey]: TablePrefs } }`; bảng chưa lưu thì không có khóa. Chỉ của người dùng đang đăng nhập.",
+        "operationId": "PreferencesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TablePrefsMapDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`UNAUTHENTICATED`: chưa đăng nhập"
+          },
+          "403": {
+            "description": "`PASSWORD_CHANGE_REQUIRED`: cần đổi mật khẩu trước"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tùy chỉnh bảng của tôi (mọi bảng đã lưu)",
+        "tags": [
+          "Tùy chỉnh bảng"
+        ]
+      }
+    },
+    "/api/v1/me/table-prefs/{tableKey}": {
+      "put": {
+        "description": "Thay thế TOÀN BỘ bản ghi của bảng (không gộp với bản cũ); chưa có thì tạo. Mọi trường tùy chọn; trường lạ → 400. Không ghi nhật ký thao tác (chỉ là tùy chọn giao diện).",
+        "operationId": "PreferencesController_save",
+        "parameters": [
+          {
+            "name": "tableKey",
+            "required": true,
+            "in": "path",
+            "description": "Khóa bảng ở giao diện: chữ thường/số, có thể có `:` `_` `-`, tối đa 64 ký tự (vd `products`, `purchase-orders`)",
+            "schema": {
+              "example": "products",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TablePrefsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Đối tượng đã lưu",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TablePrefsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`VALIDATION_ERROR`: khóa bảng hoặc nội dung không hợp lệ"
+          },
+          "401": {
+            "description": "`UNAUTHENTICATED`: chưa đăng nhập"
+          },
+          "403": {
+            "description": "`PASSWORD_CHANGE_REQUIRED`: cần đổi mật khẩu trước"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lưu tùy chỉnh một bảng (thay thế toàn bộ)",
+        "tags": [
+          "Tùy chỉnh bảng"
+        ]
+      },
+      "delete": {
+        "description": "Không có bản ghi cũng trả 204.",
+        "operationId": "PreferencesController_remove",
+        "parameters": [
+          {
+            "name": "tableKey",
+            "required": true,
+            "in": "path",
+            "description": "Khóa bảng ở giao diện: chữ thường/số, có thể có `:` `_` `-`, tối đa 64 ký tự (vd `products`, `purchase-orders`)",
+            "schema": {
+              "example": "products",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "`VALIDATION_ERROR`: khóa bảng sai"
+          },
+          "401": {
+            "description": "`UNAUTHENTICATED`: chưa đăng nhập"
+          },
+          "403": {
+            "description": "`PASSWORD_CHANGE_REQUIRED`: cần đổi mật khẩu trước"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xóa tùy chỉnh một bảng (về mặc định)",
+        "tags": [
+          "Tùy chỉnh bảng"
+        ]
+      }
+    },
     "/api/v1/auth/google": {
       "post": {
         "description": "Gửi access token Supabase sau khi đăng nhập Google. Đã có tài khoản → 200 như `/auth/login` (cookie refresh + access token). Chưa có tài khoản: nếu Quản lý cho phép tự đăng ký và tên miền email được phép → 202 `signup_required` kèm `signupToken` (chưa tạo gì); ngược lại 403 `SIGNUP_DISABLED`.",
@@ -4834,6 +4965,87 @@
         },
         "required": [
           "branchIds"
+        ]
+      },
+      "TablePrefsDto": {
+        "type": "object",
+        "properties": {
+          "hidden": {
+            "maxItems": 100,
+            "example": [
+              "description"
+            ],
+            "description": "Id các cột đang ẩn (tối đa 100, mỗi id 1–64 ký tự)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "order": {
+            "maxItems": 100,
+            "example": [
+              "code",
+              "name",
+              "onHand"
+            ],
+            "description": "Thứ tự id cột; cột không có trong danh sách xếp sau, theo thứ tự mặc định",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "widths": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 40,
+              "maximum": 1000
+            },
+            "example": {
+              "name": 360
+            },
+            "description": "Độ rộng cột (px, số nguyên 40..1000) theo id cột; tối đa 100 cột"
+          },
+          "pageSize": {
+            "type": "number",
+            "enum": [
+              15,
+              50,
+              100
+            ],
+            "example": 50,
+            "description": "Số dòng mỗi trang"
+          }
+        }
+      },
+      "TablePrefsMapDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TablePrefsDto"
+            },
+            "example": {
+              "products": {
+                "hidden": [
+                  "description"
+                ],
+                "order": [
+                  "code",
+                  "name",
+                  "onHand"
+                ],
+                "widths": {
+                  "name": 360
+                },
+                "pageSize": 50
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
         ]
       },
       "GoogleLoginDto": {

@@ -11,6 +11,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import type { TablePrefs } from '@kiot/shared';
 import {
   importStatus,
   importMode,
@@ -257,6 +258,25 @@ export const userIdentities = pgTable(
     ),
     index('user_identities_user_idx').on(t.userId),
   ],
+);
+
+/**
+ * Tùy chỉnh bảng dữ liệu theo từng tài khoản (cột ẩn, thứ tự cột, độ rộng cột, số dòng/trang).
+ * Mỗi (người dùng, khóa bảng) một dòng; `settings` có dạng `TablePrefs` (@kiot/shared). Chỉ là tùy chọn giao diện:
+ * không phải chứng từ nên ghi đè được, không vào nhật ký thao tác.
+ */
+export const userTablePrefs = pgTable(
+  'user_table_prefs',
+  {
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Khóa bảng ở giao diện, vd `products`, `purchase-orders` (khớp `TABLE_KEY_PATTERN`). */
+    tableKey: text().notNull(),
+    settings: jsonb().$type<TablePrefs>().notNull(),
+    ...timestamps(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.tableKey] })],
 );
 
 /** Cài đặt hệ thống dạng khóa → giá trị JSON, do Quản lý chỉnh (vd mở/tắt tự đăng ký bằng Google). */

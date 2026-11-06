@@ -42,6 +42,26 @@ Ký hiệu: `?` = tùy chọn · `[]` = mảng · tiền/giá/số lượng là 
 | PATCH  | `/users/:id`                | Sửa thông tin / vai trò / khóa-mở tài khoản                                      | `user.manage`                 | ✔   |
 | POST   | `/users/:id/reset-password` | Đặt lại mật khẩu (bắt đổi ở lần đăng nhập kế tiếp)                               | `user.manage`                 | ✔   |
 | PUT    | `/users/:id/branches`       | Gán chi nhánh `{ branchIds, defaultBranchId? }` (thay thế toàn bộ)               | `user.manage`                 | ✔   |
+| GET    | `/me/table-prefs`           | Tùy chỉnh bảng (cột ẩn, thứ tự, độ rộng, số dòng/trang) của chính người dùng      | đã đăng nhập                  | ✔   |
+| PUT    | `/me/table-prefs/:tableKey` | Lưu tùy chỉnh một bảng (thay thế toàn bộ bản ghi của bảng đó)                    | đã đăng nhập                  | ✔   |
+| DELETE | `/me/table-prefs/:tableKey` | Xóa tùy chỉnh một bảng (về mặc định)                                             | đã đăng nhập                  | ✔   |
+
+**Tùy chỉnh bảng theo tài khoản — `/me/table-prefs`**
+
+Chỉ tác động lên **chính người dùng đăng nhập** (không nhận `userId`); không cần quyền nghiệp vụ (mọi vai trò, kể cả `pending`, dùng được), không ghi nhật ký thao tác (chỉ là tùy chọn giao diện). Người dùng đang bị bắt đổi mật khẩu vẫn nhận `403 PASSWORD_CHANGE_REQUIRED` như mọi endpoint khác (trừ `/auth/me`, `/auth/change-password`). `tableKey` khớp `^[a-z0-9][a-z0-9:_-]{0,63}$` (vd. `products`, `purchase-orders`), sai → `400 VALIDATION_ERROR`.
+
+```jsonc
+// GET /me/table-prefs → 200  (bảng chưa lưu thì không có khóa)
+{ "data": { "products": { "hidden": ["description"], "order": ["code","name","onHand"], "widths": { "name": 360 }, "pageSize": 50 } } }
+
+// PUT /me/table-prefs/products  — thay thế toàn bộ; mọi trường tùy chọn; trường lạ → 400
+{ "hidden": ["description"], "order": ["code","name","onHand"], "widths": { "name": 360 }, "pageSize": 50 }
+// 200 → trả lại đối tượng đã lưu (cùng dạng body)
+
+// DELETE /me/table-prefs/products → 204 (không có bản ghi cũng 204)
+```
+
+Giới hạn: `hidden`/`order` tối đa 100 phần tử, mỗi id 1–64 ký tự; `widths` tối đa 100 khóa (id 1–64 ký tự), giá trị là số nguyên 40..1000; trường có mặt thì không được `null` (muốn bỏ trường thì không gửi); `pageSize` ∈ `{15, 50, 100}` (`PAGE_SIZE_OPTIONS` trong `@kiot/shared`). Danh sách phân trang (`?limit=`) vẫn nhận 1..100 như cũ.
 
 **POST `/auth/login`**
 

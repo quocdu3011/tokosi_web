@@ -699,3 +699,39 @@ ALTER TABLE "products" DROP CONSTRAINT "products_category_id_categories_id_fk";
 DROP INDEX "products_category_idx";
 ALTER TABLE "products" DROP COLUMN "category_id";
 DROP TABLE "categories";
+
+-- ===== 0027_don_hang_va_khach_hang_theo_file.sql =====
+ALTER TABLE "customer_invoice_profiles" DISABLE ROW LEVEL SECURITY;DROP TABLE "customer_invoice_profiles" CASCADE;ALTER TABLE "sales_returns" DROP CONSTRAINT "sales_returns_refund_account_id_cash_accounts_id_fk";
+ALTER TABLE "customers" DROP COLUMN "type";ALTER TABLE "customers" DROP COLUMN "facebook";ALTER TABLE "invoice_items" DROP COLUMN "list_price";ALTER TABLE "invoice_items" DROP COLUMN "is_gift";ALTER TABLE "invoices" DROP COLUMN "ship_name";ALTER TABLE "invoices" DROP COLUMN "ship_phone";ALTER TABLE "invoices" DROP COLUMN "ship_address";ALTER TABLE "order_items" DROP COLUMN "list_price";ALTER TABLE "order_items" DROP COLUMN "is_gift";ALTER TABLE "orders" DROP COLUMN "deposit_amount";ALTER TABLE "orders" DROP COLUMN "package_count";ALTER TABLE "orders" DROP COLUMN "weight_g";ALTER TABLE "sales_returns" DROP COLUMN "settlement";ALTER TABLE "sales_returns" DROP COLUMN "refund_account_id";DROP TYPE "public"."customer_type";DROP TYPE "public"."return_settlement";CREATE TYPE "public"."customer_price_level" AS ENUM('new', 'medium', 'large', 'vip');CREATE TABLE "customer_profiles" (
+	"customer_id" uuid PRIMARY KEY NOT NULL,
+	"warehouse_location" text,
+	"warehouse_count" integer,
+	"warehouse_area" text,
+	"warehouse_photo_url" text,
+	"competitors" text,
+	"sales_methods" text[],
+	"scale" text,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "customer_visits" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"customer_id" uuid NOT NULL,
+	"visited_on" date NOT NULL,
+	"note" text,
+	"created_by" uuid,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE "customers" ADD COLUMN "price_level" "customer_price_level" DEFAULT 'new' NOT NULL;ALTER TABLE "customers" ADD COLUMN "new_since" date;ALTER TABLE "customers" ADD COLUMN "acquisition_source" text;ALTER TABLE "orders" ADD COLUMN "pickup_address" text;ALTER TABLE "customer_profiles" ADD CONSTRAINT "customer_profiles_customer_id_customers_id_fk" FOREIGN KEY ("customer_id") REFERENCES "public"."customers"("id") ON DELETE cascade ON UPDATE no action;ALTER TABLE "customer_visits" ADD CONSTRAINT "customer_visits_customer_id_customers_id_fk" FOREIGN KEY ("customer_id") REFERENCES "public"."customers"("id") ON DELETE cascade ON UPDATE no action;ALTER TABLE "customer_visits" ADD CONSTRAINT "customer_visits_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;CREATE UNIQUE INDEX "customer_visits_uq" ON "customer_visits" USING btree ("customer_id","visited_on");
+
+ALTER TABLE "sales_return_items" RENAME COLUMN "restock_cost" TO "restock_price";ALTER TABLE "sales_return_items" RENAME COLUMN "reason" TO "note";DELETE FROM "role_permissions" WHERE "permission_code" = 'price.override';
+
+-- ===== 0028_tuy_chon_bang_theo_nguoi_dung.sql =====
+CREATE TABLE "user_table_prefs" (
+	"user_id" uuid NOT NULL,
+	"table_key" text NOT NULL,
+	"settings" jsonb NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "user_table_prefs_user_id_table_key_pk" PRIMARY KEY("user_id","table_key")
+);
+ALTER TABLE "user_table_prefs" ADD CONSTRAINT "user_table_prefs_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;

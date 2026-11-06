@@ -45,6 +45,7 @@ const GROUPS: Record<string, string[]> = {
     'role_permissions',
     'user_identities',
     'system_settings',
+    'user_table_prefs',
   ],
   'Hàng hóa & giá': [
     'products',
@@ -104,6 +105,8 @@ const TABLE_NOTES: Record<string, string> = {
     'Danh tính đăng nhập bên ngoài (Google qua Supabase) gắn với người dùng; khớp theo provider_subject, không theo email.',
   system_settings:
     'Cài đặt hệ thống dạng khóa → JSON do Quản lý chỉnh (vd mở/tắt tự đăng ký bằng Google).',
+  user_table_prefs:
+    'Tùy chỉnh bảng theo từng tài khoản (cột ẩn, thứ tự, độ rộng, số dòng/trang); mỗi (người dùng, khóa bảng) một dòng, settings là JSON.',
   customer_branch_terms:
     'Hạn mức và kỳ hạn công nợ của khách, riêng từng chi nhánh.',
   stock_transfers:

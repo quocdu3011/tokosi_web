@@ -1,7 +1,9 @@
 # @kiot/web – Giao diện quản trị
 
-Next.js 16 (App Router) + React 19 + Tailwind CSS 4 + shadcn/ui. Gọi API theo hợp đồng ở
-[`docs/api/`](../../docs/api/README.md).
+Next.js 16 (App Router) + React 19 + **CSS thuần theo token** (không Tailwind/shadcn; Radix cho hành vi,
+Sonner cho toast). Gọi API theo hợp đồng ở [`docs/api/`](../../docs/api/README.md). Giao diện theo
+[`docs/design-system/`](../../docs/design-system/README.md) (token, component, checklist PR);
+**trang danh sách mới phải theo [`list-page.md`](../../docs/design-system/list-page.md)**.
 
 ## Chạy
 
@@ -20,10 +22,12 @@ pnpm dev                     # chạy ở thư mục gốc: web http://localhost
 ```
 app/(auth)/            Đăng nhập, đổi mật khẩu
 app/(app)/             Khu quản trị (cổng đăng nhập + sidebar); mỗi phân hệ một thư mục
-components/ui/         Component shadcn/ui
+components/ui/         Nguyên tố giao diện (Radix + lớp CSS thuần): Button, Badge, Dialog, Sheet, Select…
 components/layout/     Khung trang, menu, chọn chi nhánh, sáng/tối, tài khoản
-components/common/     Trang trống, kiểm tra quyền, ô biểu mẫu…
-components/data-table/ Bảng dữ liệu (TanStack Table v9) + phân trang theo server
+components/common/     Trang trống, kiểm tra quyền, ô biểu mẫu, StatusBadge…
+components/data-table/ Bảng dữ liệu (TanStack Table v9), toolbar, xuất Excel, phân trang theo server
+hooks/                 useTablePrefs (tùy chỉnh bảng theo tài khoản), useListState, useDebouncedValue…
+styles/                tokens.css, base.css, layout.css, components/*.css (nạp qua components.css)
 lib/api/               Client gọi API, lỗi chuẩn, kiểu dữ liệu (sinh từ OpenAPI)
 lib/auth/              Phiên đăng nhập (token chỉ trong bộ nhớ)
 lib/queries/           Hook TanStack Query theo phân hệ
@@ -42,3 +46,9 @@ lib/navigation.ts      Sơ đồ menu + quyền + cờ `ready` (backend đã có
   không đổi sang `number` để cộng.
 - Next.js 16 với `cacheComponents` giữ trang trước trong DOM ở trạng thái ẩn: đặt `id` của ô nhập liệu
   có tiền tố riêng theo màn hình (vd `uf-username`) để không trùng với trang khác.
+- **Trang danh sách mới** theo [`docs/design-system/list-page.md`](../../docs/design-system/list-page.md):
+  `DataTable` + `useTablePrefs` (cột ẩn/hiện, thứ tự, độ rộng, số dòng/trang lưu theo tài khoản qua
+  `/me/table-prefs`) và `Pagination` có chọn cỡ trang; không hard-code `PAGE_SIZE`/`limit: 20`; trạng thái
+  dùng `StatusBadge`, không viết `<span className="badge …">`. CSS mới: thêm file vào `styles/components.css`,
+  chỉ dùng token; `src/styles/design-constraints.test.ts` khóa các ràng buộc cứng (không 3D, không
+  `transition: all`, chữ >= 12px, không Tailwind, không emoji).
