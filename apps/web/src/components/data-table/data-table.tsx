@@ -218,12 +218,11 @@ export function DataTable<TData extends RowData>({
     <TableRow key={group.id}>
       {group.headers.map((header) => {
         const id = header.column.id;
-        const cell = {
-          id,
+        const cell: HeaderCellModel = {
           label: labelOf(id),
           content: header.isPlaceholder ? null : <table.FlexRender header={header} />,
           sortable: canSort(id),
-          dir: sort?.id === id ? (sort.desc ? 'descending' : 'ascending') : ('none' as SortDir),
+          dir: sort?.id === id ? (sort.desc ? 'descending' : 'ascending') : 'none',
           sortHint: hints[id],
           onSort: () => onSortChange?.(nextSort(id)),
           resizer: fixedLayout
@@ -237,11 +236,12 @@ export function DataTable<TData extends RowData>({
         return prefs ? (
           <SortableHeaderCell
             key={header.id}
-            {...cell}
+            id={id}
+            cell={cell}
             locked={specById.get(id)?.locked === true}
           />
         ) : (
-          <HeaderCell key={header.id} {...cell} />
+          <HeaderCell key={header.id} cell={cell} />
         );
       })}
     </TableRow>
@@ -324,8 +324,8 @@ export function DataTable<TData extends RowData>({
 
 type SortDir = 'ascending' | 'descending' | 'none';
 
-interface HeaderCellProps {
-  id: string;
+/** Mọi thứ cần để vẽ nội dung một ô tiêu đề (không gồm phần kéo thả). */
+interface HeaderCellModel {
   /** Tên cột (chữ thường) cho nhãn trợ năng. */
   label: string;
   content: ReactNode;
@@ -333,31 +333,14 @@ interface HeaderCellProps {
   dir: SortDir;
   sortHint?: string;
   onSort: () => void;
-  /** Nút tay nắm kéo thả cho bàn phím (chỉ có ở bảng bật `prefs`). */
-  grip?: ReactNode;
   resizer: { width: number; onResize: (width: number) => void; onReset: () => void } | null;
 }
 
-/** Ô tiêu đề thường (không kéo thả): nút sắp xếp + tay nắm kéo mép. */
-function HeaderCell({
-  id,
-  label,
-  content,
-  sortable,
-  dir,
-  sortHint,
-  onSort,
-  grip,
-  resizer,
-  ...th
-}: HeaderCellProps & Omit<React.ComponentProps<'th'>, 'id' | 'content' | 'children'>) {
+/** Nội dung ô tiêu đề: nút sắp xếp (nếu có) + tay nắm kéo mép. */
+function HeaderInner({ cell }: { cell: HeaderCellModel }) {
+  const { label, content, sortable, dir, sortHint, onSort, resizer } = cell;
   return (
-    <TableHead
-      {...th}
-      aria-sort={sortable ? dir : undefined}
-      className={cn(sortable && 'is-sortable', th.className)}
-    >
-      {grip}
+    <>
       {sortable ? (
         <button
           type="button"
@@ -387,6 +370,18 @@ function HeaderCell({
           onReset={resizer.onReset}
         />
       )}
+    </>
+  );
+}
+
+/** Ô tiêu đề thường (không kéo thả). */
+function HeaderCell({ cell }: { cell: HeaderCellModel }) {
+  return (
+    <TableHead
+      aria-sort={cell.sortable ? cell.dir : undefined}
+      className={cn(cell.sortable && 'is-sortable')}
+    >
+      <HeaderInner cell={cell} />
     </TableHead>
   );
 }
@@ -395,40 +390,62 @@ function HeaderCell({
  * Ô tiêu đề kéo thả được (dnd-kit sortable). Con trỏ kéo cả ô tiêu đề (cần dịch ≥ 6px mới tính là kéo nên
  * bấm sắp xếp vẫn ăn); bàn phím dùng nút tay nắm ẩn (chỉ hiện khi được focus). Cột `locked` không kéo được.
  */
-function SortableHeaderCell({ locked, ...cell }: HeaderCellProps & { locked: boolean }) {
-  const s = useSortable({
-    id: cell.id,
+function SortableHeaderCell({
+  id,
+  cell,
+  locked,
+}: {
+  id: string;
+  cell: HeaderCellModel;
+  locked: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    isDragging,
+    isOver,
+    index,
+    activeIndex,
+  } = useSortable({
+    id,
     disabled: { draggable: locked, droppable: false },
     transition: null,
     animateLayoutChanges: () => false,
   });
-  const style: CSSProperties | undefined = s.transform
-    ? { transform: `translate(${Math.round(s.transform.x)}px, 0)` }
+  const style: CSSProperties | undefined = transform
+    ? { transform: `translate(${Math.round(transform.x)}px, 0)` }
     : undefined;
-  const drop =
-    s.isOver && !s.isDragging ? (s.activeIndex < s.index ? 'after' : 'before') : undefined;
+  // Vạch báo nơi thả nằm ở cạnh cột đang bị kéo qua: bên phải nếu kéo sang phải, bên trái nếu kéo sang trái.
+  const drop = isOver && !isDragging ? (activeIndex < index ? 'after' : 'before') : undefined;
   return (
-    <HeaderCell
-      {...cell}
-      {...(locked ? undefined : s.listeners)}
-      ref={s.setNodeRef}
+    <TableHead
+      {...(locked ? undefined : listeners)}
+      ref={setNodeRef}
       style={style}
       data-drop={drop}
-      className={cn(!locked && 'is-col-draggable', s.isDragging && 'is-col-dragging')}
-      grip={
-        locked ? null : (
-          <button
-            type="button"
-            ref={s.setActivatorNodeRef}
-            {...s.attributes}
-            className="col-drag-grip"
-            aria-label={`Đổi chỗ cột ${cell.label}`}
-          >
-            <GripVertical aria-hidden="true" />
-          </button>
-        )
-      }
-    />
+      aria-sort={cell.sortable ? cell.dir : undefined}
+      className={cn(
+        cell.sortable && 'is-sortable',
+        !locked && 'is-col-draggable',
+        isDragging && 'is-col-dragging',
+      )}
+    >
+      {!locked && (
+        <button
+          type="button"
+          ref={setActivatorNodeRef}
+          {...attributes}
+          className="col-drag-grip"
+          aria-label={`Đổi chỗ cột ${cell.label}`}
+        >
+          <GripVertical aria-hidden="true" />
+        </button>
+      )}
+      <HeaderInner cell={cell} />
+    </TableHead>
   );
 }
 

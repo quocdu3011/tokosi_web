@@ -44,7 +44,8 @@ Copy khối này vào mô tả PR và tick. Mục nào không áp dụng thì gh
 **Trang danh sách** (bỏ qua nếu không phải trang danh sách)
 - [ ] Theo [list-page.md](list-page.md): `PageHeader` → `TableToolbar` → `DataTable` → `Pagination`
 - [ ] `useTablePrefs('<tableKey>', columns)` với `tableKey` đúng quy tắc; mọi cột có `meta.label`; cột định danh (mã/tên) `locked`
-- [ ] KHÔNG `PAGE_SIZE`/`limit: 20` cứng: `limit` lấy từ cỡ trang của người dùng; `Pagination` có chọn "Số dòng/trang"
+- [ ] KHÔNG `PAGE_SIZE`/`limit: 20` cứng: `limit` = `list.pageSize` (từ `useTablePrefs`); `Pagination` truyền `pageSize` + `onPageSizeChange` để hiện "Số dòng/trang"
+- [ ] `<DataTable prefs={prefs} />` và `<ColumnPicker prefs={prefs} />`; không còn `useColumnVisibility` / `resizable` / `columnLabels` / `hiddenColumns` cũ
 - [ ] Đổi bộ lọc / tìm kiếm / sắp xếp / cỡ trang đều về trang 1 (dùng `useListState`)
 - [ ] Cột sắp xếp: `meta.sort: 'server'` chỉ cho cột server hỗ trợ (`docs/api/endpoints.md`), cột còn lại `'page'` kèm `sortHint`
 - [ ] Đủ ba trạng thái: skeleton khi tải, `emptyText` rõ ràng khi rỗng, `.alert-error` khi lỗi

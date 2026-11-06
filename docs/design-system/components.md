@@ -63,25 +63,49 @@ Quy tắc: `<button>` trong `<form>` mà không phải nút gửi thì đặt `t
 | `info` (= `default`)    | `badge-info`     | Thông tin/phân loại: đã xác nhận, Combo, mặc định  |
 | `secondary` (= `outline`) | `badge-neutral` | Trung tính: phiếu tạm, chưa có, ngừng giao dịch    |
 
-**Cấm viết `<span className="badge badge-…">` thô** (hiện còn ở `suppliers-screen.tsx` và `PurchaseStatus` trong `purchase-ui.tsx` — cần chuyển). Lý do: mất kiểm soát ánh xạ trạng thái → màu, mỗi màn một kiểu. Dùng `Badge` (chọn đúng biến thể) hoặc, cho trạng thái nghiệp vụ, `StatusBadge` (`components/common/status-badge.tsx`, nguồn duy nhất ánh xạ trạng thái → biến thể + nhãn).
+**Cấm viết `<span className="badge badge-…">` thô** (hiện còn ở `suppliers-screen.tsx` và `PurchaseStatus` trong `purchase-ui.tsx` — cần chuyển). Lý do: mất kiểm soát ánh xạ trạng thái → màu, mỗi màn một kiểu. Trạng thái nghiệp vụ dùng **`StatusBadge`**; nhãn phân loại không phải trạng thái (Combo, chi nhánh mặc định) dùng `Badge` với biến thể đúng nghĩa.
 
-Bảng ánh xạ trạng thái nghiệp vụ → biến thể (theo trang mẫu Hàng hóa và các màn hiện có):
+**`StatusBadge`** (`components/common/status-badge.tsx`) nhận `tone` theo NGHĨA (khớp `.badge-success|warning|danger|info|neutral`), không theo tên biến thể của `Badge`:
 
-| Nghiệp vụ          | Giá trị                      | Nhãn hiển thị         | Biến thể       |
-| ------------------ | ---------------------------- | --------------------- | -------------- |
-| Hàng hóa           | `isActive = true`            | Đang kinh doanh       | `success`      |
-| Hàng hóa           | `isActive = false`           | Ngừng kinh doanh      | `destructive`  |
-| Loại hàng          | `combo`                      | Combo                 | `info`         |
-| Người dùng         | hoạt động / khóa             | Hoạt động / Đã khóa   | `success` / `destructive` |
-| Người dùng         | `mustChangePassword`         | Chờ đổi mật khẩu      | `warning`      |
-| Phiếu mua hàng     | `draft`                      | Phiếu tạm             | `secondary`    |
-| Phiếu mua hàng     | `confirmed`                  | Đã xác nhận NCC       | `info`         |
-| Phiếu mua hàng     | `completed`                  | Hoàn thành            | `success`      |
-| Phiếu mua hàng     | `cancelled`                  | Đã hủy                | `destructive`  |
-| Tình trạng nhập    | `none` / `partial` / `full`  | Chưa nhập / Nhập một phần / Đã nhập đủ | `secondary` / `warning` / `success` (đề xuất; hiện là chữ thường) |
-| Nhà cung cấp       | đang / ngưng giao dịch       | Đang giao dịch / Ngưng giao dịch | `success` / `secondary` |
+| `tone`    | Nghĩa                                          | = `Badge variant` |
+| --------- | ---------------------------------------------- | ----------------- |
+| `success` | Hoàn tất / đang hoạt động                      | `success`         |
+| `warning` | Cần chú ý / chờ xử lý                          | `warning`         |
+| `danger`  | Hủy / lỗi / ngừng / bị khóa                    | `destructive`     |
+| `info`    | Đã xác nhận / đang xử lý                       | `info`            |
+| `neutral` | Nháp / không xác định (mặc định)               | `secondary`       |
 
-Điều còn mở: "ngừng hoạt động" của hàng hóa dùng `destructive` còn của NCC dùng `secondary`. Khi gom vào `StatusBadge`, lấy file đó làm nguồn và sửa bảng này cho khớp.
+```tsx
+import { ACTIVE_STATUS_TONES, DOCUMENT_STATUS_TONES, StatusBadge, statusTone } from '@/components/common/status-badge';
+
+<StatusBadge tone="success">Hoàn thành</StatusBadge>
+
+{/* Danh mục hoạt động / ngừng: hàng hóa, nhà cung cấp, tài khoản… */}
+<StatusBadge tone={ACTIVE_STATUS_TONES[item.isActive ? 'active' : 'inactive']}>
+  {item.isActive ? 'Đang kinh doanh' : 'Ngừng kinh doanh'}
+</StatusBadge>
+
+{/* Chứng từ: draft | confirmed | completed | cancelled; mã lạ → neutral */}
+<StatusBadge tone={statusTone(doc.status)}>{PURCHASE_STATUS[doc.status]}</StatusBadge>
+```
+
+`ACTIVE_STATUS_TONES` = `{ active: 'success', inactive: 'danger' }`; `DOCUMENT_STATUS_TONES` = `{ draft: 'neutral', confirmed: 'info', completed: 'success', cancelled: 'danger' }`; `statusTone(code, table = DOCUMENT_STATUS_TONES)` tra bảng, mã lạ trả `neutral`. Trạng thái mới của một nghiệp vụ: thêm bảng sắc thái cạnh nơi định nghĩa mã trạng thái (hoặc vào `status-badge.tsx` nếu dùng chung) rồi truyền vào `statusTone(code, TABLE)` — không rải `tone=` theo từng màn.
+
+Bảng ánh xạ trạng thái nghiệp vụ → sắc thái:
+
+| Nghiệp vụ          | Giá trị                      | Nhãn hiển thị         | `tone`        |
+| ------------------ | ---------------------------- | --------------------- | ------------- |
+| Hàng hóa, NCC, tài khoản | đang hoạt động         | Đang kinh doanh / Đang giao dịch / Hoạt động | `success` |
+| Hàng hóa, NCC, tài khoản | ngừng / khóa           | Ngừng kinh doanh / Ngưng giao dịch / Đã khóa | `danger`  |
+| Người dùng         | `mustChangePassword`         | Chờ đổi mật khẩu      | `warning`     |
+| Phiếu mua hàng     | `draft`                      | Phiếu tạm             | `neutral`     |
+| Phiếu mua hàng     | `confirmed`                  | Đã xác nhận NCC       | `info`        |
+| Phiếu mua hàng     | `completed`                  | Hoàn thành            | `success`     |
+| Phiếu mua hàng     | `cancelled`                  | Đã hủy                | `danger`      |
+| Tình trạng nhập (đề xuất; hiện là chữ thường) | `none` / `partial` / `full` | Chưa nhập / Nhập một phần / Đã nhập đủ | `neutral` / `warning` / `success` |
+| Loại hàng (không phải trạng thái) | `combo`        | Combo (`<Badge variant="info">`) | —  |
+
+Hiện NCC "Ngưng giao dịch" đang hiện xám (`neutral`) ở `suppliers-screen.tsx`; theo `ACTIVE_STATUS_TONES` phải là `danger` — thống nhất khi chuyển màn đó sang `StatusBadge`.
 
 Vai trò **không** dùng `Badge`: dùng `RoleBadge` (`components/common/role-badge.tsx`, lớp `.role-badge` + `.role-<slug>`, token `--role-*`). Nhãn "Chờ cấp quyền" cho vai trò `pending`.
 
@@ -97,7 +121,9 @@ Nhãn ngắn (<= 3 từ), tiếng Việt, không viết hoa toàn bộ. Huy hi�
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { toast } from 'sonner';
 import { Field } from '@/components/common/field';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { applyServerErrors } from '@/lib/forms';
@@ -243,7 +269,7 @@ Dùng **bảng tĩnh** (không prefs, không phân trang) cho dữ liệu nhỏ,
 | Ô nhập liệu trong dòng                       | `purchase-lines.tsx`, `component-editor.tsx` (`.mini-table`) |
 | Cấu trúc đặc biệt (cột dính, hàng nhóm)       | Ma trận phân quyền `roles-screen.tsx` (`.matrix`)          |
 
-Cách dựng — ưu tiên `Table*` của `components/ui/table.tsx` (đã có khung cuộn + tiêu đề dính); nếu viết `<table>` thô thì bọc trong `.data-table-frame` **và** `.data-table-scroll` (khung `overflow: hidden`, thiếu lớp cuộn thì bảng rộng bị cắt trên màn hẹp):
+Cách dựng — ưu tiên `Table, TableHeader, TableBody, TableRow, TableHead, TableCell` của `components/ui/table.tsx` (tự có khung cuộn `.data-table-scroll` + tiêu đề dính), bọc ngoài bằng `<div className="data-table-frame">`. Nếu viết `<table>` thô thì bọc trong `.data-table-frame` **và** `.data-table-scroll` (khung ngoài `overflow: hidden`, thiếu lớp cuộn thì bảng rộng bị cắt trên màn hẹp; `purchase-detail.tsx` thiếu lớp này nên `purchasing.css` phải bù `.purchase-workspace .data-table-frame { overflow-x: auto }` — đừng bắt chước):
 
 ```tsx
 <div className="data-table-frame">
@@ -282,7 +308,7 @@ Bẫy:
 
 ## Select, menu, popover
 
-`Select` (`ui/select.tsx`) cho lựa chọn một giá trị; trên toolbar đặt `className="toolbar-select"` (rộng 176px) và `aria-label` mô tả ("Lọc theo trạng thái"). `DropdownMenu` (`ui/dropdown-menu.tsx`) cho menu thao tác; mục nguy hiểm dùng `<DropdownMenuItem variant="destructive">` (lớp `menu-item-danger`). Popover có bóng `--shadow-modal`, **không** `backdrop-filter`.
+`Select` (`ui/select.tsx`) cho lựa chọn một giá trị trong biểu mẫu. **Bộ lọc trên toolbar dùng `FilterSelect`** (`components/data-table/table-toolbar.tsx`: `label` → `aria-label`, `value`/`onChange`, `options: {value, label}[]`; chuỗi rỗng `''` = "mọi", đặt `{ value: '', label: 'Mọi trạng thái' }` làm mục đầu) — nó đã gắn `className="toolbar-select"` (rộng 176px); đừng dựng lại `Select` thô trong toolbar. `DropdownMenu` (`ui/dropdown-menu.tsx`) cho menu thao tác; mục nguy hiểm dùng `<DropdownMenuItem variant="destructive">` (lớp `menu-item-danger`). Popover có bóng `--shadow-modal`, **không** `backdrop-filter`.
 
 ## Lớp tiện ích có sẵn
 
