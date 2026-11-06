@@ -162,6 +162,20 @@
       "when": 1793871277436,
       "tag": "0022_chan_nap_lai_file_nhap",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1793929480812,
+      "tag": "0023_nha_cung_cap_gon",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793931308255,
+      "tag": "0024_ncc_ma_khong_phan_biet_hoa_thuong",
+      "breakpoints": true
     }
   ]
 }

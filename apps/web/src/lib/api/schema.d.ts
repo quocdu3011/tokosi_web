@@ -204,6 +204,91 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/suppliers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Danh sách nhà cung cấp (lọc, tìm không dấu, phân trang)
+     * @description Không gồm nhà cung cấp hệ thống đại diện chi nhánh. Mọi số tiền (nợ, tổng mua) tính RIÊNG cho chi nhánh làm việc (header X-Branch-Id), không dùng chung; nợ chỉ có khi người gọi có quyền debt.view.
+     */
+    get: operations['SuppliersController_list'];
+    put?: never;
+    /**
+     * Tạo nhà cung cấp
+     * @description Bỏ trống `code` thì hệ thống tự cấp (NCC000056…).
+     */
+    post: operations['SuppliersController_create'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/suppliers/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Chi tiết nhà cung cấp (số tiền theo chi nhánh làm việc) */
+    get: operations['SuppliersController_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Sửa tên, nhóm; ngưng hoặc mở lại giao dịch (isActive)
+     * @description Mã không đổi được. Nhà cung cấp hệ thống (chi nhánh) không sửa được.
+     */
+    patch: operations['SuppliersController_update'];
+    trace?: never;
+  };
+  '/api/v1/suppliers/{id}/branches': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Số tiền của nhà cung cấp tại từng chi nhánh người dùng được phép
+     * @description Mỗi chi nhánh một dòng; số tiền KHÔNG cộng gộp giữa các chi nhánh. Nợ vắng mặt nếu thiếu debt.view.
+     */
+    get: operations['SuppliersController_branches'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/suppliers/{id}/ledger': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Sổ công nợ nhà cung cấp tại chi nhánh làm việc
+     * @description Số dư đầu kỳ (trước `from`), các dòng sổ cái trong khoảng ngày kèm số dư cộng dồn, số dư cuối kỳ. Mỗi chi nhánh một sổ riêng. Cần cả purchase.view và debt.view. `amount` dương = tăng nợ, âm = giảm nợ.
+     */
+    get: operations['SuppliersController_ledger'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/users': {
     parameters: {
       query?: never;
@@ -756,6 +841,108 @@ export interface components {
       currentPassword: string;
       /** @description Mật khẩu mới: 10–128 ký tự, khác mật khẩu cũ, không chứa tên đăng nhập */
       newPassword: string;
+    };
+    SupplierDto: {
+      id: string;
+      /** @example NCC000002 */
+      code: string;
+      name: string;
+      /** @description Nhóm nhà cung cấp: chuỗi tự do, có thể null; chỉ để phân loại/lọc, không có nghiệp vụ riêng (kể cả "Lái xe") */
+      groupName: string | null;
+      isActive: boolean;
+      /** @description Họ tên người tạo */
+      createdByName: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** @description Chi nhánh mà ba số tiền bên dưới tính cho (= chi nhánh làm việc, header X-Branch-Id). Tiền KHÔNG dùng chung giữa các chi nhánh */
+      branchId: string;
+      /**
+       * @description Tổng mua TẠI chi nhánh này = số lịch sử của chi nhánh (chuyển từ KiotViet) + tổng phiếu nhập hoàn tất
+       * @example 1250000000
+       */
+      totalPurchase: string;
+      /**
+       * @description Tổng mua trừ trả hàng TẠI chi nhánh này = số lịch sử + phiếu nhập − phiếu trả hàng nhập
+       * @example 1200000000
+       */
+      netPurchase: string;
+      /**
+       * @description Nợ cần trả hiện tại TẠI chi nhánh này (+ = còn nợ, có thể âm). VẮNG MẶT nếu thiếu quyền debt.view
+       * @example 240000000
+       */
+      balance?: string;
+    };
+    SupplierListMetaDto: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+    SupplierListDto: {
+      data: components['schemas']['SupplierDto'][];
+      meta: components['schemas']['SupplierListMetaDto'];
+    };
+    SupplierBranchDto: {
+      branchId: string;
+      /** @example SG */
+      branchCode: string;
+      branchName: string;
+      totalPurchase: string;
+      netPurchase: string;
+      /** @description Vắng mặt nếu thiếu debt.view */
+      balance?: string;
+    };
+    LedgerEntryDto: {
+      /** Format: date-time */
+      occurredAt: string;
+      /** @enum {string} */
+      entryType: 'opening' | 'invoice' | 'payment' | 'return' | 'adjustment' | 'transfer';
+      /** @example goods_receipt */
+      refType: string | null;
+      refId: string | null;
+      /** @example PN000948 */
+      refCode: string | null;
+      /**
+       * @description Dương = tăng nợ (mình nợ thêm), âm = giảm nợ
+       * @example 33735000
+       */
+      amount: string;
+      /**
+       * @description Số dư sau dòng này (cộng dồn từ số dư đầu kỳ)
+       * @example 33735000
+       */
+      balance: string;
+      note: string | null;
+    };
+    LedgerDto: {
+      /** @description Chi nhánh của sổ (= chi nhánh làm việc); mỗi chi nhánh một sổ riêng */
+      branchId: string;
+      /**
+       * @description Số dư trước ngày `from` (0 nếu không có `from`)
+       * @example 0
+       */
+      openingBalance: string;
+      entries: components['schemas']['LedgerEntryDto'][];
+      /** @example 21345000 */
+      closingBalance: string;
+    };
+    CreateSupplierDto: {
+      /**
+       * @description Bỏ trống = hệ thống tự cấp. Chữ, số, "-", "_", "."; 1–30 ký tự; không trùng (kể cả khác hoa thường)
+       * @example NCC000056
+       */
+      code?: string;
+      /** @example Công ty TNHH ABC */
+      name: string;
+      /** @example Lái xe */
+      groupName?: string | null;
+    };
+    UpdateSupplierDto: {
+      name?: string;
+      /** @description null hoặc rỗng = bỏ nhóm */
+      groupName?: string | null;
+      /** @description false = ngưng giao dịch */
+      isActive?: boolean;
     };
     UserDto: {
       id: string;
@@ -1483,6 +1670,190 @@ export interface operations {
         content: {
           'application/json': components['schemas']['SessionResponseDto'];
         };
+      };
+    };
+  };
+  SuppliersController_list: {
+    parameters: {
+      query?: {
+        page?: number;
+        limit?: number;
+        /** @description Tên cột cần sắp xếp; thêm `-` phía trước để giảm dần. Chỉ nhận các cột endpoint cho phép */
+        sort?: string;
+        /** @description Tìm không dấu theo mã, tên, nhóm */
+        q?: string;
+        /** @description Đúng tên nhóm (không phân biệt hoa thường, dấu) */
+        groupName?: string;
+        /** @description true = đang nợ (nợ > 0 TẠI chi nhánh làm việc), false = không nợ. Cần quyền debt.view */
+        hasDebt?: boolean;
+        isActive?: boolean;
+        /** @description xlsx = tải Excel theo đúng bộ lọc (bỏ qua page/limit, tối đa 10.000 dòng) */
+        format?: 'xlsx';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SupplierListDto'];
+        };
+      };
+    };
+  };
+  SuppliersController_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateSupplierDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SupplierDto'];
+        };
+      };
+      /** @description DUPLICATE_CODE: mã đã tồn tại */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  SuppliersController_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SupplierDto'];
+        };
+      };
+      /** @description Không tìm thấy nhà cung cấp */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  SuppliersController_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateSupplierDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SupplierDto'];
+        };
+      };
+      /** @description Không tìm thấy nhà cung cấp */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  SuppliersController_branches: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SupplierBranchDto'][];
+        };
+      };
+      /** @description Không tìm thấy nhà cung cấp */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  SuppliersController_ledger: {
+    parameters: {
+      query?: {
+        /** @description Từ ngày (giờ Việt Nam, tính cả ngày này); bỏ trống = từ đầu. Dạng YYYY-MM-DD */
+        from?: string;
+        /** @description Đến ngày (giờ Việt Nam, tính cả ngày này); bỏ trống = đến hiện tại */
+        to?: string;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LedgerDto'];
+        };
+      };
+      /** @description Không tìm thấy nhà cung cấp */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };

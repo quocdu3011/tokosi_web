@@ -2,7 +2,7 @@
 
 > **Sinh tự động** từ `apps/api/src/db/schema` bằng `pnpm db:docs` — không sửa tay. Tổng quan và cách xem sơ đồ: [`README.md`](README.md).
 
-**40 bảng · 20 kiểu liệt kê (enum)**
+**41 bảng · 19 kiểu liệt kê (enum)**
 
 ## Mục lục
 
@@ -13,6 +13,7 @@
 - **Đơn hàng**: [`orders`](#orders), [`order_items`](#order_items), [`invoices`](#invoices), [`invoice_items`](#invoice_items), [`invoice_payments`](#invoice_payments), [`sales_returns`](#sales_returns), [`sales_return_items`](#sales_return_items)
 - **Mua hàng**: [`goods_receipts`](#goods_receipts), [`goods_receipt_items`](#goods_receipt_items), [`purchase_returns`](#purchase_returns), [`purchase_return_items`](#purchase_return_items)
 - **Sổ quỹ & công nợ**: [`cash_accounts`](#cash_accounts), [`cash_categories`](#cash_categories), [`cash_transactions`](#cash_transactions), [`debt_ledger`](#debt_ledger), [`payment_allocations`](#payment_allocations)
+- **Khác**: [`supplier_branch_history`](#supplier_branch_history)
 
 ## Kiểu liệt kê (enum)
 
@@ -35,7 +36,6 @@
 | `return_settlement` | `offset_debt`, `refund` |
 | `shipping_payer` | `sender`, `receiver` |
 | `stock_ref_type` | `opening`, `goods_receipt`, `invoice`, `sales_return`, `purchase_return`, `adjustment`, `transfer_out`, `transfer_in`, `transfer_cancel` |
-| `supplier_kind` | `goods`, `driver`, `other` |
 | `transfer_status` | `in_transit`, `received`, `cancelled` |
 | `user_role` | `manager`, `assistant`, `accountant`, `warehouse`, `driver`, `sales`, `marketing`, `pending` |
 
@@ -537,13 +537,8 @@ Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng 
 | `id` | uuid |  | `gen_random_uuid()` | **PK** |
 | `code` | text |  |  | unique |
 | `name` | text |  |  |  |
-| `kind` | supplier_kind |  | `'goods'` |  |
 | `group_name` | text | ✔ |  |  |
-| `phone` | text | ✔ |  |  |
-| `address` | text | ✔ |  |  |
-| `tax_code` | text | ✔ |  |  |
 | `linked_branch_id` | uuid | ✔ |  | unique; → `branches.id`; Nhà cung cấp hệ thống đại diện một chi nhánh (chuyển kho nội bộ) |
-| `note` | text | ✔ |  |  |
 | `is_active` | boolean |  | `true` |  |
 | `created_by` | uuid | ✔ |  | → `users.id` |
 | `created_at` | timestamptz |  | `now()` |  |
@@ -552,8 +547,8 @@ Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng 
 
 **Chỉ mục:**
 
-- `suppliers_search_trgm`: `f_search_text(code || ' ' || name || ' ' || coalesce(phone, '')) gin_trgm_ops`
-- `suppliers_kind_idx`: `kind`
+- `suppliers_search_trgm`: `f_search_text(code || ' ' || name || ' ' || coalesce(groupName, '')) gin_trgm_ops`
+- `suppliers_code_lower_unique` (unique): `lower(code)`
 
 ## Đơn hàng
 
@@ -984,3 +979,16 @@ Cấn trừ phiếu thu vào từng hóa đơn.
 **Ràng buộc CHECK:**
 
 - `payment_allocations_amount_pos`: `amount > 0`
+
+## Khác
+
+### supplier_branch_history
+
+| Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
+| --- | --- | :-: | --- | --- |
+| `supplier_id` | uuid |  |  | **PK**; → `suppliers.id` (on delete cascade) |
+| `branch_id` | uuid |  |  | **PK**; → `branches.id` |
+| `purchase_total` | numeric(18,0) |  | `0` |  |
+| `purchase_net` | numeric(18,0) |  | `0` |  |
+
+**Khóa chính ghép:** (`supplier_id`, `branch_id`)

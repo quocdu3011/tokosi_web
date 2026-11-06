@@ -17,12 +17,6 @@ export const userRole = pgEnum('user_role', [
   'pending',
 ]);
 export const customerType = pgEnum('customer_type', ['individual', 'company']);
-export const supplierKind = pgEnum('supplier_kind', [
-  'goods',
-  'driver',
-  'other',
-]);
-
 /** Đơn đặt hàng: phiếu tạm → đã xuất hóa đơn / hủy. */
 export const orderStatus = pgEnum('order_status', [
   'draft',

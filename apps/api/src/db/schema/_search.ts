@@ -23,6 +23,14 @@ export const partySearchExpr = (t: {
 }): SQL =>
   sql`f_search_text(${t.code} || ' ' || ${t.name} || ' ' || coalesce(${t.phone}, ''))`;
 
+/** Nhà cung cấp: mã + tên + nhóm (không còn số điện thoại). */
+export const supplierSearchExpr = (t: {
+  code: AnyPgColumn;
+  name: AnyPgColumn;
+  groupName: AnyPgColumn;
+}): SQL =>
+  sql`f_search_text(${t.code} || ' ' || ${t.name} || ' ' || coalesce(${t.groupName}, ''))`;
+
 /** Chỉ mục GIN trigram trên một biểu thức tìm kiếm (hỗ trợ LIKE '%...%'). */
 export const trgmIndex = (name: string, expr: SQL) =>
   index(name).using('gin', sql`${expr} gin_trgm_ops`);

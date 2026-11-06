@@ -5,12 +5,15 @@ import type { Database } from '../database.module.js';
 import {
   branches,
   categories,
+  debtLedger,
   products,
   stockMovements,
   stocks,
+  supplierBranchHistory,
+  suppliers,
 } from '../schema/index.js';
 import { createTestDb } from '../test-db.js';
-import { demoStockHn, runDemoSeed } from './demo.js';
+import { demoStockHn, demoSupplierFigures, runDemoSeed } from './demo.js';
 import { runSeed } from './index.js';
 
 describe('demoStockHn (công thức thuần túy)', () => {
@@ -21,6 +24,27 @@ describe('demoStockHn (công thức thuần túy)', () => {
       expect(cost).toMatch(/^\d+\.\d{4}$/);
       expect(demoStockHn(i)).toEqual({ qty, cost });
     }
+  });
+});
+
+describe('demoSupplierFigures (công thức thuần túy)', () => {
+  it('xác định, hai chi nhánh khác nhau; có nợ 0 và nợ âm; trừ trả hàng không vượt tổng mua', () => {
+    const debts: number[] = [];
+    for (let i = 0; i < 8; i++) {
+      const hn = demoSupplierFigures(i, 'HN');
+      const sg = demoSupplierFigures(i, 'SG');
+      expect(demoSupplierFigures(i, 'HN')).toEqual(hn);
+      expect(hn.purchaseTotal).not.toBe(sg.purchaseTotal);
+      for (const f of [hn, sg]) {
+        expect(f.purchaseNet).toBeLessThanOrEqual(f.purchaseTotal);
+        expect(f.purchaseNet).toBeGreaterThan(0);
+        expect(Number.isInteger(f.debt)).toBe(true);
+        debts.push(f.debt);
+      }
+    }
+    expect(debts.some((d) => d === 0)).toBe(true);
+    expect(debts.some((d) => d < 0)).toBe(true);
+    expect(debts.some((d) => d > 0)).toBe(true);
   });
 });
 
@@ -52,7 +76,12 @@ describe('runDemoSeed (CSDL thật trong bộ nhớ)', () => {
 
   it('tạo 60 hàng, nhóm hàng 2 cấp, 3 combo và tồn đầu của 2 chi nhánh', async () => {
     const r = await runDemoSeed(db, { nodeEnv: 'test' });
-    expect(r).toMatchObject({ categories: 12, products: 60, combos: 3 });
+    expect(r).toMatchObject({
+      categories: 12,
+      products: 60,
+      combos: 3,
+      suppliers: 8,
+    });
     // 60 hàng hóa + 3 combo mẫu; combo không có dòng tồn riêng
     const all = await db.select().from(products);
     expect(all).toHaveLength(63);
@@ -61,6 +90,24 @@ describe('runDemoSeed (CSDL thật trong bộ nhớ)', () => {
       .map((p) => p.id);
     expect(comboIds).toHaveLength(3);
     expect(await db.select().from(categories)).toHaveLength(12);
+
+    // nhà cung cấp mẫu: số lịch sử và nợ đầu kỳ RIÊNG từng chi nhánh; nợ chỉ nằm ở sổ cái (dòng opening)
+    const sup = (await db.select().from(suppliers)).filter((x) =>
+      x.code.startsWith('DEMO-NCC'),
+    );
+    expect(sup).toHaveLength(8);
+    const hist = await db.select().from(supplierBranchHistory);
+    expect(hist).toHaveLength(16); // 8 nhà cung cấp × 2 chi nhánh
+    const ledger = (await db.select().from(debtLedger)).filter(
+      (l) => l.partyType === 'supplier',
+    );
+    expect(ledger.every((l) => l.entryType === 'opening')).toBe(true);
+    const expectedRows = [0, 1, 2, 3, 4, 5, 6, 7].flatMap((i) =>
+      (['HN', 'SG'] as const).filter(
+        (b) => demoSupplierFigures(i, b).debt !== 0,
+      ),
+    ).length;
+    expect(ledger).toHaveLength(expectedRows);
 
     const [hn] = await db
       .select()
@@ -99,6 +146,8 @@ describe('runDemoSeed (CSDL thật trong bộ nhớ)', () => {
     const snapshot = async () => ({
       products: (await db.select().from(products)).length,
       moves: (await db.select().from(stockMovements)).length,
+      debts: (await db.select().from(debtLedger)).length,
+      hist: (await db.select().from(supplierBranchHistory)).length,
       cats: (await db.select().from(categories)).length,
     });
     const before = await snapshot();
@@ -107,6 +156,7 @@ describe('runDemoSeed (CSDL thật trong bộ nhớ)', () => {
       categories: 0,
       products: 0,
       combos: 0,
+      suppliers: 0,
       openingMovements: 0,
     });
     expect(await snapshot()).toEqual(before);

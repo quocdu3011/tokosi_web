@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   boolean,
   index,
@@ -5,11 +6,12 @@ import {
   pgTable,
   primaryKey,
   text,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { customerType, supplierKind } from './enums.js';
+import { customerType } from './enums.js';
 import { money, pk, softDelete, timestamps, tstz } from './_helpers.js';
-import { partySearchExpr, trgmIndex } from './_search.js';
+import { partySearchExpr, supplierSearchExpr, trgmIndex } from './_search.js';
 import { branches, users } from './system.js';
 
 /**
@@ -86,23 +88,40 @@ export const suppliers = pgTable(
     id: pk(),
     code: text().notNull().unique(),
     name: text().notNull(),
-    kind: supplierKind().notNull().default('goods'),
-    /** Nhóm nhà cung cấp (tên tự do, như "Nhóm NCC" của KiotViet). Có thể để trống; hệ thống không dựa vào nó để xử lý nghiệp vụ. */
+    /** Nhóm nhà cung cấp (tên tự do, như "Nhóm NCC" của KiotViet). Có thể để trống; hệ thống không dựa vào nó để xử lý nghiệp vụ (kể cả nhóm "Lái xe"). */
     groupName: text(),
-    phone: text(),
-    address: text(),
-    taxCode: text(),
     linkedBranchId: uuid()
       .unique('suppliers_linked_branch_unique')
       .references(() => branches.id),
-    note: text(),
     isActive: boolean().notNull().default(true),
     createdBy: uuid().references(() => users.id),
     ...timestamps(),
     ...softDelete(),
   },
   (t) => [
-    trgmIndex('suppliers_search_trgm', partySearchExpr(t)),
-    index('suppliers_kind_idx').on(t.kind),
+    trgmIndex('suppliers_search_trgm', supplierSearchExpr(t)),
+    // Mã không trùng kể cả khác hoa thường (cột `code` đã unique nhưng phân biệt hoa thường)
+    uniqueIndex('suppliers_code_lower_unique').on(sql`lower(${t.code})`),
   ],
+);
+
+/**
+ * Số liệu LỊCH SỬ mua hàng của nhà cung cấp THEO TỪNG CHI NHÁNH, chuyển từ KiotViet (chỉ công cụ chuyển dữ liệu ghi,
+ * giao diện không sửa): tổng mua và tổng mua trừ trả hàng TRƯỚC khi chạy hệ thống mới. Tổng hiển thị của một chi
+ * nhánh = số này + phát sinh từ phiếu nhập / trả hàng nhập của chi nhánh đó. Nợ đầu kỳ KHÔNG nằm ở đây mà là một
+ * dòng `debt_ledger` loại `opening`.
+ */
+export const supplierBranchHistory = pgTable(
+  'supplier_branch_history',
+  {
+    supplierId: uuid()
+      .notNull()
+      .references(() => suppliers.id, { onDelete: 'cascade' }),
+    branchId: uuid()
+      .notNull()
+      .references(() => branches.id),
+    purchaseTotal: money().notNull().default('0'),
+    purchaseNet: money().notNull().default('0'),
+  },
+  (t) => [primaryKey({ columns: [t.supplierId, t.branchId] })],
 );

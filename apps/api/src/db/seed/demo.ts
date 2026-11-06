@@ -10,8 +10,11 @@ import type { Database } from '../database.module.js';
 import {
   branches,
   categories,
+  debtLedger,
   productComponents,
   products,
+  supplierBranchHistory,
+  suppliers,
 } from '../schema/index.js';
 import { InventoryService } from '../../modules/inventory/inventory.service.js';
 
@@ -65,6 +68,7 @@ export interface DemoSeedReport {
   categories: number;
   products: number;
   combos: number;
+  suppliers: number;
   openingMovements: number;
 }
 
@@ -90,6 +94,7 @@ export async function runDemoSeed(
     products: 0,
     openingMovements: 0,
     combos: 0,
+    suppliers: 0,
   };
   const inventory = new InventoryService(db);
 
@@ -100,6 +105,8 @@ export async function runDemoSeed(
     if (!hn || !sg) {
       throw new Error('Chưa có chi nhánh: chạy `pnpm db:seed` trước');
     }
+
+    await seedSuppliers(tx, report, hn.id, sg.id);
 
     // nhóm hàng
     const leafIds: string[] = [];
@@ -261,5 +268,86 @@ async function seedCombos(
       })),
     );
     report.combos++;
+  }
+}
+
+/** Nhà cung cấp mẫu: tên GIẢ, mã `DEMO-NCC01…`. */
+const DEMO_SUPPLIER_COUNT = 8;
+const DEMO_SUPPLIER_GROUPS = ['Bao bì', 'Gia dụng', 'Lái xe', null] as const;
+
+/**
+ * Số liệu mẫu theo công thức của nhà cung cấp thứ `i` (0..7) tại một chi nhánh: số lịch sử (tổng mua, trừ trả hàng) và
+ * nợ đầu kỳ. Hai chi nhánh khác nhau; có nợ bằng 0 và nợ ÂM (trả dư) để thử giao diện. Thuần túy để test được.
+ */
+export function demoSupplierFigures(i: number, branch: 'HN' | 'SG') {
+  const k = branch === 'SG' ? 3 : 2;
+  const purchaseTotal = (20 + ((i * 17 + k * 5) % 80)) * 1_000_000;
+  const returned = ((i * 3 + k) % 7) * 500_000;
+  const debt =
+    i % 4 === 3
+      ? 0 // nhà cung cấp không nợ
+      : i % 4 === 2 && branch === 'SG'
+        ? -((1 + (i % 3)) * 300_000) // trả dư
+        : (1 + ((i * 7 + k) % 9)) * 2_000_000;
+  return { purchaseTotal, purchaseNet: purchaseTotal - returned, debt };
+}
+
+/**
+ * Nhà cung cấp mẫu kèm số liệu lịch sử và nợ đầu kỳ THEO TỪNG CHI NHÁNH (nợ đầu kỳ = một dòng sổ cái `opening`).
+ * Chỉ tạo nhà cung cấp CHƯA có, nên chạy lại không nhân đôi nợ.
+ */
+async function seedSuppliers(
+  tx: Pick<Database, 'select' | 'insert'>,
+  report: DemoSeedReport,
+  hnId: string,
+  sgId: string,
+): Promise<void> {
+  const codes = Array.from(
+    { length: DEMO_SUPPLIER_COUNT },
+    (_, i) => `${DEMO_PREFIX}NCC${String(i + 1).padStart(2, '0')}`,
+  );
+  const have = new Set(
+    (
+      await tx
+        .select({ code: suppliers.code })
+        .from(suppliers)
+        .where(inArray(suppliers.code, codes))
+    ).map((x) => x.code),
+  );
+  for (const [i, code] of codes.entries()) {
+    if (have.has(code)) continue;
+    const [row] = await tx
+      .insert(suppliers)
+      .values({
+        code,
+        name: `Nhà cung cấp mẫu ${i + 1}`,
+        groupName: DEMO_SUPPLIER_GROUPS[i % DEMO_SUPPLIER_GROUPS.length],
+      })
+      .returning({ id: suppliers.id });
+    for (const [branchId, branch] of [
+      [hnId, 'HN'],
+      [sgId, 'SG'],
+    ] as const) {
+      const f = demoSupplierFigures(i, branch);
+      await tx.insert(supplierBranchHistory).values({
+        supplierId: row!.id,
+        branchId,
+        purchaseTotal: String(f.purchaseTotal),
+        purchaseNet: String(f.purchaseNet),
+      });
+      if (f.debt !== 0) {
+        await tx.insert(debtLedger).values({
+          branchId,
+          partyType: 'supplier',
+          partyId: row!.id,
+          entryType: 'opening',
+          refCode: 'DEMO',
+          amount: String(f.debt),
+          occurredAt: new Date('2026-10-31T17:00:00Z'),
+          note: 'Nợ đầu kỳ mẫu',
+        });
+      }
+    }
+    report.suppliers++;
   }
 }

@@ -24,6 +24,8 @@ try {
   console.log(
     `Hàng hóa mẫu     +${r.products}${r.products === 0 ? ' (đã có)' : ''}`,
   );
+  console.log(`Combo mẫu        +${r.combos}`);
+  console.log(`Nhà cung cấp mẫu +${r.suppliers}`);
   console.log(`Tồn đầu          +${r.openingMovements} dòng`);
 } finally {
   await pool.end();

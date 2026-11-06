@@ -32,3 +32,26 @@ export async function nextDocumentCode(
   }
   return formatDocumentCode(prefix, row.next - 1, row.digits);
 }
+
+/**
+ * Như `nextDocumentCode` nhưng BỎ QUA các mã đã có người dùng (nhập tay hoặc chuyển từ hệ thống cũ). Nếu không, một
+ * mã nhập tay trùng đúng số kế tiếp sẽ làm mọi lần tự cấp sau đó lỗi trùng mãi mãi (giao dịch hủy kéo bộ đếm lùi lại).
+ * `isTaken` kiểm tra mã đã tồn tại chưa. Mỗi mã bị bỏ qua vẫn tiêu một số của bộ đếm.
+ */
+export async function nextFreeDocumentCode(
+  db: Pick<Database, 'update'>,
+  prefix: string,
+  isTaken: (code: string) => Promise<boolean>,
+): Promise<string> {
+  for (let attempt = 0; attempt < MAX_SKIPPED_CODES; attempt++) {
+    const code = await nextDocumentCode(db, prefix);
+    if (!(await isTaken(code))) return code;
+  }
+  throw new AppError(
+    500,
+    'INTERNAL_ERROR',
+    `Không tìm được mã "${prefix}" còn trống sau ${MAX_SKIPPED_CODES} lần thử; hãy nâng bộ đếm mã lên số lớn nhất hiện có`,
+  );
+}
+
+const MAX_SKIPPED_CODES = 1000;

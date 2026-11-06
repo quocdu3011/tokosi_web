@@ -385,13 +385,17 @@ Màn hình chỉ cần một nút Lưu và gọi lần lượt hai API này. N�
 
 ### 3.1 Nhà cung cấp
 
-| Method | Đường dẫn                       | Mô tả                                                       | Quyền           | Mốc |
-| ------ | ------------------------------- | ----------------------------------------------------------- | --------------- | --- |
-| GET    | `/suppliers`                    | Danh sách (`q`, `kind`, `groupName`, `hasDebt`, `isActive`) | `purchase.view` | W3  |
-| GET    | `/suppliers/:id`                | Chi tiết + `balance`                                        | `purchase.view` | W3  |
-| POST   | `/suppliers`                    | Tạo                                                         | `purchase.edit` | W3  |
-| PATCH  | `/suppliers/:id`                | Sửa / ngưng                                                 | `purchase.edit` | W3  |
-| GET    | `/suppliers/:id/ledger?from&to` | Sổ công nợ NCC                                              | `purchase.view` | W7  |
+> **Trạng thái:** đã triển khai `GET/POST /suppliers`, `GET/PATCH /suppliers/:id`, `GET /suppliers/:id/branches`, `GET /suppliers/:id/ledger`. Thuộc tính theo file `DanhSachNhaCungCap` của KiotViet sau khi lược bỏ cột không dùng (06/11/2026): **không còn** điện thoại, địa chỉ, mã số thuế, ghi chú, loại (`kind`).
+> **Mọi số tiền của nhà cung cấp (nợ, tổng mua, tổng mua trừ trả hàng) là RIÊNG TỪNG CHI NHÁNH, không bao giờ cộng gộp.** Các endpoint trả số tiền cần `X-Branch-Id` (người có nhiều chi nhánh không gửi → `400 BRANCH_REQUIRED`); muốn xem cả hai chi nhánh dùng `GET /suppliers/:id/branches`.
+
+| Method | Đường dẫn                       | Mô tả                                                                 | Quyền                          |
+| ------ | ------------------------------- | --------------------------------------------------------------------- | ------------------------------ |
+| GET    | `/suppliers`                    | Danh sách (`q`, `groupName`, `hasDebt`, `isActive`, `sort`: `code`, `name`, `createdAt`; `?format=xlsx`); tiền theo chi nhánh làm việc | `purchase.view` + `X-Branch-Id` (`hasDebt` cần `debt.view`) |
+| GET    | `/suppliers/:id`                | Chi tiết; tiền theo chi nhánh làm việc                                 | `purchase.view` + `X-Branch-Id` |
+| GET    | `/suppliers/:id/branches`       | Tiền của nhà cung cấp tại TỪNG chi nhánh người dùng được phép          | `purchase.view`                |
+| POST   | `/suppliers`                    | Tạo `{ name, groupName?, code? }` (bỏ `code` = tự cấp `NCC000056`…)    | `purchase.edit` + `X-Branch-Id` |
+| PATCH  | `/suppliers/:id`                | Sửa `{ name?, groupName?, isActive? }`; mã không đổi được             | `purchase.edit` + `X-Branch-Id` |
+| GET    | `/suppliers/:id/ledger?from&to` | **Sổ công nợ** NCC tại chi nhánh làm việc                              | `purchase.view` + `debt.view` + `X-Branch-Id` |
 
 ```json
 // Supplier
@@ -399,53 +403,64 @@ Màn hình chỉ cần một nút Lưu và gọi lần lượt hai API này. N�
   "id": "…",
   "code": "NCC000002",
   "name": "Công ty TNHH ABC",
-  "kind": "goods",
-  "groupName": null, // nhóm nhà cung cấp: chuỗi tự do, có thể null (để trống); chỉ để phân loại/lọc, không ảnh hưởng nghiệp vụ
-  "phone": "0901234567",
-  "address": null,
-  "taxCode": null,
-  "note": null,
-  "isInternalBranch": false, // true = nhà cung cấp hệ thống đại diện một chi nhánh (chuyển kho nội bộ)
-  "balances": [
-    // công nợ TÁCH BIỆT theo chi nhánh (chỉ các chi nhánh người dùng được phép); + = mình còn nợ NCC; có thể âm
-    { "branchId": "…", "branchCode": "SG", "balance": "240000000" },
-    { "branchId": "…", "branchCode": "HN", "balance": "0" }
-  ],
+  "groupName": null, // nhóm nhà cung cấp: chuỗi tự do, có thể null; chỉ để phân loại/lọc, không có nghiệp vụ riêng (kể cả "Lái xe")
   "isActive": true,
-  "createdAt": "…"
+  "createdByName": "Nguyễn Văn A", // họ tên người tạo
+  "createdAt": "…",
+  "branchId": "…", // chi nhánh mà 3 số tiền dưới đây tính cho (= X-Branch-Id)
+  "totalPurchase": "1250000000", // Tổng mua TẠI chi nhánh này = số lịch sử của chi nhánh (chuyển từ KiotViet) + phiếu nhập hoàn tất
+  "netPurchase": "1200000000", // Tổng mua trừ trả hàng TẠI chi nhánh này = số lịch sử + phiếu nhập − phiếu trả hàng nhập
+  "balance": "240000000" // Nợ cần trả hiện tại TẠI chi nhánh này (+ = còn nợ, có thể âm); VẮNG MẶT nếu thiếu debt.view
 }
+
+// GET /suppliers/:id/branches  (chỉ các chi nhánh người dùng được phép; mỗi chi nhánh một bộ số riêng)
+[
+  { "branchId": "…", "branchCode": "HN", "branchName": "Chi nhánh Hà Nội", "totalPurchase": "…", "netPurchase": "…", "balance": "…" },
+  { "branchId": "…", "branchCode": "SG", "branchName": "Chi nhánh Sài Gòn", "totalPurchase": "…", "netPurchase": "…", "balance": "…" }
+]
 ```
 
-Lưu ý: `phone` không kiểm tra định dạng (dữ liệu cũ có nhiều giá trị không phải số điện thoại).
+Lưu ý:
+- `hasDebt` xét nợ **tại chi nhánh làm việc** (nợ âm hoặc 0 là "không nợ"). Một nhà cung cấp có thể đang nợ ở chi nhánh này nhưng không nợ ở chi nhánh kia.
+- Danh sách và chi tiết **không gồm** nhà cung cấp hệ thống đại diện chi nhánh (chuyển kho nội bộ); id của chúng trả `404`.
+- **Nợ không phải cột của nhà cung cấp:** là tổng sổ cái công nợ của chi nhánh. Nợ đầu kỳ lúc chuyển từ KiotViet là một dòng sổ cái loại `opening` GẮN VÀO MỘT CHI NHÁNH; số lịch sử "tổng mua", "tổng mua trừ trả hàng" lưu theo từng chi nhánh ở bảng `supplier_branch_history` (giao diện không sửa được; do công cụ chuyển dữ liệu ghi).
+- Mã trùng (kể cả khác hoa thường) → `409 DUPLICATE_CODE`. Gửi trường đã bỏ (`phone`, `kind`…) → `400`.
+- Xuất Excel `?format=xlsx` (theo chi nhánh làm việc) có cột: Mã, Tên, Nhóm, Nợ cần trả hiện tại (chỉ khi có `debt.view`), Tổng mua, Tổng mua trừ trả hàng, Trạng thái, Người tạo, Ngày tạo. `Ngày tạo` hiển thị **giờ Việt Nam** dạng `dd/MM/yyyy HH:mm`; `Trạng thái` là `1`/`0` (giữ như file KiotViet để sau này nhập lại được).
+- **Mã tự cấp bỏ qua mã đã có:** nếu số kế tiếp (vd `NCC000057`) đã bị mã nhập tay hoặc dữ liệu chuyển từ hệ thống cũ chiếm thì hệ thống tự lấy số tiếp theo, không báo lỗi trùng.
 
-**Sổ công nợ** (dùng chung cấu trúc cho khách và NCC):
+**Sổ công nợ** (`GET /suppliers/:id/ledger?from=2026-11-01&to=2026-11-30`; cùng cấu trúc sẽ dùng cho khách hàng):
 
 ```json
 {
-  "openingBalance": "0",
+  "branchId": "…", // sổ của chi nhánh làm việc (X-Branch-Id); mỗi chi nhánh một sổ riêng
+  "openingBalance": "0", // số dư TRƯỚC ngày `from` (0 nếu không có `from`)
   "entries": [
     {
       "occurredAt": "…",
-      "entryType": "invoice",
-      "refCode": "HD016890",
+      "entryType": "invoice", // opening | invoice | payment | return | adjustment | transfer
+      "refType": "goods_receipt",
       "refId": "…",
+      "refCode": "PN000948",
       "amount": "33735000",
-      "balance": "33735000",
+      "balance": "33735000", // số dư sau dòng này (cộng dồn từ openingBalance)
       "note": null
     },
     {
       "occurredAt": "…",
       "entryType": "payment",
-      "refCode": "TT019327",
+      "refType": null,
+      "refId": null,
+      "refCode": "CTM019327",
       "amount": "-12390000",
-      "balance": "21345000"
+      "balance": "21345000",
+      "note": null
     }
   ],
   "closingBalance": "21345000"
 }
 ```
 
-`amount` dương = tăng nợ, âm = giảm nợ.
+`amount` dương = tăng nợ (mình nợ thêm), âm = giảm nợ. `from`/`to` dạng `YYYY-MM-DD` (phải là ngày có thật, vd `2026-02-31` → `400`), tính theo giờ Việt Nam, **cả hai đầu đều gồm cả ngày**; bỏ trống `from` = từ đầu, bỏ trống `to` = đến hiện tại. Ngày sai dạng hoặc `to` < `from` → `400`. Cần cả `purchase.view` và `debt.view`. Dòng sắp theo thời gian phát sinh; nợ đầu kỳ chuyển từ KiotViet là dòng `opening`.
 
 ### 3.2 Nhập hàng
 

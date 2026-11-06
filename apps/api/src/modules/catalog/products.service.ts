@@ -29,6 +29,7 @@ import {
 import { AppError } from '../../common/app-error.js';
 import type { AuthUser } from '../../common/auth-user.js';
 import { pageMeta, pageParams, parseSort } from '../../common/pagination.js';
+import { vnDayStart } from '../../common/vn-date.js';
 import { uniqueViolation } from '../../common/pg-errors.js';
 import { DB, type Database, type DbOrTx } from '../../db/database.module.js';
 import { categoryWithDescendants } from '../../db/category-tree.js';
@@ -74,7 +75,6 @@ import {
 
 /** Tối đa số dòng khi xuất Excel. */
 export const EXPORT_MAX_ROWS = 10_000;
-const VN_OFFSET = '+07:00';
 
 type ProductRow = typeof products.$inferSelect;
 
@@ -910,15 +910,4 @@ function rethrowDuplicateCode(e: unknown): never {
     ]);
   }
   throw e;
-}
-
-/** 00:00 của ngày `YYYY-MM-DD` theo giờ Việt Nam (UTC+7, không có giờ mùa hè). */
-function vnDayStart(day: string, field: string): Date {
-  const d = new Date(`${day}T00:00:00${VN_OFFSET}`);
-  if (Number.isNaN(d.getTime())) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Ngày không hợp lệ', [
-      { field, message: 'Ngày không hợp lệ' },
-    ]);
-  }
-  return d;
 }

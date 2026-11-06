@@ -33,7 +33,7 @@ docs/           Tài liệu thiết kế, ERD, ADR
 | `pnpm --filter @kiot/api test`                              | Chạy test của một gói                                                                                                             |
 | `pnpm --filter @kiot/api test:e2e`                          | Test e2e của API (không cần CSDL thật)                                                                                            |
 | `pnpm --filter @kiot/api db:seed`                           | Dữ liệu khởi tạo đầy đủ (xem `docs/db/README.md`); chạy lại an toàn                                                               |
-| `pnpm --filter @kiot/api db:seed:demo`                      | Dữ liệu MẪU để dev (60 hàng, 3 combo, tồn 2 chi nhánh); chỉ dev, từ chối ở production                                    |
+| `pnpm --filter @kiot/api db:seed:demo`                      | Dữ liệu MẪU để dev (60 hàng, 3 combo, tồn 2 chi nhánh, 8 nhà cung cấp kèm nợ đầu kỳ theo chi nhánh); chỉ dev, từ chối ở production                                    |
 | `pnpm --filter @kiot/api storage:init`                      | Tạo bucket ảnh + cho phép đọc công khai trên MinIO dev (chạy sau `pnpm db:up`); chạy lại an toàn                                  |
 | `pnpm --filter @kiot/api db:reconcile`                      | Đối soát sổ cái với số liệu cache (tồn, công nợ nội bộ, quỹ); thoát mã 1 nếu lệch. Chạy hằng ngày khi chạy song song với KiotViet |
 | `pnpm --filter @kiot/api storage:gc`                        | Liệt kê file ảnh mồ côi trên kho file (thêm `--apply` để xóa)                                                                     |
@@ -69,6 +69,7 @@ Mọi PR phải qua: `lint`, `typecheck`, `test`, `build`, và `openapi.json` + 
 
 ## Quy ước kỹ thuật dùng chung
 
+- **Mã tự cấp (`KH…`, `NCC…`) phải dùng `nextFreeDocumentCode`** (`db/code-sequence.ts`, bỏ qua mã đã bị chiếm), không dùng `nextDocumentCode` trần cho thực thể có thể nhập mã tay: một mã nhập tay trùng đúng số kế tiếp sẽ làm mọi lần tự cấp sau đó lỗi trùng mãi. Sau khi chuyển dữ liệu từ KiotViet vẫn nâng bộ đếm lên số lớn nhất + 1.
 - **Nhật ký thao tác:** luôn qua `AuditService.record(tx, {...})` (`modules/audit/`), trong CÙNG transaction với thay đổi. `requestId`, người dùng, chi nhánh, IP tự lấy từ ngữ cảnh yêu cầu (`common/request-context.ts`). Không tự `insert` vào `audit_logs`; không ghi mật khẩu/token/băm vào nhật ký.
 - **Ghi nhiều dòng cùng lúc (tồn, nhập Excel…):** xử lý theo **thứ tự khóa cố định** (vd chi nhánh → sản phẩm) rồi mới ghi, để hai người ghi cùng lúc không bế tắc (deadlock → lỗi 500). PGlite (test) chỉ có một kết nối nên KHÔNG tái hiện bế tắc: phần nào khóa nhiều dòng phải thử trên PostgreSQL thật nhiều kết nối.
 - **Tham số đường dẫn là UUID:** luôn `@Param('id', ParseIdPipe)` (`common/parse-id.pipe.ts`), không dùng `ParseUUIDPipe` của Nest (trả `BAD_REQUEST`, sai hợp đồng lỗi).

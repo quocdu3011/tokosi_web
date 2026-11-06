@@ -114,12 +114,6 @@ enum stock_ref_type {
   "transfer_cancel"
 }
 
-enum supplier_kind {
-  "goods"
-  "driver"
-  "other"
-}
-
 enum transfer_status {
   "in_transit"
   "received"
@@ -860,17 +854,23 @@ Table stocks {
 CHECK stocks_on_hand_nonneg: onHand >= 0'''
 }
 
+Table supplier_branch_history {
+  supplier_id uuid [not null]
+  branch_id uuid [not null]
+  purchase_total numeric(18,0) [not null, default: 0]
+  purchase_net numeric(18,0) [not null, default: 0]
+
+  indexes {
+    (supplier_id, branch_id) [pk]
+  }
+}
+
 Table suppliers {
   id uuid [pk, default: `gen_random_uuid()`]
   code text [not null, unique]
   name text [not null]
-  kind supplier_kind [not null, default: 'goods']
   group_name text
-  phone text
-  address text
-  tax_code text
   linked_branch_id uuid [unique, note: 'Nhà cung cấp hệ thống đại diện một chi nhánh (chuyển kho nội bộ)']
-  note text
   is_active boolean [not null, default: true]
   created_by uuid
   created_at timestamptz [not null, default: `now()`]
@@ -878,8 +878,8 @@ Table suppliers {
   deleted_at timestamptz
 
   indexes {
-    (`f_search_text(code || ' ' || name || ' ' || coalesce(phone, '')) gin_trgm_ops`) [name: 'suppliers_search_trgm']
-    (kind) [name: 'suppliers_kind_idx']
+    (`f_search_text(code || ' ' || name || ' ' || coalesce(groupName, '')) gin_trgm_ops`) [name: 'suppliers_search_trgm']
+    (`lower(code)`) [name: 'suppliers_code_lower_unique', unique]
   }
 
   Note: '''Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng khác; group_name là nhóm NCC (chuỗi tự do, có thể để trống).'''
@@ -1025,6 +1025,8 @@ Ref: stock_transfers.created_by > users.id
 Ref: stock_transfers.received_by > users.id
 Ref: stocks.branch_id > branches.id
 Ref: stocks.product_id > products.id
+Ref: supplier_branch_history.supplier_id > suppliers.id [delete: cascade]
+Ref: supplier_branch_history.branch_id > branches.id
 Ref: suppliers.linked_branch_id > branches.id
 Ref: suppliers.created_by > users.id
 Ref: system_settings.updated_by > users.id [delete: set null]
@@ -1094,4 +1096,8 @@ TableGroup "Sổ quỹ & công nợ" {
   cash_transactions
   debt_ledger
   payment_allocations
+}
+
+TableGroup "Khác" {
+  supplier_branch_history
 }

@@ -649,3 +649,16 @@ CREATE TYPE "public"."liquidation_status" AS ENUM('normal', 'clearance', 'disabl
 CREATE TYPE "public"."import_mode" AS ENUM('overwrite', 'add');ALTER TABLE "import_jobs" ADD COLUMN "mode" "import_mode" DEFAULT 'overwrite' NOT NULL;
 -- ===== 0022_chan_nap_lai_file_nhap.sql =====
 ALTER TABLE "import_jobs" ADD COLUMN "branch_id" uuid;ALTER TABLE "import_jobs" ADD COLUMN "file_hash" text;ALTER TABLE "import_jobs" ADD CONSTRAINT "import_jobs_branch_id_branches_id_fk" FOREIGN KEY ("branch_id") REFERENCES "public"."branches"("id") ON DELETE no action ON UPDATE no action;CREATE UNIQUE INDEX "import_jobs_add_file_unique" ON "import_jobs" USING btree ("branch_id","file_hash") WHERE "import_jobs"."mode" = 'add' and "import_jobs"."dry_run" = false and "import_jobs"."status" = 'completed' and "import_jobs"."file_hash" is not null;
+-- ===== 0023_nha_cung_cap_gon.sql =====
+DROP INDEX "suppliers_kind_idx";DROP INDEX "suppliers_search_trgm";CREATE INDEX "suppliers_search_trgm" ON "suppliers" USING gin (f_search_text("code" || ' ' || "name" || ' ' || coalesce("group_name", '')) gin_trgm_ops);ALTER TABLE "suppliers" DROP COLUMN "kind";ALTER TABLE "suppliers" DROP COLUMN "phone";ALTER TABLE "suppliers" DROP COLUMN "address";ALTER TABLE "suppliers" DROP COLUMN "tax_code";ALTER TABLE "suppliers" DROP COLUMN "note";DROP TYPE "public"."supplier_kind";
+CREATE TABLE "supplier_branch_history" (
+	"supplier_id" uuid NOT NULL,
+	"branch_id" uuid NOT NULL,
+	"purchase_total" numeric(18, 0) DEFAULT '0' NOT NULL,
+	"purchase_net" numeric(18, 0) DEFAULT '0' NOT NULL,
+	CONSTRAINT "supplier_branch_history_supplier_id_branch_id_pk" PRIMARY KEY("supplier_id","branch_id")
+);
+ALTER TABLE "supplier_branch_history" ADD CONSTRAINT "supplier_branch_history_supplier_id_suppliers_id_fk" FOREIGN KEY ("supplier_id") REFERENCES "public"."suppliers"("id") ON DELETE cascade ON UPDATE no action;ALTER TABLE "supplier_branch_history" ADD CONSTRAINT "supplier_branch_history_branch_id_branches_id_fk" FOREIGN KEY ("branch_id") REFERENCES "public"."branches"("id") ON DELETE no action ON UPDATE no action;
+
+-- ===== 0024_ncc_ma_khong_phan_biet_hoa_thuong.sql =====
+CREATE UNIQUE INDEX "suppliers_code_lower_unique" ON "suppliers" USING btree (lower("code"));

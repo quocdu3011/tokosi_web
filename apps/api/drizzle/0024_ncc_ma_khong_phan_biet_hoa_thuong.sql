@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "suppliers_code_lower_unique" ON "suppliers" USING btree (lower("code"));

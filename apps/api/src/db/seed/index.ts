@@ -122,7 +122,6 @@ export async function runSeed(
           .values({
             code: `CN-${b.code}`,
             name,
-            kind: 'other',
             linkedBranchId: b.id,
           })
           .onConflictDoNothing()

@@ -433,6 +433,342 @@
         ]
       }
     },
+    "/api/v1/suppliers": {
+      "get": {
+        "description": "Không gồm nhà cung cấp hệ thống đại diện chi nhánh. Mọi số tiền (nợ, tổng mua) tính RIÊNG cho chi nhánh làm việc (header X-Branch-Id), không dùng chung; nợ chỉ có khi người gọi có quyền debt.view.",
+        "operationId": "SuppliersController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Tên cột cần sắp xếp; thêm `-` phía trước để giảm dần. Chỉ nhận các cột endpoint cho phép",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Tìm không dấu theo mã, tên, nhóm",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupName",
+            "required": false,
+            "in": "query",
+            "description": "Đúng tên nhóm (không phân biệt hoa thường, dấu)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasDebt",
+            "required": false,
+            "in": "query",
+            "description": "true = đang nợ (nợ > 0 TẠI chi nhánh làm việc), false = không nợ. Cần quyền debt.view",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "description": "xlsx = tải Excel theo đúng bộ lọc (bỏ qua page/limit, tối đa 10.000 dòng)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "xlsx"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierListDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách nhà cung cấp (lọc, tìm không dấu, phân trang)",
+        "tags": [
+          "Nhà cung cấp"
+        ]
+      },
+      "post": {
+        "description": "Bỏ trống `code` thì hệ thống tự cấp (NCC000056…).",
+        "operationId": "SuppliersController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSupplierDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "DUPLICATE_CODE: mã đã tồn tại"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tạo nhà cung cấp",
+        "tags": [
+          "Nhà cung cấp"
+        ]
+      }
+    },
+    "/api/v1/suppliers/{id}": {
+      "get": {
+        "operationId": "SuppliersController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy nhà cung cấp"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Chi tiết nhà cung cấp (số tiền theo chi nhánh làm việc)",
+        "tags": [
+          "Nhà cung cấp"
+        ]
+      },
+      "patch": {
+        "description": "Mã không đổi được. Nhà cung cấp hệ thống (chi nhánh) không sửa được.",
+        "operationId": "SuppliersController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSupplierDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy nhà cung cấp"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sửa tên, nhóm; ngưng hoặc mở lại giao dịch (isActive)",
+        "tags": [
+          "Nhà cung cấp"
+        ]
+      }
+    },
+    "/api/v1/suppliers/{id}/branches": {
+      "get": {
+        "description": "Mỗi chi nhánh một dòng; số tiền KHÔNG cộng gộp giữa các chi nhánh. Nợ vắng mặt nếu thiếu debt.view.",
+        "operationId": "SuppliersController_branches",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SupplierBranchDto"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy nhà cung cấp"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Số tiền của nhà cung cấp tại từng chi nhánh người dùng được phép",
+        "tags": [
+          "Nhà cung cấp"
+        ]
+      }
+    },
+    "/api/v1/suppliers/{id}/ledger": {
+      "get": {
+        "description": "Số dư đầu kỳ (trước `from`), các dòng sổ cái trong khoảng ngày kèm số dư cộng dồn, số dư cuối kỳ. Mỗi chi nhánh một sổ riêng. Cần cả purchase.view và debt.view. `amount` dương = tăng nợ, âm = giảm nợ.",
+        "operationId": "SuppliersController_ledger",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Từ ngày (giờ Việt Nam, tính cả ngày này); bỏ trống = từ đầu. Dạng YYYY-MM-DD",
+            "schema": {
+              "example": "2026-11-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Đến ngày (giờ Việt Nam, tính cả ngày này); bỏ trống = đến hiện tại",
+            "schema": {
+              "example": "2026-11-30",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LedgerDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy nhà cung cấp"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sổ công nợ nhà cung cấp tại chi nhánh làm việc",
+        "tags": [
+          "Nhà cung cấp"
+        ]
+      }
+    },
     "/api/v1/users": {
       "get": {
         "operationId": "UsersController_list",
@@ -2263,6 +2599,269 @@
           "currentPassword",
           "newPassword"
         ]
+      },
+      "SupplierDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "NCC000002"
+          },
+          "name": {
+            "type": "string"
+          },
+          "groupName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nhóm nhà cung cấp: chuỗi tự do, có thể null; chỉ để phân loại/lọc, không có nghiệp vụ riêng (kể cả \"Lái xe\")"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Họ tên người tạo"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Chi nhánh mà ba số tiền bên dưới tính cho (= chi nhánh làm việc, header X-Branch-Id). Tiền KHÔNG dùng chung giữa các chi nhánh"
+          },
+          "totalPurchase": {
+            "type": "string",
+            "example": "1250000000",
+            "description": "Tổng mua TẠI chi nhánh này = số lịch sử của chi nhánh (chuyển từ KiotViet) + tổng phiếu nhập hoàn tất"
+          },
+          "netPurchase": {
+            "type": "string",
+            "example": "1200000000",
+            "description": "Tổng mua trừ trả hàng TẠI chi nhánh này = số lịch sử + phiếu nhập − phiếu trả hàng nhập"
+          },
+          "balance": {
+            "type": "string",
+            "example": "240000000",
+            "description": "Nợ cần trả hiện tại TẠI chi nhánh này (+ = còn nợ, có thể âm). VẮNG MẶT nếu thiếu quyền debt.view"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "groupName",
+          "isActive",
+          "createdByName",
+          "createdAt",
+          "branchId",
+          "totalPurchase",
+          "netPurchase"
+        ]
+      },
+      "SupplierListMetaDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "totalPages": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages"
+        ]
+      },
+      "SupplierListDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupplierDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/SupplierListMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "SupplierBranchDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string"
+          },
+          "branchCode": {
+            "type": "string",
+            "example": "SG"
+          },
+          "branchName": {
+            "type": "string"
+          },
+          "totalPurchase": {
+            "type": "string"
+          },
+          "netPurchase": {
+            "type": "string"
+          },
+          "balance": {
+            "type": "string",
+            "description": "Vắng mặt nếu thiếu debt.view"
+          }
+        },
+        "required": [
+          "branchId",
+          "branchCode",
+          "branchName",
+          "totalPurchase",
+          "netPurchase"
+        ]
+      },
+      "LedgerEntryDto": {
+        "type": "object",
+        "properties": {
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "entryType": {
+            "type": "string",
+            "enum": [
+              "opening",
+              "invoice",
+              "payment",
+              "return",
+              "adjustment",
+              "transfer"
+            ]
+          },
+          "refType": {
+            "type": "string",
+            "nullable": true,
+            "example": "goods_receipt"
+          },
+          "refId": {
+            "type": "string",
+            "nullable": true
+          },
+          "refCode": {
+            "type": "string",
+            "nullable": true,
+            "example": "PN000948"
+          },
+          "amount": {
+            "type": "string",
+            "example": "33735000",
+            "description": "Dương = tăng nợ (mình nợ thêm), âm = giảm nợ"
+          },
+          "balance": {
+            "type": "string",
+            "example": "33735000",
+            "description": "Số dư sau dòng này (cộng dồn từ số dư đầu kỳ)"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "occurredAt",
+          "entryType",
+          "refType",
+          "refId",
+          "refCode",
+          "amount",
+          "balance",
+          "note"
+        ]
+      },
+      "LedgerDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "description": "Chi nhánh của sổ (= chi nhánh làm việc); mỗi chi nhánh một sổ riêng"
+          },
+          "openingBalance": {
+            "type": "string",
+            "example": "0",
+            "description": "Số dư trước ngày `from` (0 nếu không có `from`)"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LedgerEntryDto"
+            }
+          },
+          "closingBalance": {
+            "type": "string",
+            "example": "21345000"
+          }
+        },
+        "required": [
+          "branchId",
+          "openingBalance",
+          "entries",
+          "closingBalance"
+        ]
+      },
+      "CreateSupplierDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "NCC000056",
+            "description": "Bỏ trống = hệ thống tự cấp. Chữ, số, \"-\", \"_\", \".\"; 1–30 ký tự; không trùng (kể cả khác hoa thường)"
+          },
+          "name": {
+            "type": "string",
+            "example": "Công ty TNHH ABC"
+          },
+          "groupName": {
+            "type": "string",
+            "nullable": true,
+            "example": "Lái xe"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateSupplierDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "groupName": {
+            "type": "string",
+            "nullable": true,
+            "description": "null hoặc rỗng = bỏ nhóm"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "false = ngưng giao dịch"
+          }
+        }
       },
       "UserDto": {
         "type": "object",
