@@ -3,13 +3,12 @@
 import { Plus } from 'lucide-react';
 import { LIQUIDATION_STATUSES, LIQUIDATION_STATUS_LABELS } from '@kiot/shared';
 import { useMemo, useState } from 'react';
-import { toast } from 'sonner';
 
-import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { PageHeader } from '@/components/common/coming-soon';
 import { DataTable, type AppColumnDef, type SortState } from '@/components/data-table/data-table';
 import { Pagination } from '@/components/data-table/pagination';
 import {
+  ColumnPicker,
   ExportMenu,
   ImportButton,
   TableSearch,
@@ -25,11 +24,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useColumnVisibility } from '@/hooks/use-column-visibility';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { errorMessage } from '@/lib/api';
 import type { Product } from '@/lib/api/types';
 import { useAuthStore } from '@/lib/auth/store';
-import { formatDecimal, formatMoney } from '@/lib/format';
+import { formatDateTime, formatDecimal, formatMoney } from '@/lib/format';
 import { can } from '@/lib/permissions';
 import {
   downloadProductsXlsx,
@@ -37,7 +37,6 @@ import {
   flattenCategories,
   useCategories,
   useProductList,
-  useUpdateProduct,
   type ProductFilterParams,
 } from '@/lib/queries/products';
 import { buildHtmlDocument, exportFilename, saveBlob, type ExportColumn } from '@/lib/table-export';
@@ -56,6 +55,8 @@ const PAGE_SORT: Record<string, (p: Product) => SortValue> = {
   costPrice: (p) => decimalSortValue(p.costPrice),
   reserved: (p) => decimalSortValue(p.reserved),
   available: (p) => decimalSortValue(p.available),
+  onOrder: (p) => decimalSortValue(p.onOrder),
+  lastPurchasePrice: (p) => decimalSortValue(p.lastPurchasePrice),
   status: (p) => (p.isActive ? 0 : 1),
 };
 const SORTABLE_IDS: readonly string[] = [...SERVER_SORT_IDS, ...Object.keys(PAGE_SORT)];
@@ -72,7 +73,35 @@ const DEFAULT_WIDTHS = {
   reserved: 110,
   available: 120,
   status: 210,
-  actions: 170,
+  productType: 120,
+  liquidation: 140,
+  lastPurchasePrice: 150,
+  onOrder: 120,
+  createdAt: 170,
+  description: 280,
+};
+/** Cột phụ: mặc định ẩn, bật ở nút "Cột" (dữ liệu API đã trả sẵn). */
+const DEFAULT_HIDDEN: readonly string[] = [
+  'productType',
+  'liquidation',
+  'lastPurchasePrice',
+  'onOrder',
+  'createdAt',
+  'description',
+];
+/** Tên cột hiển thị trong hộp "Cột". */
+const PICKER_LABELS: Record<string, string> = {
+  costPrice: 'Giá vốn',
+  onHand: 'Tồn kho',
+  reserved: 'Khách đặt',
+  available: 'Có thể bán',
+  status: 'Trạng thái',
+  productType: 'Loại hàng',
+  liquidation: 'Thanh lý',
+  lastPurchasePrice: 'Giá nhập cuối',
+  onOrder: 'Đang đặt NCC',
+  createdAt: 'Thời gian tạo',
+  description: 'Mô tả',
 };
 const COLUMN_LABELS: Record<string, string> = {
   code: 'mã hàng',
@@ -82,7 +111,12 @@ const COLUMN_LABELS: Record<string, string> = {
   reserved: 'khách đặt',
   available: 'có thể bán',
   status: 'trạng thái',
-  actions: 'thao tác',
+  productType: 'loại hàng',
+  liquidation: 'thanh lý',
+  lastPurchasePrice: 'giá nhập cuối',
+  onOrder: 'đang đặt NCC',
+  createdAt: 'thời gian tạo',
+  description: 'mô tả',
 };
 
 /** Danh sách hàng hóa theo chi nhánh làm việc (tồn kho, giá vốn riêng từng chi nhánh). */
@@ -92,9 +126,8 @@ export function ProductsScreen() {
   const canImport = can(me, 'import.run');
   const canEdit = can(me, 'product.edit');
   const [drawer, setDrawer] = useState<DrawerTarget | null>(null);
-  const [toToggle, setToToggle] = useState<Product | null>(null);
-  const updateProduct = useUpdateProduct();
   const [importOpen, setImportOpen] = useState(false);
+  const { hidden, setVisible, reset } = useColumnVisibility('cols:products', DEFAULT_HIDDEN);
 
   const [q, setQ] = useState('');
   const [categoryId, setCategoryId] = useState<string>(ALL);
@@ -168,6 +201,17 @@ export function ProductsScreen() {
           </span>
         ),
       });
+      cols.push({
+        id: 'lastPurchasePrice',
+        header: () => <span className="num">Giá nhập cuối</span>,
+        cell: ({ row }) => (
+          <span className="num">
+            {row.original.lastPurchasePrice === undefined
+              ? ''
+              : formatMoney(row.original.lastPurchasePrice)}
+          </span>
+        ),
+      });
     }
     cols.push(
       {
@@ -190,6 +234,43 @@ export function ProductsScreen() {
         ),
       },
       {
+        id: 'productType',
+        header: 'Loại hàng',
+        cell: ({ row }) =>
+          row.original.productType === 'combo' ? (
+            <Badge variant="info">Combo</Badge>
+          ) : (
+            <span>Hàng hóa</span>
+          ),
+      },
+      {
+        id: 'liquidation',
+        header: 'Thanh lý',
+        cell: ({ row }) =>
+          LIQUIDATION_STATUS_LABELS[
+            row.original.liquidationStatus as keyof typeof LIQUIDATION_STATUS_LABELS
+          ] ?? '',
+      },
+      {
+        id: 'onOrder',
+        header: () => <span className="num">Đang đặt NCC</span>,
+        cell: ({ row }) => (
+          <span className="num">{formatDecimal(row.original.onOrder) || '0'}</span>
+        ),
+      },
+      {
+        id: 'createdAt',
+        header: 'Thời gian tạo',
+        cell: ({ row }) => (
+          <span className="tabular">{formatDateTime(row.original.createdAt)}</span>
+        ),
+      },
+      {
+        id: 'description',
+        header: 'Mô tả',
+        cell: ({ row }) => <span className="cell-sub">{row.original.description ?? ''}</span>,
+      },
+      {
         id: 'status',
         header: 'Trạng thái',
         cell: ({ row }) => (
@@ -203,21 +284,18 @@ export function ProductsScreen() {
         ),
       },
     );
-    if (canEdit) {
-      cols.push({
-        id: 'actions',
-        header: () => <span className="sr-only">Thao tác</span>,
-        cell: ({ row }) => (
-          <div className="cell-actions">
-            <Button variant="ghost" size="sm" onClick={() => setToToggle(row.original)}>
-              {row.original.isActive ? 'Ngừng kinh doanh' : 'Kích hoạt lại'}
-            </Button>
-          </div>
-        ),
-      });
-    }
     return cols;
-  }, [canSeeCost, canEdit]);
+  }, [canSeeCost]);
+
+  /** Cột cho phép ẩn/hiện, theo thứ tự trên bảng (Mã hàng, Tên hàng và Thao tác luôn hiện). */
+  const columnOptions = useMemo(
+    () =>
+      columns
+        .map((c) => c.id ?? '')
+        .filter((id) => id !== 'code' && id !== 'name' && id !== 'actions')
+        .map((id) => ({ id, label: PICKER_LABELS[id] ?? id })),
+    [columns],
+  );
 
   const resetFilters = (fn: () => void) => {
     fn();
@@ -355,32 +433,18 @@ export function ProductsScreen() {
               {data.meta.total.toLocaleString('vi-VN')} kết quả
             </span>
           )}
+          <ColumnPicker
+            options={columnOptions}
+            hidden={hidden}
+            onToggle={setVisible}
+            onReset={reset}
+          />
           {canImport && <ImportButton onClick={() => setImportOpen(true)} />}
           <ExportMenu onExport={handleExport} disabled={!data || data.meta.total === 0} />
         </div>
       </div>
       {importOpen && <ImportDialog type="products" onClose={() => setImportOpen(false)} />}
       {drawer && <ProductDrawer target={drawer} onClose={() => setDrawer(null)} />}
-      {toToggle && (
-        <ConfirmDialog
-          title={toToggle.isActive ? 'Ngừng kinh doanh hàng này?' : 'Kích hoạt lại hàng này?'}
-          description={
-            toToggle.isActive
-              ? `${toToggle.code} · ${toToggle.name} sẽ không còn được chọn khi lập đơn. Dữ liệu và lịch sử giữ nguyên, có thể kích hoạt lại bất cứ lúc nào.`
-              : `${toToggle.code} · ${toToggle.name} sẽ được kinh doanh trở lại.`
-          }
-          confirmLabel={toToggle.isActive ? 'Ngừng kinh doanh' : 'Kích hoạt lại'}
-          destructive={toToggle.isActive}
-          onConfirm={async () => {
-            await updateProduct.mutateAsync({
-              id: toToggle.id,
-              patch: { isActive: !toToggle.isActive },
-            });
-            toast.success(toToggle.isActive ? 'Đã ngừng kinh doanh' : 'Đã kích hoạt lại');
-          }}
-          onClose={() => setToToggle(null)}
-        />
-      )}
 
       {isError ? (
         <p className="alert alert-error" role="alert">
@@ -400,6 +464,8 @@ export function ProductsScreen() {
             sortHints={SORT_HINTS}
             resizable={{ storageKey: 'table:products', defaultWidths: DEFAULT_WIDTHS }}
             columnLabels={COLUMN_LABELS}
+            onRowClick={(p) => setDrawer({ kind: 'view', id: p.id })}
+            hiddenColumns={hidden}
           />
           <Pagination meta={data?.meta} onPageChange={setPage} />
         </>

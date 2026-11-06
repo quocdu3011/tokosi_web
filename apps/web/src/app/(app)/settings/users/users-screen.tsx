@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { PageHeader } from '@/components/common/coming-soon';
 import { PENDING_LABEL, RoleBadge } from '@/components/common/role-badge';
 import { DataTable, type AppColumnDef } from '@/components/data-table/data-table';
+import { ColumnPicker } from '@/components/data-table/table-toolbar';
 import { Pagination } from '@/components/data-table/pagination';
 import {
   AlertDialog,
@@ -29,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useColumnVisibility } from '@/hooks/use-column-visibility';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { errorMessage } from '@/lib/api';
 import type { RoleCode, User } from '@/lib/api/types';
@@ -41,6 +43,18 @@ import { UserFormDialog } from './user-form-dialog';
 
 const ALL = 'all';
 const PAGE_SIZE = 20;
+
+/** Cột ẩn/hiện được ở nút "Cột"; `createdAt` ẩn mặc định. */
+const COLUMN_OPTIONS = [
+  { id: 'code', label: 'Mã' },
+  { id: 'role', label: 'Vai trò' },
+  { id: 'phone', label: 'Số điện thoại' },
+  { id: 'branches', label: 'Chi nhánh' },
+  { id: 'status', label: 'Trạng thái' },
+  { id: 'lastLogin', label: 'Đăng nhập gần nhất' },
+  { id: 'createdAt', label: 'Ngày tạo' },
+];
+const DEFAULT_HIDDEN: readonly string[] = ['createdAt'];
 
 export function UsersScreen() {
   const me = useAuthStore((s) => s.user);
@@ -67,6 +81,7 @@ export function UsersScreen() {
     null,
   );
   const resetPassword = useResetPassword();
+  const { hidden, setVisible, reset } = useColumnVisibility('cols:users', DEFAULT_HIDDEN);
 
   const columns = useMemo<AppColumnDef<User>[]>(
     () => [
@@ -127,6 +142,13 @@ export function UsersScreen() {
           <span className="tabular">
             {formatDateTime(row.original.lastLoginAt) || 'Chưa đăng nhập'}
           </span>
+        ),
+      },
+      {
+        id: 'createdAt',
+        header: 'Ngày tạo',
+        cell: ({ row }) => (
+          <span className="tabular">{formatDateTime(row.original.createdAt)}</span>
         ),
       },
       {
@@ -213,6 +235,14 @@ export function UsersScreen() {
             <SelectItem value="locked">Đã khóa</SelectItem>
           </SelectContent>
         </Select>
+        <div className="toolbar-end">
+          <ColumnPicker
+            options={COLUMN_OPTIONS}
+            hidden={hidden}
+            onToggle={setVisible}
+            onReset={reset}
+          />
+        </div>
       </div>
 
       {isError ? (
@@ -227,6 +257,7 @@ export function UsersScreen() {
             isLoading={isLoading}
             emptyText="Không có người dùng phù hợp"
             getRowId={(u) => u.id}
+            hiddenColumns={hidden}
           />
           <Pagination meta={data?.meta} onPageChange={setPage} />
         </>

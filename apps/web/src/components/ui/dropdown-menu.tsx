@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { Check } from 'lucide-react';
 import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui';
 
 import { cn } from '@/lib/utils';
@@ -47,6 +48,27 @@ function DropdownMenuItem({
   );
 }
 
+function DropdownMenuCheckboxItem({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.CheckboxItem>) {
+  return (
+    <DropdownMenuPrimitive.CheckboxItem
+      data-slot="dropdown-menu-checkbox-item"
+      className={cn('menu-item menu-checkbox-item', className)}
+      {...props}
+    >
+      <span className="menu-checkbox-box" aria-hidden="true">
+        <DropdownMenuPrimitive.ItemIndicator>
+          <Check />
+        </DropdownMenuPrimitive.ItemIndicator>
+      </span>
+      {children}
+    </DropdownMenuPrimitive.CheckboxItem>
+  );
+}
+
 function DropdownMenuLabel({
   className,
   ...props
@@ -66,6 +88,7 @@ export {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuCheckboxItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
 };

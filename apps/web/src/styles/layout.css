@@ -24,6 +24,24 @@
   .sidebar {
     display: flex;
   }
+  .sidebar[data-collapsed='true'] {
+    width: 56px;
+  }
+}
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--header-h);
+  padding: 0 8px;
+  flex-shrink: 0;
+}
+.sidebar-header .brand {
+  min-width: 0;
+  padding: 0;
+}
+.sidebar-header .desktop-menu-btn {
+  flex-shrink: 0;
 }
 .sidebar-drawer {
   display: flex;
@@ -100,9 +118,15 @@
 .menu-btn {
   display: inline-flex;
 }
+.desktop-menu-btn {
+  display: none;
+}
 @media (min-width: 1024px) {
   .menu-btn {
     display: none;
+  }
+  .desktop-menu-btn {
+    display: inline-flex;
   }
 }
 

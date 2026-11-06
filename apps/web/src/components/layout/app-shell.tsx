@@ -30,12 +30,30 @@ export function Brand() {
 /** Khung trang quản trị: thanh bên (máy tính) / ngăn kéo (điện thoại) + thanh trên. */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <Brand />
-        <SidebarNav />
+      <aside id="desktop-sidebar" className="sidebar" data-collapsed={!sidebarOpen}>
+        <div className="sidebar-header">
+          <Button
+            id="toggle-desktop-menu"
+            variant="ghost"
+            size="icon"
+            className="desktop-menu-btn"
+            aria-label={sidebarOpen ? 'Thu gọn menu' : 'Mở menu'}
+            aria-expanded={sidebarOpen}
+            aria-controls="desktop-sidebar-content"
+            title={sidebarOpen ? 'Thu gọn menu' : 'Mở menu'}
+            onClick={() => setSidebarOpen((open) => !open)}
+          >
+            <Menu />
+          </Button>
+          {sidebarOpen && <Brand />}
+        </div>
+        <div id="desktop-sidebar-content" hidden={!sidebarOpen}>
+          <SidebarNav />
+        </div>
       </aside>
 
       <div className="app-main">

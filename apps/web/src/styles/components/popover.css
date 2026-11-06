@@ -100,3 +100,39 @@
     opacity: 0;
   }
 }
+
+/* ---------- Ẩn hiện cột của bảng (giống "Ẩn hiện cột" KiotViet) ---------- */
+.menu-checkbox-box {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+}
+.menu-checkbox-item[data-state="checked"] .menu-checkbox-box {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.menu-checkbox-box svg {
+  width: 13px;
+  height: 13px;
+  color: #fff;
+}
+.column-picker {
+  min-width: 300px;
+  max-height: min(70vh, var(--radix-dropdown-menu-content-available-height));
+  overflow-y: auto;
+}
+.column-picker-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px var(--space-sm);
+}
+@media (max-width: 480px) {
+  .column-picker-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -2,7 +2,7 @@
 
 import { tableFeatures, useTable, type ColumnDef, type RowData } from '@tanstack/react-table';
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
-import { useCallback, useRef, type KeyboardEvent, type PointerEvent } from 'react';
+import { useCallback, useMemo, useRef, type KeyboardEvent, type PointerEvent } from 'react';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -43,7 +43,7 @@ const FALLBACK_WIDTH = 160;
 const NO_WIDTHS: ColumnWidths = {};
 
 export function DataTable<TData extends RowData>({
-  columns,
+  columns: allColumns,
   data,
   isLoading,
   emptyText = 'Không có dữ liệu',
@@ -55,6 +55,8 @@ export function DataTable<TData extends RowData>({
   columnLabels,
   sortHints,
   cellClassNames,
+  onRowClick,
+  hiddenColumns,
 }: {
   columns: AppColumnDef<TData>[];
   data: TData[];
@@ -71,7 +73,16 @@ export function DataTable<TData extends RowData>({
   sortHints?: Record<string, string>;
   /** Lớp CSS thêm cho ô dữ liệu (`td`) theo id cột, vd. `cell-edit` cho ô nhập liệu. */
   cellClassNames?: Record<string, string>;
+  /** Bấm vào chỗ trống bất kỳ của dòng (không phải nút/liên kết) để mở chi tiết. */
+  onRowClick?: (row: TData) => void;
+  /** Id các cột đang ẩn (xem `useColumnVisibility` + `ColumnPicker`). */
+  hiddenColumns?: ReadonlySet<string>;
 }) {
+  const columns = useMemo(
+    () =>
+      hiddenColumns?.size ? allColumns.filter((c) => !hiddenColumns.has(c.id ?? '')) : allColumns,
+    [allColumns, hiddenColumns],
+  );
   const table = useTable({ features, columns, data, getRowId });
   const { widths, setWidth, resetWidth } = useColumnWidths(
     resizable?.storageKey ?? 'table:unused',
@@ -170,7 +181,24 @@ export function DataTable<TData extends RowData>({
             </TableRow>
           ) : (
             table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
+              <TableRow
+                key={row.id}
+                className={onRowClick ? 'row-clickable' : undefined}
+                onClick={
+                  onRowClick
+                    ? (e) => {
+                        // Bấm vào nút/liên kết/ô nhập trong dòng thì để chính phần tử đó xử lý.
+                        if (
+                          (e.target as HTMLElement).closest(
+                            'button, a, input, select, textarea, label',
+                          )
+                        )
+                          return;
+                        onRowClick(row.original);
+                      }
+                    : undefined
+                }
+              >
                 {row.getAllCells().map((cell) => (
                   <TableCell key={cell.id} className={cellClassNames?.[cell.column.id]}>
                     <table.FlexRender cell={cell} />

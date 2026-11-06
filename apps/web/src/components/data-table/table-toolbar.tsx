@@ -1,14 +1,25 @@
 'use client';
 
-import { Download, FileSpreadsheet, FileText, Search, Upload, X } from 'lucide-react';
+import {
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Search,
+  SlidersHorizontal,
+  Upload,
+  X,
+} from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
@@ -116,6 +127,57 @@ export function ExportMenu({
         <DropdownMenuItem onSelect={() => void run('html')}>
           <FileText aria-hidden="true" />
           Trang HTML (.html)
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+export interface ColumnOption {
+  id: string;
+  label: string;
+}
+
+/**
+ * Nút "Cột" ẩn/hiện cột của bảng (giống "Ẩn hiện cột" của KiotViet): hộp tích chọn từng cột.
+ * Menu giữ mở sau mỗi lần tích để bật/tắt nhiều cột liền nhau; "Mặc định" khôi phục lựa chọn ban đầu.
+ */
+export function ColumnPicker({
+  options,
+  hidden,
+  onToggle,
+  onReset,
+}: {
+  options: readonly ColumnOption[];
+  hidden: ReadonlySet<string>;
+  onToggle: (id: string, visible: boolean) => void;
+  onReset: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" aria-label="Ẩn hiện cột" title="Ẩn hiện cột">
+          <SlidersHorizontal aria-hidden="true" />
+          Cột
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="column-picker">
+        <DropdownMenuLabel>Hiển thị cột</DropdownMenuLabel>
+        <div className="column-picker-grid">
+          {options.map((o) => (
+            <DropdownMenuCheckboxItem
+              key={o.id}
+              checked={!hidden.has(o.id)}
+              onCheckedChange={(v) => onToggle(o.id, v === true)}
+              onSelect={(e) => e.preventDefault()}
+            >
+              {o.label}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={(e) => (e.preventDefault(), onReset())}>
+          Mặc định
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
