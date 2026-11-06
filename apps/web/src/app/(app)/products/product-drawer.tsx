@@ -17,12 +17,12 @@ import { can } from '@/lib/permissions';
 import { useCategories, useProduct, useUpdateProduct } from '@/lib/queries/products';
 
 import { ImageManager } from './image-manager';
-import { ProductBranchesTab } from './product-branches-tab';
+import { ProductStockSummary } from './product-stock-summary';
 import { ProductInfoForm } from './product-info-form';
 import { StockCardTab } from './stock-card-tab';
 
 export type DrawerTarget = { kind: 'create' } | { kind: 'view'; id: string; tab?: DrawerTab };
-export type DrawerTab = 'info' | 'images' | 'branches' | 'stock-card';
+export type DrawerTab = 'info' | 'images' | 'stock-card';
 
 /**
  * Ngăn kéo hàng hóa bên phải: tạo mới (chỉ tab Thông tin) hoặc xem/sửa một hàng (các tab).
@@ -100,12 +100,12 @@ export function ProductDrawer({ target, onClose }: { target: DrawerTarget; onClo
               <TabsList aria-label="Thông tin hàng hóa">
                 <TabsTrigger value="info">Thông tin</TabsTrigger>
                 <TabsTrigger value="images">Ảnh ({product.images.length})</TabsTrigger>
-                <TabsTrigger value="branches">Theo chi nhánh</TabsTrigger>
                 {product.productType === 'goods' && (
                   <TabsTrigger value="stock-card">Thẻ kho</TabsTrigger>
                 )}
               </TabsList>
               <TabsContent value="info">
+                <ProductStockSummary product={product} />
                 <ProductInfoForm
                   key={product.updatedAt}
                   product={product}
@@ -116,9 +116,6 @@ export function ProductDrawer({ target, onClose }: { target: DrawerTarget; onClo
               </TabsContent>
               <TabsContent value="images">
                 <ImageManager product={product} canEdit={canEditImages} />
-              </TabsContent>
-              <TabsContent value="branches">
-                <ProductBranchesTab product={product} />
               </TabsContent>
               {product.productType === 'goods' && (
                 <TabsContent value="stock-card">

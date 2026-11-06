@@ -1,7 +1,7 @@
 'use client';
 
-import { ArrowDown, ArrowUp, ImagePlus, Star, Trash2 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { ImagePlus, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
@@ -18,13 +18,15 @@ export function ImageManager({ product, canEdit }: { product: Product; canEdit: 
   const reorder = useReorderImages();
   const remove = useDeleteImage();
   const input = useRef<HTMLInputElement>(null);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropId, setDropId] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<ProductImage | null>(null);
   const busy = upload.isPending || reorder.isPending || remove.isPending;
 
-  const onPick = async (list: FileList | null) => {
+  const onPick = async (list: FileList | File[] | null) => {
     const files = Array.from(list ?? []);
     if (input.current) input.current.value = '';
-    if (files.length === 0) return;
+    if (!canEdit || busy || toDelete || files.length === 0) return;
     const problem = validateImageFiles(images.length, files);
     if (problem) {
       toast.error(problem);
@@ -38,9 +40,23 @@ export function ImageManager({ product, canEdit }: { product: Product; canEdit: 
     }
   };
 
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      const files = Array.from(event.clipboardData?.files ?? []).filter((file) =>
+        file.type.startsWith('image/'),
+      );
+      if (!canEdit || toDelete || files.length === 0) return;
+      event.preventDefault();
+      if (busy) return;
+      void onPick(files);
+    };
+    document.addEventListener('paste', onPaste);
+    return () => document.removeEventListener('paste', onPaste);
+  });
+
   /** Gửi ĐỦ id mọi ảnh theo thứ tự mới (API từ chối nếu thiếu/thừa). */
   const move = async (from: number, to: number) => {
-    if (to < 0 || to >= images.length) return;
+    if (!canEdit || busy || from < 0 || to < 0 || to >= images.length || from === to) return;
     const ids = images.map((i) => i.id);
     const [moved] = ids.splice(from, 1);
     ids.splice(to, 0, moved!);
@@ -79,57 +95,80 @@ export function ImageManager({ product, canEdit }: { product: Product; canEdit: 
         </span>
       </div>
 
+      {canEdit && (
+        <p className="field-hint">
+          Ctrl+V để dán ảnh · Kéo thả để sắp xếp · Ảnh đầu là ảnh đại diện
+        </p>
+      )}
+
       {images.length === 0 ? (
         <p className="muted">Hàng này chưa có ảnh.</p>
       ) : (
         <ul className="image-grid">
           {images.map((img, i) => (
-            <li key={img.id} className="image-card">
+            <li
+              key={img.id}
+              className={`image-card${dropId === img.id ? ' image-card-drop' : ''}`}
+              draggable={canEdit && !busy && !toDelete}
+              tabIndex={canEdit ? 0 : undefined}
+              aria-label={`Ảnh ${i + 1}${i === 0 ? ', ảnh đại diện' : ''}`}
+              title={canEdit ? 'Kéo thả hoặc dùng Alt và phím mũi tên để đổi thứ tự' : undefined}
+              onKeyDown={(event) => {
+                if (
+                  !event.altKey ||
+                  !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)
+                )
+                  return;
+                event.preventDefault();
+                void move(i, i + (['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 1));
+              }}
+              onDragStart={(event) => {
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', img.id);
+                setDraggedId(img.id);
+              }}
+              onDragOver={(event) => {
+                if (!draggedId || busy) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+                setDropId(img.id);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                if (draggedId)
+                  void move(
+                    images.findIndex((image) => image.id === draggedId),
+                    i,
+                  );
+                setDraggedId(null);
+                setDropId(null);
+              }}
+              onDragEnd={() => {
+                setDraggedId(null);
+                setDropId(null);
+              }}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element -- URL ảnh từ kho file/Excel, không qua tối ưu hóa của Next */}
-              <img src={img.url} alt={`${product.name} - ảnh ${i + 1}`} loading="lazy" />
+              <img
+                src={img.url}
+                alt={`${product.name} - ảnh ${i + 1}`}
+                loading="lazy"
+                draggable={false}
+              />
               {i === 0 && <span className="image-badge">Ảnh đại diện</span>}
               {canEdit && (
-                <div className="image-actions">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Chuyển lên trước"
-                    onClick={() => void move(i, i - 1)}
-                    disabled={busy || i === 0}
-                  >
-                    <ArrowUp aria-hidden="true" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Chuyển ra sau"
-                    onClick={() => void move(i, i + 1)}
-                    disabled={busy || i === images.length - 1}
-                  >
-                    <ArrowDown aria-hidden="true" />
-                  </Button>
-                  {i !== 0 && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Đặt làm ảnh đại diện"
-                      title="Đặt làm ảnh đại diện"
-                      onClick={() => void move(i, 0)}
-                      disabled={busy}
-                    >
-                      <Star aria-hidden="true" />
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Xóa ảnh"
-                    onClick={() => setToDelete(img)}
-                    disabled={busy}
-                  >
-                    <Trash2 aria-hidden="true" />
-                  </Button>
-                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="image-remove"
+                  aria-label={`Xóa ảnh ${i + 1}`}
+                  title="Xóa ảnh"
+                  onDragStart={(event) => event.preventDefault()}
+                  onClick={() => setToDelete(img)}
+                  disabled={busy}
+                >
+                  <X aria-hidden="true" />
+                </Button>
               )}
             </li>
           ))}

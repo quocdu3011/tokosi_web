@@ -5,7 +5,6 @@ import type {
   CategoryNode,
   CreateProductInput,
   Product,
-  ProductBranch,
   ProductList,
   ProductLookup,
   StockCard,
@@ -59,7 +58,6 @@ export const productKeys = {
     ['products', 'list', branchId, p] as const,
   categories: ['categories'] as const,
   detail: (branchId: string | null, id: string) => ['products', 'detail', branchId, id] as const,
-  branches: (id: string) => ['products', 'branches', id] as const,
   stockCard: (branchId: string | null, id: string, from: string, to: string) =>
     ['products', 'stock-card', branchId, id, from, to] as const,
   lookup: (branchId: string | null, q: string) => ['products', 'lookup', branchId, q] as const,
@@ -133,15 +131,6 @@ export function useUpdateProduct() {
       void qc.invalidateQueries({ queryKey: productKeys.categories });
       return invalidate();
     },
-  });
-}
-
-/** Tồn và thiết lập từng chi nhánh người dùng được phép (không phụ thuộc chi nhánh làm việc). */
-export function useProductBranches(id: string | null) {
-  return useQuery({
-    queryKey: productKeys.branches(id ?? ''),
-    enabled: id !== null,
-    queryFn: ({ signal }) => api.get<ProductBranch[]>(`/products/${id}/branches`, { signal }),
   });
 }
 
