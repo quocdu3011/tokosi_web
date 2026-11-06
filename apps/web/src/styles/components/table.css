@@ -33,7 +33,7 @@
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  text-align: left;
+  text-align: center;
   white-space: nowrap;
   border-bottom: 1px solid var(--border);
 }
@@ -54,15 +54,20 @@
   border-bottom: 0;
 }
 
-/* Cột số liệu / mã: canh phải, phông dữ liệu */
+/* Tiêu đề luôn căn giữa; chỉ nội dung cột số liệu / thao tác căn phải. */
+.data-table th .num {
+  text-align: center;
+}
 .data-table .col-numeric {
-  text-align: right;
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
 .data-table .col-actions {
   width: 1%;
+}
+.data-table td.col-numeric,
+.data-table td.col-actions {
   text-align: right;
 }
 
@@ -116,7 +121,8 @@
 
 /* Nút sắp xếp phủ cả ô tiêu đề */
 .sort-button {
-  display: flex;
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) 14px;
   align-items: center;
   gap: 6px;
   width: 100%;
@@ -129,11 +135,11 @@
   font: inherit;
   letter-spacing: inherit;
   text-transform: inherit;
-  text-align: left;
+  text-align: center;
   cursor: pointer;
 }
 .sort-button .sort-label {
-  flex: 1 1 auto;
+  grid-column: 2;
   min-width: 0;
 }
 .sort-button:hover {
@@ -145,6 +151,7 @@
   border-radius: var(--radius-xs, 4px);
 }
 .sort-indicator {
+  grid-column: 3;
   display: inline-flex;
   flex: 0 0 auto;
   color: var(--muted);
@@ -270,6 +277,8 @@ body.is-col-resizing {
 .data-table-compact th.num,
 .data-table-compact td.num {
   display: table-cell; /* `.num` toàn cục là display:block, sẽ làm vỡ ô bảng */
+}
+.data-table-compact td.num {
   text-align: right;
 }
 

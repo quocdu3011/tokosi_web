@@ -5,8 +5,8 @@ import type { ImportJob } from '@/lib/api/types';
  * Hợp đồng: docs/api/endpoints.md mục 9.
  */
 
-/** Loại dữ liệu API đang hỗ trợ (`customers`, `suppliers` còn trả `IMPORT_TYPE_NOT_SUPPORTED`). */
-export type ImportType = 'products';
+/** Loại dữ liệu API đang hỗ trợ. */
+export type ImportType = 'products' | 'customers';
 
 /**
  * - `overwrite` (Import đè): cùng khóa (mã) thì ghi thông tin trong file lên bản ghi cũ; ô trống hoặc
@@ -33,6 +33,13 @@ export interface ImportTypeConfig {
 }
 
 export const IMPORT_TYPES: Record<ImportType, ImportTypeConfig> = {
+  customers: {
+    label: 'khách hàng',
+    templateFilename: 'mau-nhap-khach-hang.xlsx',
+    needsBranch: true,
+    keyLabel: 'Mã khách hàng',
+    addModeSupported: false,
+  },
   products: {
     label: 'hàng hóa',
     templateFilename: 'mau-nhap-hang-hoa.xlsx',

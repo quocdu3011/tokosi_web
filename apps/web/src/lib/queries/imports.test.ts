@@ -5,6 +5,21 @@ import { runImport } from './imports';
 vi.mock('@/lib/api', () => ({ api: { post: vi.fn() } }));
 beforeEach(() => vi.clearAllMocks());
 
+it('nhập khách theo mẫu TKS, không cho gửi chế độ cộng tồn', async () => {
+  const args = {
+    type: 'customers' as const,
+    mode: 'overwrite' as const,
+    file: new File(['test'], 'customers.xlsx'),
+    branchId: 'hn',
+    dryRun: true,
+  };
+  await runImport(args);
+  expect(api.post).toHaveBeenCalledWith('/imports/customers', expect.any(FormData), {
+    query: { dryRun: true, branchId: 'hn', mode: 'overwrite', allowDuplicate: false },
+  });
+  await expect(runImport({ ...args, mode: 'add' })).rejects.toThrow();
+});
+
 it('chặn file trùng theo mặc định và chỉ cho phép khi xác nhận rõ ràng', async () => {
   const args = {
     type: 'products' as const,

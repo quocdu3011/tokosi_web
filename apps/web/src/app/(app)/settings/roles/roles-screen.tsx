@@ -173,7 +173,13 @@ export function RolesScreen() {
       ) : (
         <div className="data-table-frame">
           <div className="data-table-scroll">
-            <table className="data-table matrix">
+            <table className="data-table data-table-fixed matrix">
+              <colgroup>
+                <col className="matrix-permission-column" />
+                {ROLES.map((role) => (
+                  <col key={role} />
+                ))}
+              </colgroup>
               <thead>
                 <tr>
                   <th>Quyền</th>

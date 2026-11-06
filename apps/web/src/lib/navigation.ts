@@ -87,7 +87,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'Khách hàng',
     icon: Users,
     items: [
-      { href: '/customers', label: 'Khách hàng', permissions: ['customer.view'], ready: false },
+      { href: '/customers', label: 'Khách hàng', permissions: ['customer.view'], ready: true },
     ],
   },
   {

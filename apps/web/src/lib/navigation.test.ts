@@ -10,6 +10,10 @@ describe('isNavActive', () => {
     expect(findNavItem('/orders')?.ready).toBe(false);
   });
   it('khớp chính xác và trang con', () => {
+    expect(findNavItem('/customers')).toMatchObject({
+      ready: true,
+      permissions: ['customer.view'],
+    });
     expect(isNavActive('/products', '/products')).toBe(true);
     expect(isNavActive('/settings/users', '/settings/users')).toBe(true);
   });

@@ -133,10 +133,17 @@ function ImportForm({ type, onClose }: { type: ImportType; onClose: () => void }
           </DialogDescription>
         </DialogHeader>
 
+        {type === 'customers' && (
+          <p className="alert alert-warning" role="note">
+            Dùng mẫu khách hàng TKS. Số điện thoại trùng chỉ cảnh báo. Công nợ đầu kỳ chỉ ghi cho
+            khách tạo mới khi bạn có quyền nhập công nợ đầu kỳ; mỗi chi nhánh có số dư riêng.
+          </p>
+        )}
+
         <fieldset className="fieldset" disabled={busy}>
           <legend>Chế độ nhập</legend>
           <div className="radio-cards">
-            {MODES.map((m) => {
+            {MODES.filter((m) => type !== 'customers' || m === 'overwrite').map((m) => {
               const supported = isModeSupported(type, m);
               const info = IMPORT_MODE_LABELS[m];
               return (
@@ -298,6 +305,18 @@ function ImportResult({ job }: { job: ImportJob }) {
             </li>
           ))}
         </ul>
+      )}
+      {(job.warnings?.length ?? 0) > 0 && (
+        <div className="alert alert-warning" role="status">
+          <p>Cảnh báo cần kiểm tra:</p>
+          <ul>
+            {job.warnings.slice(0, MAX_ERRORS_SHOWN).map((warning, index) => (
+              <li key={index}>
+                Dòng {warning.row} · {warning.field}: {warning.message}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       {job.errors.length > shown.length && (
         <p className="field-hint">

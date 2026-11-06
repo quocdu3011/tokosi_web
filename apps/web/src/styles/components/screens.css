@@ -111,7 +111,10 @@
   border-radius: var(--radius-lg);
 }
 .matrix {
-  min-width: 900px;
+  min-width: 1160px;
+}
+.matrix-permission-column {
+  width: 320px;
 }
 .matrix th,
 .matrix td {
@@ -122,10 +125,10 @@
   position: sticky;
   left: 0;
   z-index: 5;
-  width: 288px;
-  min-width: 288px;
-  text-align: left;
   background: var(--panel);
+}
+.matrix td:first-child {
+  text-align: left;
 }
 .matrix th:first-child {
   z-index: 11;
@@ -189,7 +192,7 @@
   font-size: 12px;
 }
 
-/* Số liệu canh phải trong ô/tiêu đề cột của bảng */
+/* Số liệu căn phải trong ô dữ liệu; tiêu đề cột căn giữa theo table.css. */
 .num {
   display: block;
   text-align: right;

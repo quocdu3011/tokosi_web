@@ -50,9 +50,11 @@ export function useRunImport() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: runImport,
-    onSuccess: (job) => {
+    onSuccess: (job, args) => {
       if (job.dryRun || job.status !== 'completed') return;
-      void qc.invalidateQueries({ queryKey: productKeys.all });
+      void qc.invalidateQueries({
+        queryKey: args.type === 'customers' ? ['customers'] : productKeys.all,
+      });
     },
   });
 }

@@ -6,6 +6,14 @@ import type { components } from './schema';
 
 type Schemas = components['schemas'];
 
+export type Customer = Schemas['CustomerDto'];
+export type CustomerList = Schemas['CustomerListDto'];
+export type CreateCustomerInput = Schemas['CreateCustomerDto'];
+export type UpdateCustomerInput = Schemas['UpdateCustomerDto'];
+export type CustomerVisit = Schemas['CustomerVisitDto'];
+export type CustomerTermsInput = Schemas['SetCustomerTermsDto'];
+export type CustomerLedger = Schemas['LedgerDto'];
+
 export type Supplier = Schemas['SupplierDto'];
 export type SupplierList = Schemas['SupplierListDto'];
 export type SupplierBranch = Schemas['SupplierBranchDto'];
