@@ -37,6 +37,7 @@ docs/           Tài liệu thiết kế, ERD, ADR
 | `pnpm --filter @kiot/api storage:init`                      | Tạo bucket ảnh + cho phép đọc công khai trên MinIO dev (chạy sau `pnpm db:up`); chạy lại an toàn                                  |
 | `pnpm --filter @kiot/api db:reconcile`                      | Đối soát sổ cái với số liệu cache (tồn, công nợ nội bộ, quỹ); thoát mã 1 nếu lệch. Chạy hằng ngày khi chạy song song với KiotViet |
 | `pnpm --filter @kiot/api storage:gc`                        | Liệt kê file ảnh mồ côi trên kho file (thêm `--apply` để xóa)                                                                     |
+| `pnpm --filter @kiot/api kiotviet:pull -- --out <file.xlsx>` | Kéo hàng hóa + nhóm + tồn từ API KiotViet ra .xlsx (cần `KIOTVIET_CLIENT_ID/SECRET/RETAILER`; file phải NGOÀI repo) rồi nhập bằng Import "Thêm"; chỉ đọc, không chạm CSDL |
 | `pnpm --filter @kiot/api openapi:export`                    | Xuất `docs/api/openapi.json` (chạy khi đổi endpoint/DTO, commit kèm)                                                              |
 
 Mọi PR phải qua: `lint`, `typecheck`, `test`, `build`, và `openapi.json` + `docs/db/` đã sinh lại (CI chạy đúng bộ này và so sánh tài liệu sinh tự động).

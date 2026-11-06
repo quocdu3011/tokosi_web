@@ -29,6 +29,8 @@
     "db:docs": "nest build && node dist/db/export-docs.js",
     "db:seed": "nest build && node dist/db/seed.js",
     "db:seed:demo": "nest build && node dist/db/seed-demo.js",
+    "kiotviet:pull": "nest build && node dist/tools/kiotviet/pull-products.js",
+    "kiotviet:import": "nest build && node dist/tools/kiotviet/import-file.js",
     "db:reconcile": "nest build && node dist/db/reconcile.js",
     "storage:gc": "nest build && node dist/modules/catalog/storage-gc.js",
     "storage:init": "nest build && node dist/modules/files/storage-init.js"
