@@ -5,6 +5,7 @@ import { AppError } from '../../common/app-error.js';
 import {
   dec,
   roundUnitPrice,
+  removeAtCost,
   weightedAverageCost,
 } from '../../common/costing.js';
 import { DB, type Database } from '../../db/database.module.js';
@@ -32,6 +33,11 @@ export interface StockMovementInput {
   userId?: string | null;
   /** Ghi nhận `unitCost` làm giá nhập cuối (nhập hàng từ nhà cung cấp). Chuyển kho thì không. */
   setLastPurchasePrice?: boolean;
+  /**
+   * Chỉ khi XUẤT hàng đã nhập từ nhà cung cấp (trả hàng nhập, hủy phiếu nhập): đơn giá của số hàng rút ra. Có giá trị
+   * thì giá vốn bình quân được tính lại (`removeAtCost`) và dòng sổ cái ghi đơn giá này. Bán/chuyển kho KHÔNG truyền.
+   */
+  reduceCostAt?: string;
 }
 
 export interface StockMovementResult {
@@ -140,6 +146,14 @@ export class InventoryService {
         m.unitCost === undefined ? row.costPrice : roundUnitPrice(m.unitCost);
       cost = weightedAverageCost(row.onHand, row.costPrice, delta, inCost);
       movementCost = inCost;
+    } else if (m.reduceCostAt !== undefined) {
+      movementCost = roundUnitPrice(m.reduceCostAt);
+      cost = removeAtCost(
+        row.onHand,
+        row.costPrice,
+        delta.negated(),
+        movementCost,
+      );
     }
 
     await tx

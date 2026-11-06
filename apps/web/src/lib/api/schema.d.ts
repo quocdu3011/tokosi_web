@@ -289,6 +289,241 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/purchase-orders': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Danh sách phiếu đặt hàng nhập của chi nhánh làm việc
+     * @description `receiveState` (chưa nhập / nhập một phần / đã nhập đủ) tính từ các phiếu nhập hoàn tất. `?format=xlsx` tải Excel theo đúng bộ lọc.
+     */
+    get: operations['PurchaseOrdersController_list'];
+    put?: never;
+    /**
+     * Tạo phiếu đặt hàng nhập
+     * @description Không chạm kho và công nợ. `status`: `draft` (mặc định) hoặc `confirmed`.
+     */
+    post: operations['PurchaseOrdersController_create'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/purchase-orders/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Chi tiết phiếu đặt hàng nhập
+     * @description Dòng hàng kèm `receivedQty`, `remainingQty` và danh sách phiếu nhập hoàn tất.
+     */
+    get: operations['PurchaseOrdersController_get'];
+    /**
+     * Sửa phiếu đặt hàng nhập (thay toàn bộ dòng hàng)
+     * @description Chỉ khi phiếu còn mở và chưa có phiếu nhập hoàn tất (409 nếu đã có).
+     */
+    put: operations['PurchaseOrdersController_update'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/purchase-orders/{id}/confirm': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Xác nhận với nhà cung cấp (phiếu tạm → đã xác nhận) */
+    post: operations['PurchaseOrdersController_confirm'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/purchase-orders/{id}/complete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Kết thúc phiếu đặt (nhà cung cấp không giao nốt phần còn lại)
+     * @description Cần đã có ít nhất một phiếu nhập. Hủy một phiếu nhập sau đó sẽ mở lại phiếu đặt nếu thiếu hàng.
+     */
+    post: operations['PurchaseOrdersController_complete'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/purchase-orders/{id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Hủy phiếu đặt hàng nhập
+     * @description Chỉ khi chưa có phiếu nhập hoàn tất.
+     */
+    post: operations['PurchaseOrdersController_cancel'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/goods-receipts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Danh sách phiếu nhập hàng của chi nhánh làm việc
+     * @description `?format=xlsx` tải Excel (mỗi dòng hàng một dòng) theo đúng bộ lọc.
+     */
+    get: operations['GoodsReceiptsController_list'];
+    put?: never;
+    /**
+     * Tạo phiếu nhập hàng
+     * @description Cộng tồn và tính lại giá vốn bình quân của chi nhánh làm việc, ghi nợ nhà cung cấp tại chi nhánh đó. Có `purchaseOrderId` thì nhập theo phiếu đặt (nhập một phần được; đủ thì phiếu đặt tự hoàn thành). Tiền trả nhà cung cấp làm bằng phiếu chi ở Sổ quỹ.
+     */
+    post: operations['GoodsReceiptsController_create'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/goods-receipts/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Chi tiết phiếu nhập hàng (kèm dòng hàng và số đã trả lại) */
+    get: operations['GoodsReceiptsController_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Sửa ghi chú phiếu nhập
+     * @description Chỉ ghi chú sửa được; muốn đổi hàng/giá hãy hủy rồi tạo lại.
+     */
+    patch: operations['GoodsReceiptsController_updateNote'];
+    trace?: never;
+  };
+  '/api/v1/goods-receipts/{id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Hủy phiếu nhập
+     * @description Trừ lại tồn (giá vốn tính ngược) và ghi bút toán đảo công nợ. Không hủy được khi hàng đã bán hết (422 STOCK_NOT_ENOUGH) hoặc đã có phiếu trả hàng nhập (409).
+     */
+    post: operations['GoodsReceiptsController_cancel'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/purchase-returns': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Danh sách phiếu trả hàng nhập của chi nhánh làm việc
+     * @description `?format=xlsx` tải Excel (mỗi dòng hàng một dòng) theo đúng bộ lọc.
+     */
+    get: operations['PurchaseReturnsController_list'];
+    put?: never;
+    /**
+     * Tạo phiếu trả hàng nhập
+     * @description Trừ tồn (giá vốn bình quân tính lại theo giá trả) và GIẢM công nợ nhà cung cấp tại chi nhánh làm việc. Có `goodsReceiptId` thì không được trả quá số đã nhập (422 RETURN_QTY_EXCEEDED). Luôn trừ vào công nợ; tiền hoàn lại (nếu có) ghi bằng phiếu thu ở Sổ quỹ.
+     */
+    post: operations['PurchaseReturnsController_create'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/purchase-returns/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Chi tiết phiếu trả hàng nhập (kèm dòng hàng) */
+    get: operations['PurchaseReturnsController_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Sửa ghi chú phiếu trả hàng nhập
+     * @description Chỉ ghi chú sửa được; muốn đổi hàng/giá hãy hủy rồi tạo lại.
+     */
+    patch: operations['PurchaseReturnsController_updateNote'];
+    trace?: never;
+  };
+  '/api/v1/purchase-returns/{id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Hủy phiếu trả hàng nhập
+     * @description Nhập lại hàng theo giá trả (giá vốn tính ngược) và tăng lại công nợ nhà cung cấp.
+     */
+    post: operations['PurchaseReturnsController_cancel'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/users': {
     parameters: {
       query?: never;
@@ -943,6 +1178,290 @@ export interface components {
       groupName?: string | null;
       /** @description false = ngưng giao dịch */
       isActive?: boolean;
+    };
+    DocPartyDto: {
+      id: string;
+      /** @example NCC000001 */
+      code: string;
+      name: string;
+    };
+    DocPersonDto: {
+      id: string;
+      fullName: string;
+    };
+    PurchaseOrderItemDto: {
+      productId: string;
+      code: string;
+      name: string;
+      /** @example 1000 */
+      qty: string;
+      /**
+       * @description Giá nhập
+       * @example 5500.0000
+       */
+      unitCost: string;
+      lineTotal: string;
+      /**
+       * @description Đã nhập (Σ phiếu nhập hoàn tất của phiếu đặt này)
+       * @example 500
+       */
+      receivedQty: string;
+      /**
+       * @description Còn phải nhập = max(0, qty − receivedQty)
+       * @example 500
+       */
+      remainingQty: string;
+    };
+    DocRefDto: {
+      id: string;
+      /** @example PDN000394 */
+      code: string;
+    };
+    PurchaseOrderDto: {
+      id: string;
+      code: string;
+      branchId: string;
+      supplier: components['schemas']['DocPartyDto'];
+      /**
+       * @description Cần trả NCC (= Σ thành tiền các dòng)
+       * @example 240000000
+       */
+      total: string;
+      /**
+       * @description Tổng số lượng các dòng (tính khi đọc)
+       * @example 1095
+       */
+      totalQty: string;
+      /** @description Số mặt hàng (số dòng) */
+      itemCount: number;
+      note: string | null;
+      createdBy: components['schemas']['DocPersonDto'] | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      /** Format: date-time */
+      cancelledAt: string | null;
+      cancelReason: string | null;
+      /** @enum {string} */
+      status: 'draft' | 'confirmed' | 'completed' | 'cancelled';
+      /**
+       * @description Tình trạng nhập (tính khi đọc): chưa nhập / nhập một phần / đã nhập đủ
+       * @enum {string}
+       */
+      receiveState: 'none' | 'partial' | 'full';
+      /** Format: date-time */
+      orderedAt: string;
+      orderedBy: components['schemas']['DocPersonDto'] | null;
+      items?: components['schemas']['PurchaseOrderItemDto'][];
+      /** @description Các phiếu nhập hoàn tất của phiếu đặt này (chỉ ở chi tiết) */
+      receipts?: components['schemas']['DocRefDto'][];
+    };
+    DocMetaDto: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+    PurchaseOrderListDto: {
+      data: components['schemas']['PurchaseOrderDto'][];
+      meta: components['schemas']['DocMetaDto'];
+    };
+    PurchaseLineDto: {
+      productId: string;
+      /**
+       * @description Số lượng > 0, tối đa 3 chữ số thập phân
+       * @example 1095
+       */
+      qty: string;
+      /**
+       * @description Giá nhập ≥ 0, tối đa 4 chữ số thập phân
+       * @example 219967.9800
+       */
+      unitCost: string;
+    };
+    CreatePurchaseOrderDto: {
+      supplierId: string;
+      /** Format: date-time */
+      orderedAt?: string;
+      /** @description Người đặt; mặc định = người đang đăng nhập */
+      orderedById?: string;
+      /**
+       * @description draft = phiếu tạm; confirmed = đã xác nhận với NCC
+       * @default draft
+       * @enum {string}
+       */
+      status: 'draft' | 'confirmed';
+      note?: string;
+      items: components['schemas']['PurchaseLineDto'][];
+    };
+    UpdatePurchaseOrderDto: {
+      supplierId: string;
+      /** Format: date-time */
+      orderedAt?: string;
+      /** @description Người đặt; mặc định = người đang đăng nhập */
+      orderedById?: string;
+      /**
+       * @description draft = phiếu tạm; confirmed = đã xác nhận với NCC
+       * @default draft
+       * @enum {string}
+       */
+      status: 'draft' | 'confirmed';
+      note?: string;
+      items: components['schemas']['PurchaseLineDto'][];
+    };
+    CancelDocDto: {
+      reason?: string;
+    };
+    GoodsReceiptItemDto: {
+      productId: string;
+      code: string;
+      name: string;
+      /** @example 1095 */
+      qty: string;
+      /**
+       * @description Giá nhập
+       * @example 219967.9800
+       */
+      unitCost: string;
+      /** @example 240000000 */
+      lineTotal: string;
+      /**
+       * @description Đã trả lại NCC (phiếu trả hàng nhập hoàn tất)
+       * @example 0
+       */
+      returnedQty: string;
+    };
+    GoodsReceiptDto: {
+      id: string;
+      code: string;
+      branchId: string;
+      supplier: components['schemas']['DocPartyDto'];
+      /**
+       * @description Cần trả NCC (= Σ thành tiền các dòng)
+       * @example 240000000
+       */
+      total: string;
+      /**
+       * @description Tổng số lượng các dòng (tính khi đọc)
+       * @example 1095
+       */
+      totalQty: string;
+      /** @description Số mặt hàng (số dòng) */
+      itemCount: number;
+      note: string | null;
+      createdBy: components['schemas']['DocPersonDto'] | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      /** Format: date-time */
+      cancelledAt: string | null;
+      cancelReason: string | null;
+      /** @enum {string} */
+      status: 'completed' | 'cancelled';
+      /** @description Phiếu đặt hàng nhập; null nếu nhập trực tiếp */
+      purchaseOrder: components['schemas']['DocRefDto'] | null;
+      /** Format: date-time */
+      receivedAt: string;
+      receivedBy: components['schemas']['DocPersonDto'] | null;
+      /** @description Chỉ có ở chi tiết, không có ở danh sách */
+      items?: components['schemas']['GoodsReceiptItemDto'][];
+    };
+    GoodsReceiptListDto: {
+      data: components['schemas']['GoodsReceiptDto'][];
+      meta: components['schemas']['DocMetaDto'];
+    };
+    CreateGoodsReceiptDto: {
+      supplierId: string;
+      /** @description Phiếu đặt hàng nhập (PDN…) nếu nhập theo đơn đặt */
+      purchaseOrderId?: string | null;
+      /**
+       * Format: date-time
+       * @description Mặc định = bây giờ; không ở tương lai
+       */
+      receivedAt?: string;
+      /** @description Người nhập; mặc định = người đang đăng nhập */
+      receivedById?: string;
+      note?: string;
+      items: components['schemas']['PurchaseLineDto'][];
+    };
+    UpdateNoteDto: {
+      /** @description Chỉ ghi chú sửa được sau khi lập phiếu */
+      note: string | null;
+    };
+    PurchaseReturnItemDto: {
+      productId: string;
+      code: string;
+      name: string;
+      /** @example 10 */
+      qty: string;
+      /**
+       * @description Giá trả lại
+       * @example 8450.2200
+       */
+      returnPrice: string;
+      lineTotal: string;
+    };
+    PurchaseReturnDto: {
+      id: string;
+      code: string;
+      branchId: string;
+      supplier: components['schemas']['DocPartyDto'];
+      /**
+       * @description Cần trả NCC (= Σ thành tiền các dòng)
+       * @example 240000000
+       */
+      total: string;
+      /**
+       * @description Tổng số lượng các dòng (tính khi đọc)
+       * @example 1095
+       */
+      totalQty: string;
+      /** @description Số mặt hàng (số dòng) */
+      itemCount: number;
+      note: string | null;
+      createdBy: components['schemas']['DocPersonDto'] | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      /** Format: date-time */
+      cancelledAt: string | null;
+      cancelReason: string | null;
+      /** @enum {string} */
+      status: 'completed' | 'cancelled';
+      /** @description Phiếu nhập gốc (nếu có) */
+      goodsReceipt: components['schemas']['DocRefDto'] | null;
+      /** Format: date-time */
+      returnedAt: string;
+      returnedBy: components['schemas']['DocPersonDto'] | null;
+      items?: components['schemas']['PurchaseReturnItemDto'][];
+    };
+    PurchaseReturnListDto: {
+      data: components['schemas']['PurchaseReturnDto'][];
+      meta: components['schemas']['DocMetaDto'];
+    };
+    ReturnLineDto: {
+      productId: string;
+      /** @example 10 */
+      qty: string;
+      /**
+       * @description Giá trả lại ≥ 0, tối đa 4 chữ số thập phân
+       * @example 8450.2200
+       */
+      returnPrice: string;
+    };
+    CreatePurchaseReturnDto: {
+      supplierId: string;
+      /** @description Phiếu nhập gốc; có thì không trả quá số đã nhập */
+      goodsReceiptId?: string;
+      /** Format: date-time */
+      returnedAt?: string;
+      /** @description Người trả; mặc định = người đang đăng nhập */
+      returnedById?: string;
+      note?: string;
+      items: components['schemas']['ReturnLineDto'][];
     };
     UserDto: {
       id: string;
@@ -1850,6 +2369,486 @@ export interface operations {
       };
       /** @description Không tìm thấy nhà cung cấp */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  PurchaseOrdersController_list: {
+    parameters: {
+      query?: {
+        page?: number;
+        limit?: number;
+        /** @description Tên cột cần sắp xếp; thêm `-` phía trước để giảm dần. Chỉ nhận các cột endpoint cho phép */
+        sort?: string;
+        /** @description Tìm không dấu theo mã phiếu, mã và tên nhà cung cấp */
+        q?: string;
+        supplierId?: string;
+        /** @description YYYY-MM-DD giờ Việt Nam, gồm cả ngày */
+        from?: string;
+        to?: string;
+        /** @description xlsx = tải Excel theo đúng bộ lọc (mỗi dòng hàng một dòng Excel, bỏ qua page/limit, tối đa 10.000 phiếu) */
+        format?: 'xlsx';
+        status?: 'draft' | 'confirmed' | 'completed' | 'cancelled';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PurchaseOrderListDto'];
+        };
+      };
+    };
+  };
+  PurchaseOrdersController_create: {
+    parameters: {
+      query?: never;
+      header: {
+        'Idempotency-Key': string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreatePurchaseOrderDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PurchaseOrderDto'];
+        };
+      };
+    };
+  };
+  PurchaseOrdersController_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PurchaseOrderDto'];
+        };
+      };
+      /** @description Không có phiếu (hoặc thuộc chi nhánh khác) */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  PurchaseOrdersController_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdatePurchaseOrderDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PurchaseOrderDto'];
+        };
+      };
+    };
+  };
+  PurchaseOrdersController_confirm: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PurchaseOrderDto'];
+        };
+      };
+      /** @description INVALID_STATE: không phải phiếu tạm */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  PurchaseOrdersController_complete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PurchaseOrderDto'];
+        };
+      };
+    };
+  };
+  PurchaseOrdersController_cancel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CancelDocDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PurchaseOrderDto'];
+        };
+      };
+    };
+  };
+  GoodsReceiptsController_list: {
+    parameters: {
+      query?: {
+        page?: number;
+        limit?: number;
+        /** @description Tên cột cần sắp xếp; thêm `-` phía trước để giảm dần. Chỉ nhận các cột endpoint cho phép */
+        sort?: string;
+        /** @description Tìm không dấu theo mã phiếu, mã và tên nhà cung cấp */
+        q?: string;
+        supplierId?: string;
+        /** @description YYYY-MM-DD giờ Việt Nam, gồm cả ngày */
+        from?: string;
+        to?: string;
+        /** @description xlsx = tải Excel theo đúng bộ lọc (mỗi dòng hàng một dòng Excel, bỏ qua page/limit, tối đa 10.000 phiếu) */
+        format?: 'xlsx';
+        purchaseOrderId?: string;
+        status?: 'completed' | 'cancelled';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GoodsReceiptListDto'];
+        };
+      };
+    };
+  };
+  GoodsReceiptsController_create: {
+    parameters: {
+      query?: never;
+      header: {
+        'Idempotency-Key': string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateGoodsReceiptDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GoodsReceiptDto'];
+        };
+      };
+    };
+  };
+  GoodsReceiptsController_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GoodsReceiptDto'];
+        };
+      };
+      /** @description Không có phiếu (hoặc thuộc chi nhánh khác) */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  GoodsReceiptsController_updateNote: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateNoteDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GoodsReceiptDto'];
+        };
+      };
+    };
+  };
+  GoodsReceiptsController_cancel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CancelDocDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GoodsReceiptDto'];
+        };
+      };
+      /** @description INVALID_STATE: đã có phiếu trả hàng nhập */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description STOCK_NOT_ENOUGH / INVALID_STATE */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  PurchaseReturnsController_list: {
+    parameters: {
+      query?: {
+        page?: number;
+        limit?: number;
+        /** @description Tên cột cần sắp xếp; thêm `-` phía trước để giảm dần. Chỉ nhận các cột endpoint cho phép */
+        sort?: string;
+        /** @description Tìm không dấu theo mã phiếu, mã và tên nhà cung cấp */
+        q?: string;
+        supplierId?: string;
+        /** @description YYYY-MM-DD giờ Việt Nam, gồm cả ngày */
+        from?: string;
+        to?: string;
+        /** @description xlsx = tải Excel theo đúng bộ lọc (mỗi dòng hàng một dòng Excel, bỏ qua page/limit, tối đa 10.000 phiếu) */
+        format?: 'xlsx';
+        goodsReceiptId?: string;
+        status?: 'completed' | 'cancelled';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PurchaseReturnListDto'];
+        };
+      };
+    };
+  };
+  PurchaseReturnsController_create: {
+    parameters: {
+      query?: never;
+      header: {
+        'Idempotency-Key': string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreatePurchaseReturnDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PurchaseReturnDto'];
+        };
+      };
+    };
+  };
+  PurchaseReturnsController_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PurchaseReturnDto'];
+        };
+      };
+      /** @description Không có phiếu (hoặc thuộc chi nhánh khác) */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  PurchaseReturnsController_updateNote: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateNoteDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PurchaseReturnDto'];
+        };
+      };
+    };
+  };
+  PurchaseReturnsController_cancel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CancelDocDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PurchaseReturnDto'];
+        };
+      };
+      /** @description STOCK_NOT_ENOUGH / RETURN_QTY_EXCEEDED / INVALID_STATE */
+      422: {
         headers: {
           [name: string]: unknown;
         };

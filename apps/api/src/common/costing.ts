@@ -45,6 +45,26 @@ export function weightedAverageCost(
 }
 
 /**
+ * Giá vốn bình quân sau khi RÚT `outQty` hàng đã nhập với đơn giá `outCost` (trả hàng nhập, hủy phiếu nhập):
+ * (tồn × giá vốn − SL rút × đơn giá rút) / (tồn − SL rút).
+ * Tồn còn lại ≤ 0 → giữ giá vốn cũ (không chia cho 0). Kết quả CÓ THỂ ÂM (đơn giá rút cao hơn giá vốn): chủ hệ thống
+ * chọn giữ nguyên giá âm (06/11/2026) để số liệu phản ánh đúng phép tính và còn phát hiện được nhập/trả sai giá.
+ */
+export function removeAtCost(
+  onHand: Num,
+  currentCost: Num,
+  outQty: Num,
+  outCost: Num,
+): string {
+  const remain = dec(onHand).minus(dec(outQty));
+  if (remain.lte(0)) return roundUnitPrice(currentCost);
+  const total = dec(onHand)
+    .times(dec(currentCost))
+    .minus(dec(outQty).times(dec(outCost)));
+  return roundUnitPrice(total.div(remain));
+}
+
+/**
  * Chia một khoản tiền SỐ NGUYÊN theo tỷ lệ `weights` sao cho tổng các phần đúng bằng khoản đó
  * (phương pháp phần dư lớn nhất). Nếu mọi trọng số bằng 0 thì chia đều.
  */

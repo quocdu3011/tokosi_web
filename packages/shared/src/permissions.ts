@@ -100,26 +100,27 @@ export const PERMISSIONS = [
   {
     code: 'product.cost.view',
     module: 'product',
-    label: 'Xem giá vốn / giá nhập',
-    description: 'Giá vốn, giá nhập cuối, lãi gộp',
+    label: 'Xem giá vốn / giá nhập cuối',
+    description:
+      'Giá vốn, giá nhập cuối của hàng hóa, giá chuyển kho, lãi gộp. Giá nhập trên phiếu đặt hàng nhập / nhập hàng / trả hàng nhập thuộc nghiệp vụ mua hàng: ai có purchase.view đều xem được',
   },
   // ---- Mua hàng
   {
     code: 'purchase.view',
     module: 'purchase',
     label: 'Xem mua hàng',
-    description: 'Nhà cung cấp, phiếu nhập, phiếu trả hàng nhập',
+    description: 'Nhà cung cấp, đặt hàng nhập, phiếu nhập, phiếu trả hàng nhập',
   },
   {
     code: 'purchase.edit',
     module: 'purchase',
-    label: 'Nhập hàng / trả hàng nhập / sửa nhà cung cấp',
+    label: 'Đặt hàng nhập / nhập hàng / trả hàng nhập / sửa nhà cung cấp',
     requires: ['purchase.view', 'product.view'],
   },
   {
     code: 'purchase.cancel',
     module: 'purchase',
-    label: 'Hủy phiếu nhập / phiếu trả nhập',
+    label: 'Hủy phiếu đặt nhập / phiếu nhập / phiếu trả nhập',
     requires: ['purchase.view'],
   },
   // ---- Kho & chuyển kho (giữa các chi nhánh)

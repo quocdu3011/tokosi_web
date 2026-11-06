@@ -122,7 +122,7 @@ describe('Hàng hóa qua HTTP', () => {
       onHand: '515.000',
       reserved: '40.000',
       available: '475.000',
-      onOrder: '0',
+      onOrder: '0.000',
       costPrice: '21800.5000',
       categoryPath: 'NHÀ BẾP > Dao kéo',
       images: [],

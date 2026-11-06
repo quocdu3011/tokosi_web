@@ -248,7 +248,7 @@ Bộ lọc `GET /products`: `q` (tìm không dấu theo mã và tên), `category
   "onHand": "515.000",
   "reserved": "40.000", // đang giữ cho các đơn đặt hàng chưa chốt (phiếu tạm) tại chi nhánh này
   "available": "475.000", // onHand − reserved
-  "onOrder": "0", // đang đặt nhà cung cấp; CHƯA có phân hệ Đặt hàng nhập nên luôn "0"
+  "onOrder": "0.000", // đang đặt nhà cung cấp = phần còn phải nhập của các phiếu đặt hàng nhập đang mở tại chi nhánh làm việc
   "description": null,
   "images": [{ "id": "…", "url": "https://files…/products/<id>/<uuid>.jpg", "sortOrder": 0 }],
   "isActive": true,
@@ -464,81 +464,125 @@ Lưu ý:
 
 ### 3.2 Nhập hàng
 
-| Method | Đường dẫn                    | Mô tả                                                 | Quyền             | Mốc |
-| ------ | ---------------------------- | ----------------------------------------------------- | ----------------- | --- |
-| GET    | `/goods-receipts`            | Danh sách (`q`, `supplierId`, `status`, `from`, `to`) | `purchase.view`   | W7  |
-| GET    | `/goods-receipts/:id`        | Chi tiết                                              | `purchase.view`   | W7  |
-| POST   | `/goods-receipts`            | Tạo phiếu nhập (**Idempotency-Key**)                  | `purchase.edit`   | W7  |
-| POST   | `/goods-receipts/:id/cancel` | Hủy phiếu `{ reason }`                                | `purchase.cancel` | W7  |
-| GET    | `/goods-receipts/:id/print`  | PDF A4                                                | `purchase.view`   | W7  |
+> **Trạng thái:** đã triển khai (trừ in PDF). Thuộc tính theo file `DanhSachChiTietNhapHang` của KiotViet sau khi lược bỏ cột không dùng. Mọi endpoint cần `X-Branch-Id`: phiếu thuộc **chi nhánh làm việc**; phiếu của chi nhánh khác trả `404`.
+> **Tiền trả nhà cung cấp KHÔNG nằm trên phiếu nhập** (không có `paid`, `payment`, `discount`, số hóa đơn đầu vào): phiếu nhập chỉ ghi **nợ** nhà cung cấp; trả tiền làm bằng phiếu chi ở Sổ quỹ.
+
+| Method | Đường dẫn                    | Mô tả                                                                                     | Quyền             |
+| ------ | ---------------------------- | ----------------------------------------------------------------------------------------- | ----------------- |
+| GET    | `/goods-receipts`            | Danh sách (`q`, `supplierId`, `purchaseOrderId`, `status`, `from`, `to`, `sort`: `receivedAt` \| `code` \| `total`; `?format=xlsx`) | `purchase.view`   |
+| GET    | `/goods-receipts/:id`        | Chi tiết (kèm dòng hàng và số đã trả lại)                                                | `purchase.view`   |
+| POST   | `/goods-receipts`            | Tạo phiếu nhập (**Idempotency-Key**)                                                      | `purchase.edit`   |
+| PATCH  | `/goods-receipts/:id`        | Chỉ sửa ghi chú `{ note }`; muốn đổi hàng/giá thì hủy rồi tạo lại                        | `purchase.edit`   |
+| POST   | `/goods-receipts/:id/cancel` | Hủy phiếu `{ reason? }`                                                                   | `purchase.cancel` |
 
 ```json
 // POST /goods-receipts
 {
   "supplierId": "…",
-  "receivedAt": "2026-11-03T04:00:00.000Z", // tùy chọn, mặc định = bây giờ
-  "supplierInvoiceNo": null, // số hóa đơn đầu vào
-  "poRef": "PDN000394", // mã phiếu đặt nhập (chỉ để đối chiếu, dạng chữ)
-  "discount": "0",
+  "purchaseOrderId": null, // phiếu đặt hàng nhập (PDN…) nếu nhập theo đơn đặt
+  "receivedAt": "2026-11-03T04:00:00.000Z", // tùy chọn, mặc định = bây giờ, không ở tương lai
+  "receivedById": "…", // người nhập, tùy chọn, mặc định = người đang đăng nhập
   "note": "Lô hàng tháng 10",
-  "items": [{ "productId": "…", "qty": "1095", "unitCost": "219967.9800", "note": null }],
-  "payment": { "accountId": "…", "amount": "0" } // tùy chọn: trả ngay một phần
+  "items": [{ "productId": "…", "qty": "1095", "unitCost": "219967.9800" }]
 }
 ```
 
-Response (chi tiết):
+Response (chi tiết; ở danh sách không có `items`):
 
 ```json
 {
   "id": "…",
   "code": "PN000946",
-  "status": "completed",
+  "status": "completed", // completed | cancelled
+  "branchId": "…",
   "supplier": { "id": "…", "code": "NCC000001", "name": "Công ty TNHH ABC" },
+  "purchaseOrder": { "id": "…", "code": "PDN000394" }, // null nếu nhập trực tiếp
   "receivedAt": "…",
-  "supplierInvoiceNo": null,
-  "poRef": "PDN000394",
-  "subtotal": "240000000",
-  "discount": "0",
-  "total": "240000000",
-  "paid": "0",
-  "debt": "240000000",
+  "receivedBy": { "id": "…", "fullName": "…" },
+  "total": "240000000", // cần trả NCC = Σ thành tiền (server tính, không gửi lên)
+  "totalQty": "1095.000", // tính khi đọc
+  "itemCount": 1,
   "items": [
     {
       "productId": "…",
       "code": "LUMI5T",
       "name": "…",
-      "qty": "1095",
-      "unitCost": "219967.9800",
-      "lineTotal": "240000000"
+      "qty": "1095.000",
+      "unitCost": "219967.9800", // giá nhập
+      "lineTotal": "240000000", // làm tròn về đồng
+      "returnedQty": "0.000" // đã trả lại NCC (phiếu trả hoàn tất)
     }
   ],
   "note": "…",
   "createdBy": { "id": "…", "fullName": "…" },
-  "createdAt": "…"
+  "createdAt": "…",
+  "updatedAt": "…",
+  "cancelledAt": null,
+  "cancelReason": null
 }
 ```
 
-Sau khi lưu server cộng tồn, tính lại **giá vốn bình quân** và ghi công nợ NCC.
+**Khi tạo** (một transaction): cộng tồn của chi nhánh làm việc, tính lại **giá vốn bình quân** của chi nhánh đó (không dùng tồn/giá vốn chi nhánh khác), ghi giá nhập cuối, ghi **nợ** nhà cung cấp tại chi nhánh đó (dòng `invoice` trong sổ công nợ). Quy tắc: nhà cung cấp phải đang hoạt động và không phải NCC nội bộ; hàng không phải combo (tách combo thành hàng thành phần) và còn kinh doanh; mỗi hàng một dòng; số lượng > 0 (tối đa 3 số thập phân); giá nhập ≥ 0 (tối đa 4 số thập phân). Client gửi `total`/`lineTotal`/`discount`/`paid`… → `400`.
+
+**Giá vốn bình quân:** `(tồn × giá vốn + SL nhập × giá nhập) / (tồn + SL nhập)`, lưu 4 chữ số thập phân. Ví dụ tồn 1000 @5000, nhập 500 @5500 → **5166,6667**.
+
+**Nhập theo phiếu đặt:** có `purchaseOrderId` thì phiếu đặt phải thuộc chi nhánh làm việc (khác chi nhánh → `404`), cùng nhà cung cấp (khác → `400 VALIDATION_ERROR`, `field = purchaseOrderId`) và còn mở `draft`/`confirmed` (đã hoàn thành/hủy → `422 INVALID_STATE`). Một phiếu đặt nhập được **nhiều lần**; phiếu nhập được phép có dòng khác/nhiều hơn phiếu đặt. Nhập đủ mọi dòng thì phiếu đặt tự `completed`.
+
+**Hủy** (`purchase.cancel`): trừ lại tồn (giá vốn **tính ngược**: `(tồn × giá vốn − SL × giá nhập) / (tồn − SL)`; tồn về 0 thì giữ giá vốn cũ; có thể âm nếu giá nhập của phiếu cao hơn giá vốn hiện tại) và ghi bút toán đảo công nợ (dòng `adjustment`). Lỗi: `422 STOCK_NOT_ENOUGH` nếu hàng đã bán/chuyển hết; `409 INVALID_STATE` nếu còn phiếu trả hàng nhập hoàn tất gắn vào phiếu này (hủy phiếu trả trước); `422 INVALID_STATE` nếu đã hủy. Phiếu đặt liên quan được tính lại (mở lại `confirmed` nếu thiếu hàng). Vì giá vốn lưu 4 chữ số nên sau khi hủy có thể lệch ±0,0001 so với trước khi nhập.
+
+**Excel** (`?format=xlsx`): theo đúng bộ lọc, mỗi dòng hàng một dòng Excel, tiêu đề như file "Chi tiết nhập hàng" của KiotViet (`Mã nhập hàng`, `Mã đặt hàng nhập`, `Cần trả NCC`, `Giá nhập`, …); thời gian giờ Việt Nam `dd/MM/yyyy HH:mm`.
 
 ### 3.3 Trả hàng nhập
 
-| Method | Đường dẫn                      | Mô tả                                       | Quyền             | Mốc |
-| ------ | ------------------------------ | ------------------------------------------- | ----------------- | --- |
-| GET    | `/purchase-returns`            | Danh sách (`q`, `supplierId`, `from`, `to`) | `purchase.view`   | W7  |
-| GET    | `/purchase-returns/:id`        | Chi tiết                                    | `purchase.view`   | W7  |
-| POST   | `/purchase-returns`            | Tạo (**Idempotency-Key**)                   | `purchase.edit`   | W7  |
-| POST   | `/purchase-returns/:id/cancel` | Hủy                                         | `purchase.cancel` | W7  |
+> **Trạng thái:** đã triển khai. Cần `X-Branch-Id`; phiếu thuộc chi nhánh làm việc.
+> Trả hàng nhập **luôn trừ vào công nợ** nhà cung cấp; phiếu không có hình thức thanh toán. Tiền hoàn lại (nếu có) ghi bằng phiếu thu ở Sổ quỹ; gửi `settlement`/`refund` → `400`.
+
+| Method | Đường dẫn                      | Mô tả                                                                    | Quyền             |
+| ------ | ------------------------------ | ------------------------------------------------------------------------ | ----------------- |
+| GET    | `/purchase-returns`            | Danh sách (`q`, `supplierId`, `goodsReceiptId`, `status`, `from`, `to`, `sort`: `returnedAt` \| `code` \| `total`; `?format=xlsx`) | `purchase.view`   |
+| GET    | `/purchase-returns/:id`        | Chi tiết                                                                 | `purchase.view`   |
+| POST   | `/purchase-returns`            | Tạo (**Idempotency-Key**)                                                | `purchase.edit`   |
+| PATCH  | `/purchase-returns/:id`        | Chỉ sửa ghi chú `{ note }`                                               | `purchase.edit`   |
+| POST   | `/purchase-returns/:id/cancel` | Hủy `{ reason? }`                                                        | `purchase.cancel` |
 
 ```json
+// POST /purchase-returns
 {
   "supplierId": "…",
-  "goodsReceiptId": "…?",
-  "reason": "Hàng lỗi",
-  "items": [{ "productId": "…", "qty": "10", "returnPrice": "8450.2200" }],
-  "settlement": "offset_debt", // hoặc "refund" (kèm refund.accountId)
-  "refund": { "accountId": "…" } // chỉ khi settlement = "refund"
+  "goodsReceiptId": "…", // tùy chọn: phiếu nhập gốc
+  "returnedAt": "…", // tùy chọn
+  "returnedById": "…", // người trả, tùy chọn, mặc định = người đăng nhập
+  "note": "Hàng lỗi",
+  "items": [{ "productId": "…", "qty": "10", "returnPrice": "8450.2200" }]
 }
 ```
+
+Response: `id`, `code` (`THN…`), `status`, `branchId`, `supplier`, `goodsReceipt { id, code } | null`, `returnedAt`, `returnedBy`, `total` (NCC cần trả), `totalQty`, `itemCount`, `items[{ productId, code, name, qty, returnPrice, lineTotal }]`, `note`, `createdBy`, `createdAt`, `updatedAt`, `cancelledAt`, `cancelReason`.
+
+- **Khi tạo:** trừ tồn của chi nhánh làm việc, tính lại giá vốn bình quân theo **giá trả**: `(tồn × giá vốn − SL trả × giá trả) / (tồn − SL trả)`; ghi **giảm** công nợ (dòng `return`). Ví dụ tồn 1500 @5166,6667, trả 100 × 5500 → giá vốn **5142,8572**. Tồn về 0 thì giữ giá vốn cũ; nếu giá trả cao hơn giá vốn nhiều thì giá vốn mới **có thể âm** và được giữ nguyên (không chặn).
+- **Có `goodsReceiptId`:** phiếu nhập phải `completed`, cùng chi nhánh và nhà cung cấp; mỗi hàng phải có trong phiếu nhập và (đã trả + lần này) ≤ số đã nhập, vượt → `422 RETURN_QTY_EXCEEDED` (`details[].field = items.N.qty`). Không có `goodsReceiptId` thì trả tự do (vẫn cần đủ tồn: `422 STOCK_NOT_ENOUGH`).
+- Nhà cung cấp phải đang hoạt động; hàng **ngưng kinh doanh vẫn trả được**; combo bị từ chối.
+- **Hủy** (`purchase.cancel`): nhập lại hàng theo giá trả và ghi bút toán đảo tăng lại nợ.
+
+### 3.4 Đặt hàng nhập
+
+> **Trạng thái:** đã triển khai. Cần `X-Branch-Id`. Đặt hàng nhập **không đổi tồn kho và công nợ**; chỉ ảnh hưởng `onOrder` của hàng hóa. Thuộc tính theo file `DanhSachChiTietDatHangNhap` của KiotViet.
+
+| Method | Đường dẫn                        | Mô tả                                                                                                   | Quyền             |
+| ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------- |
+| GET    | `/purchase-orders`               | Danh sách (`q`, `supplierId`, `status`, `from`, `to`, `sort`: `orderedAt` \| `code` \| `total`; `?format=xlsx`) | `purchase.view`   |
+| GET    | `/purchase-orders/:id`           | Chi tiết: dòng kèm `receivedQty`, `remainingQty`; `receipts[]` = các phiếu nhập hoàn tất               | `purchase.view`   |
+| POST   | `/purchase-orders`               | Tạo `{ supplierId, orderedAt?, orderedById?, status?: "draft" \| "confirmed", note?, items[{ productId, qty, unitCost }] }` (**Idempotency-Key**) | `purchase.edit`   |
+| PUT    | `/purchase-orders/:id`           | Sửa toàn bộ (thay hết dòng); chỉ khi còn mở và chưa có phiếu nhập hoàn tất (`409` nếu đã có)           | `purchase.edit`   |
+| POST   | `/purchase-orders/:id/confirm`   | Phiếu tạm → đã xác nhận NCC                                                                             | `purchase.edit`   |
+| POST   | `/purchase-orders/:id/complete`  | "Kết thúc": đóng khi NCC không giao nốt; cần đã có ít nhất một phiếu nhập                              | `purchase.edit`   |
+| POST   | `/purchase-orders/:id/cancel`    | Hủy `{ reason? }`; chỉ khi chưa có phiếu nhập hoàn tất                                                  | `purchase.cancel` |
+
+- `status`: `draft` (Phiếu tạm) → `confirmed` (Đã xác nhận NCC) → `completed` (Hoàn thành) hoặc `cancelled`. **"Nhập một phần" không phải trạng thái lưu**: dùng `receiveState` (`none` | `partial` | `full`, tính từ các phiếu nhập hoàn tất).
+- Response: `id`, `code` (`PDN…`), `status`, `receiveState`, `branchId`, `supplier`, `orderedAt`, `orderedBy` (Người đặt), `createdBy` (Người tạo), `total` (cần trả NCC), `totalQty`, `itemCount`, `note`, `items[{ productId, code, name, qty, unitCost, lineTotal, receivedQty, remainingQty }]` (chỉ ở chi tiết), `receipts[]` (chỉ ở chi tiết), `createdAt`, `updatedAt`, `cancelledAt`, `cancelReason`.
+- **Tự hoàn thành / mở lại:** nhập đủ mọi dòng → `completed`. Hủy một phiếu nhập làm thiếu hàng → phiếu đặt về `confirmed` (kể cả khi trước đó "Kết thúc" tay). Nhập từ phiếu tạm → tự sang `confirmed`.
+- **`onOrder`** của `GET /products` (và chi tiết) = Σ phần còn phải nhập (`remainingQty`) của các phiếu đặt `draft`/`confirmed` **tại chi nhánh làm việc**.
+- Excel (`?format=xlsx`): tiêu đề như file "Chi tiết đặt hàng nhập" của KiotViet (`Mã đặt hàng nhập`, `Người đặt`, `Cần trả NCC`, …).
 
 ---
 
