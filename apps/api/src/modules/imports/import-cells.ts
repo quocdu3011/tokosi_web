@@ -13,6 +13,8 @@ export interface ImportOutcome {
   /** Số bản ghi sẽ được cập nhật / đã cập nhật (có thay đổi thật). */
   updated: number;
   errors: ImportRowError[];
+  /** Cảnh báo không chặn việc ghi (cùng dạng với lỗi). */
+  warnings?: ImportRowError[];
 }
 
 /** Lấy giá trị của cột đầu tiên có mặt trong `aliases` (tên cột đã chuẩn hóa). */

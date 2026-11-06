@@ -73,7 +73,7 @@ describe('PermissionsService (CSDL thật trong bộ nhớ)', () => {
     );
     const after = await service.getGrants('marketing');
     expect(after.find((g) => g.code === 'invoice.create')?.scope).toBe('own');
-    expect(after.find((g) => g.code === 'customer.view')?.scope).toBe('own');
+    expect(after.find((g) => g.code === 'customer.view')?.scope).toBe('all');
 
     const [{ n }] = await db
       .select({ n: count() })

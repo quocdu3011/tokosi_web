@@ -9,6 +9,7 @@ import { readSheet, writeSheet, type ParsedSheet } from '../../common/excel.js';
 import { DB, type Database } from '../../db/database.module.js';
 import { importJobs } from '../../db/schema/index.js';
 import { AuditService } from '../audit/audit.service.js';
+import { PermissionsService } from '../authorization/permissions.service.js';
 import { BranchAccessService } from '../branches/branch-access.service.js';
 import { InventoryService } from '../inventory/inventory.service.js';
 import type { ImportOutcome, ImportRowError } from './import-cells.js';
@@ -20,6 +21,7 @@ import {
   type ImportMode,
   type SupportedImportType,
 } from './imports.dto.js';
+import { importCustomers } from './customers.importer.js';
 import { importProducts } from './products.importer.js';
 
 /** Ném để hủy transaction (chạy thử hoặc có lỗi) nhưng vẫn mang kết quả ra ngoài. */
@@ -40,6 +42,7 @@ export class ImportsService {
     private readonly auditLog: AuditService,
     private readonly branchAccess: BranchAccessService,
     private readonly inventory: InventoryService,
+    private readonly permissions: PermissionsService,
   ) {}
 
   /**
@@ -66,6 +69,33 @@ export class ImportsService {
     }
     if (opts.branchId)
       await this.branchAccess.assertAccess(user, opts.branchId);
+    let debtBranchIds: string[] = [];
+    if (kind === 'customers') {
+      if (opts.mode === 'add') {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Nhập khách hàng chỉ có chế độ cập nhật theo mã/tên (mode=overwrite)',
+          [{ field: 'mode', message: 'Khách hàng không có chế độ "thêm"' }],
+        );
+      }
+      // Nhập hàng loạt sửa khách của mọi nhân viên nên cần quyền sửa TẤT CẢ khách
+      const edit = await this.permissions.getGrant(user.role, 'customer.edit');
+      if (edit?.scope !== 'all') {
+        throw new AppError(
+          403,
+          'FORBIDDEN',
+          'Nhập khách hàng cần quyền thêm/sửa khách hàng ở phạm vi tất cả',
+          { permission: 'customer.edit' },
+        );
+      }
+      // Công nợ đầu kỳ: cần quyền riêng; chỉ ghi vào các chi nhánh người nhập được phép
+      if (await this.permissions.has(user.role, 'customer.debt.opening')) {
+        debtBranchIds = (await this.branchAccess.listAllowed(user)).map(
+          (b) => b.id,
+        );
+      }
+    }
 
     let sheet: ParsedSheet;
     try {
@@ -116,13 +146,20 @@ export class ImportsService {
     let savedJob: typeof importJobs.$inferSelect | undefined;
     try {
       outcome = await this.db.transaction(async (tx) => {
-        const result = await importProducts(tx, sheet, {
-          branchId: opts.branchId,
-          userId: user.id,
-          mode: opts.mode,
-          inventory: this.inventory,
-          ref,
-        });
+        const result =
+          kind === 'customers'
+            ? await importCustomers(tx, sheet, {
+                userId: user.id,
+                ref,
+                debtBranchIds,
+              })
+            : await importProducts(tx, sheet, {
+                branchId: opts.branchId,
+                userId: user.id,
+                mode: opts.mode,
+                inventory: this.inventory,
+                ref,
+              });
         if (opts.dryRun || result.errors.length > 0) throw new Rollback(result);
         await this.auditLog.record(tx, {
           action: 'import.run',
@@ -160,6 +197,7 @@ export class ImportsService {
             updated: result.updated,
             failed: 0,
             errors: [],
+            warnings: (result.warnings ?? []).slice(0, MAX_STORED_ERRORS),
             createdBy: user.id,
             finishedAt: new Date(),
           })
@@ -203,6 +241,7 @@ export class ImportsService {
         updated: failed ? 0 : outcome.updated,
         failed: failedRows,
         errors: errors.slice(0, MAX_STORED_ERRORS),
+        warnings: (outcome.warnings ?? []).slice(0, MAX_STORED_ERRORS),
         createdBy: user.id,
         finishedAt: new Date(),
       })
@@ -221,7 +260,7 @@ export class ImportsService {
 
   /** File Excel mẫu: tiêu đề giống file KiotViet kèm một dòng ví dụ (dữ liệu giả). */
   async template(type: string): Promise<Buffer> {
-    this.parseType(type); // hiện chỉ có mẫu hàng hóa; loại không hỗ trợ ném lỗi
+    if (this.parseType(type) === 'customers') return customersTemplate();
     return writeSheet(
       'Hàng hóa',
       [
@@ -275,11 +314,11 @@ export class ImportsService {
     if ((SUPPORTED_IMPORT_TYPES as readonly string[]).includes(type)) {
       return type as SupportedImportType;
     }
-    if (type === 'customers' || type === 'suppliers') {
+    if (type === 'suppliers') {
       throw new AppError(
         400,
         'IMPORT_TYPE_NOT_SUPPORTED',
-        'Chưa hỗ trợ nhập khách hàng / nhà cung cấp từ Excel; sẽ có cùng phân hệ tương ứng',
+        'Chưa hỗ trợ nhập nhà cung cấp từ Excel; sẽ có cùng đợt chuyển dữ liệu nhà cung cấp',
       );
     }
     throw new AppError(404, 'NOT_FOUND', `Không có loại nhập "${type}"`);
@@ -299,6 +338,7 @@ function toDto(j: JobRow): ImportJobDto {
     updated: j.updated,
     failed: j.failed,
     errors: (j.errors as ImportRowError[] | null) ?? [],
+    warnings: (j.warnings as ImportRowError[] | null) ?? [],
     createdAt: j.createdAt.toISOString(),
     finishedAt: j.finishedAt?.toISOString() ?? null,
   };
@@ -322,5 +362,58 @@ function duplicateFile(prev?: {
           importedAt: prev.createdAt.toISOString(),
         }
       : undefined,
+  );
+}
+
+/** Mẫu nhập khách hàng: đúng tiêu đề file TKS kèm một dòng ví dụ (dữ liệu giả). */
+function customersTemplate(): Promise<Buffer> {
+  return writeSheet(
+    'Theo khách hàng',
+    [
+      { header: 'Mã Khách hàng', width: 14 },
+      { header: 'Tên khách', width: 36 },
+      { header: 'Sale', width: 20 },
+      { header: 'Level giá', width: 10 },
+      { header: 'Khách mới', width: 14 },
+      { header: 'Tiếp khách lần cuối', width: 18 },
+      { header: 'Điện thoại', width: 14 },
+      { header: 'Địa chỉ', width: 36 },
+      { header: 'Định vị kho', width: 24 },
+      { header: 'Số lượng kho', width: 12 },
+      { header: 'Diện tích', width: 12 },
+      { header: 'Đối thủ', width: 20 },
+      { header: 'Hình thức bán hàng', width: 24 },
+      { header: 'Quy mô khách', width: 14 },
+      { header: 'Các ngày tiếp khách', width: 26 },
+      { header: 'Ảnh kho', width: 28 },
+      { header: 'Trạng thái', width: 12 },
+      { header: 'Ghi chú', width: 24 },
+      { header: 'Công nợ Hà Nội', width: 16 },
+      { header: 'Công nợ Sài Gòn', width: 16 },
+    ],
+    [
+      [
+        null,
+        'HN - Cửa hàng Ví Dụ',
+        'Nguyễn Văn A',
+        'Vừa',
+        'T10/26-Page',
+        null,
+        '0900000001',
+        '12 Đường Ví Dụ, Hà Nội',
+        null,
+        1,
+        '300m2',
+        null,
+        'Bán sàn, FB live',
+        'Chưa có',
+        null,
+        null,
+        1,
+        null,
+        1500000,
+        null,
+      ],
+    ],
   );
 }

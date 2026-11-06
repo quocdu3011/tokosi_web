@@ -289,6 +289,152 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/customers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Danh sách khách hàng (lọc, tìm không dấu, phân trang)
+     * @description Xem được MỌI khách, kể cả khách của nhân viên khác. Mặc định không gồm khách hệ thống đại diện chi nhánh (includeInternal=true để gồm). `branches[]` chỉ có chi nhánh làm việc (header X-Branch-Id); công nợ/hạn mức chỉ có khi có quyền debt.view (chỉ "của mình" thì chỉ với khách mình phụ trách). `?format=xlsx` tải Excel với tiêu đề như file TKS.
+     */
+    get: operations['CustomersController_list'];
+    put?: never;
+    /**
+     * Tạo khách hàng
+     * @description Bỏ trống `code` thì hệ thống tự cấp (KH000056…). Số điện thoại được chuẩn hóa, có thể trùng khách khác (chỉ cảnh báo trong `warnings`). Quyền "chỉ của mình": khách luôn do chính mình phụ trách.
+     */
+    post: operations['CustomersController_create'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/customers/lookup': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Tìm nhanh khách cho ô chọn khách (tối đa 20, chỉ khách đang hoạt động)
+     * @description Kèm công nợ, hạn mức và hạn mức còn lại TẠI chi nhánh làm việc nếu người gọi có quyền xem công nợ của khách đó.
+     */
+    get: operations['CustomersController_lookup'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/customers/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Chi tiết khách hàng
+     * @description `branches[]` gồm MỌI chi nhánh người dùng được phép, mỗi chi nhánh một bộ số riêng (không cộng gộp). `warnings` có DUPLICATE_PHONE nếu số điện thoại trùng khách khác.
+     */
+    get: operations['CustomersController_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Sửa khách hàng, hồ sơ kho; ngưng hoặc mở lại giao dịch (isActive)
+     * @description Mã không đổi được. Khách hệ thống đại diện chi nhánh không sửa được. Quyền "chỉ của mình": chỉ sửa khách mình phụ trách và không chuyển cho người khác.
+     */
+    patch: operations['CustomersController_update'];
+    trace?: never;
+  };
+  '/api/v1/customers/{id}/ledger': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Sổ công nợ khách hàng tại chi nhánh làm việc
+     * @description Số dư đầu kỳ (trước `from`), các dòng sổ cái trong khoảng ngày kèm số dư cộng dồn, số dư cuối kỳ. Mỗi chi nhánh một sổ riêng. Cần customer.view và debt.view (chỉ "của mình" thì chỉ khách mình phụ trách). `amount` dương = tăng nợ (khách nợ thêm), âm = giảm nợ.
+     */
+    get: operations['CustomersController_ledger'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/customers/{id}/branches/{branchId}/terms': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Đặt hạn mức và kỳ hạn công nợ của khách tại một chi nhánh
+     * @description Riêng từng chi nhánh. Cả hai null = không giới hạn (xóa thiết lập). Cần customer.edit và debt.view; chi nhánh phải nằm trong chi nhánh người dùng được phép.
+     */
+    put: operations['CustomersController_setTerms'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/customers/{id}/visits': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Lịch tiếp khách (mới nhất trước) */
+    get: operations['CustomersController_visits'];
+    put?: never;
+    /**
+     * Ghi một ngày tiếp khách
+     * @description Chỉ người có quyền "Ghi ngày tiếp khách" (mặc định Quản lý). Ngày không được ở tương lai.
+     */
+    post: operations['CustomersController_addVisit'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/customers/{id}/visits/{visitId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Xóa một ngày tiếp khách (ghi nhật ký) */
+    delete: operations['CustomersController_removeVisit'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/purchase-orders': {
     parameters: {
       query?: never;
@@ -601,6 +747,50 @@ export interface paths {
     put: operations['UsersController_setBranches'];
     post?: never;
     delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/me/table-prefs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Tùy chỉnh bảng của tôi (mọi bảng đã lưu)
+     * @description Trả `{ data: { [tableKey]: TablePrefs } }`; bảng chưa lưu thì không có khóa. Chỉ của người dùng đang đăng nhập.
+     */
+    get: operations['PreferencesController_list'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/me/table-prefs/{tableKey}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Lưu tùy chỉnh một bảng (thay thế toàn bộ)
+     * @description Thay thế TOÀN BỘ bản ghi của bảng (không gộp với bản cũ); chưa có thì tạo. Mọi trường tùy chọn; trường lạ → 400. Không ghi nhật ký thao tác (chỉ là tùy chọn giao diện).
+     */
+    put: operations['PreferencesController_save'];
+    post?: never;
+    /**
+     * Xóa tùy chỉnh một bảng (về mặc định)
+     * @description Không có bản ghi cũng trả 204.
+     */
+    delete: operations['PreferencesController_remove'];
     options?: never;
     head?: never;
     patch?: never;
@@ -1134,6 +1324,226 @@ export interface components {
       /** @description false = ngưng giao dịch */
       isActive?: boolean;
     };
+    CustomerSalesOwnerDto: {
+      id: string;
+      fullName: string;
+    };
+    CustomerProfileDto: {
+      /** @description Định vị kho: link bản đồ, tọa độ hoặc địa chỉ chữ */
+      warehouseLocation: string | null;
+      warehouseCount: number | null;
+      /**
+       * @description Diện tích kho, nhập tự do
+       * @example 600m2
+       */
+      warehouseArea: string | null;
+      warehousePhotoUrl: string | null;
+      competitors: string | null;
+      /** @description Hình thức bán hàng (chọn nhiều) */
+      salesMethods: (
+        'Bán cửa hàng' | 'FB live' | 'Kho buôn' | 'Bán sàn' | 'Sang tay' | 'FB ads' | 'Khác'
+      )[];
+      /** @description Quy mô khách; null = "Chưa có" */
+      scale: string | null;
+    };
+    CustomerBranchFiguresDto: {
+      branchId: string;
+      /** @example SG */
+      branchCode: string;
+      branchName: string;
+      /**
+       * @description Tổng bán TẠI chi nhánh này = tổng hóa đơn hoàn tất (chưa có hóa đơn thì 0)
+       * @example 1200000000
+       */
+      totalSales: string;
+      /** @description Tổng bán trừ trả hàng TẠI chi nhánh này */
+      netSales: string;
+      /**
+       * Format: date-time
+       * @description Thời điểm hóa đơn hoàn tất gần nhất tại chi nhánh này
+       */
+      lastTransactionAt: string | null;
+      /**
+       * @description Công nợ phải thu TẠI chi nhánh này (+ = khách còn nợ, có thể ÂM = khách dư/ứng trước). VẮNG MẶT nếu thiếu quyền debt.view (hoặc debt.view chỉ của mình và đây không phải khách mình phụ trách)
+       * @example 12500000
+       */
+      balance?: string;
+      /** @description Hạn mức công nợ tại chi nhánh này; null = không giới hạn. Vắng mặt như balance */
+      creditLimit?: string | null;
+      /** @description Kỳ hạn thanh toán (ngày) tại chi nhánh này. Vắng mặt như balance */
+      paymentTermDays?: number | null;
+    };
+    CustomerWarningDto: {
+      /** @example DUPLICATE_PHONE */
+      code: string;
+      message: string;
+      /** @description Các khách khác cùng số điện thoại */
+      customers?: string[];
+    };
+    CustomerDto: {
+      id: string;
+      /** @example KH006974 */
+      code: string;
+      name: string;
+      /**
+       * @description Đã chuẩn hóa; KHÔNG duy nhất (có thể trùng khách khác)
+       * @example 0901234567
+       */
+      phone: string | null;
+      address: string | null;
+      /** @description Nhân viên phụ trách (cột "Sale" của file TKS) */
+      salesOwner: components['schemas']['CustomerSalesOwnerDto'] | null;
+      /**
+       * @description Level giá: new = Mới, medium = Vừa, large = Lớn, vip = Vip. Chỉ để nhân viên tham chiếu khi báo giá (hệ thống không có bảng giá)
+       * @enum {string}
+       */
+      priceLevel: 'new' | 'medium' | 'large' | 'vip';
+      /**
+       * @description Tháng trở thành khách mới (ngày đầu tháng); null = khách cũ/không rõ
+       * @example 2026-10-01
+       */
+      newSince: string | null;
+      /** @example Page */
+      acquisitionSource: string | null;
+      note: string | null;
+      isActive: boolean;
+      /** @description true = khách hệ thống đại diện một chi nhánh (chuyển kho nội bộ); không sửa được */
+      isInternalBranch: boolean;
+      profile: components['schemas']['CustomerProfileDto'] | null;
+      /**
+       * @description Ngày tiếp khách gần nhất (YYYY-MM-DD)
+       * @example 2026-11-03
+       */
+      lastVisitedOn: string | null;
+      /** @description Số liệu TÁCH BIỆT theo chi nhánh, không bao giờ cộng gộp. Danh sách: chỉ chi nhánh làm việc. Chi tiết: mọi chi nhánh người dùng được phép */
+      branches: components['schemas']['CustomerBranchFiguresDto'][];
+      /** @description Họ tên người tạo */
+      createdByName: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      /** @description Cảnh báo mềm (vd DUPLICATE_PHONE); chỉ có ở chi tiết, tạo và sửa */
+      warnings?: components['schemas']['CustomerWarningDto'][];
+    };
+    CustomerListMetaDto: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+    CustomerListDto: {
+      data: components['schemas']['CustomerDto'][];
+      meta: components['schemas']['CustomerListMetaDto'];
+    };
+    CustomerLookupItemDto: {
+      id: string;
+      code: string;
+      name: string;
+      phone: string | null;
+      address: string | null;
+      /** @enum {string} */
+      priceLevel: 'new' | 'medium' | 'large' | 'vip';
+      salesOwner: components['schemas']['CustomerSalesOwnerDto'] | null;
+      /** @description Công nợ tại chi nhánh làm việc; vắng mặt nếu thiếu quyền xem */
+      balance?: string;
+      creditLimit?: string | null;
+      /** @description Hạn mức còn lại = hạn mức − công nợ (có thể âm = đã vượt); null nếu không giới hạn */
+      creditAvailable?: string | null;
+    };
+    CustomerProfileInputDto: {
+      warehouseLocation?: string | null;
+      warehouseCount?: number | null;
+      warehouseArea?: string | null;
+      warehousePhotoUrl?: string | null;
+      competitors?: string | null;
+      salesMethods?: (
+        'Bán cửa hàng' | 'FB live' | 'Kho buôn' | 'Bán sàn' | 'Sang tay' | 'FB ads' | 'Khác'
+      )[];
+      scale?: string | null;
+    };
+    CreateCustomerDto: {
+      /** @example 0901 234 567 */
+      phone?: string | null;
+      address?: string | null;
+      /** @description Id nhân viên phụ trách (người dùng đang hoạt động) */
+      salesOwnerId?: string | null;
+      /** @enum {string} */
+      priceLevel?: 'new' | 'medium' | 'large' | 'vip';
+      /**
+       * @description Tháng trở thành khách mới, dạng YYYY-MM-01 (chỉ nhận ngày đầu tháng); null = khách cũ
+       * @example 2026-10-01
+       */
+      newSince?: string | null;
+      /** @example Page */
+      acquisitionSource?: string | null;
+      note?: string | null;
+      /** @description Hồ sơ kho/đối thủ. Gửi object: chỉ đổi các trường có mặt. Gửi null: xóa cả hồ sơ */
+      profile?: components['schemas']['CustomerProfileInputDto'] | null;
+      /**
+       * @description Bỏ trống = hệ thống tự cấp. Chữ, số, "-", "_", "."; 1–30 ký tự; không trùng (kể cả khác hoa thường)
+       * @example KH006974
+       */
+      code?: string;
+      /** @example HN - Cửa hàng Ví Dụ */
+      name: string;
+    };
+    UpdateCustomerDto: {
+      /** @example 0901 234 567 */
+      phone?: string | null;
+      address?: string | null;
+      /** @description Id nhân viên phụ trách (người dùng đang hoạt động) */
+      salesOwnerId?: string | null;
+      /** @enum {string} */
+      priceLevel?: 'new' | 'medium' | 'large' | 'vip';
+      /**
+       * @description Tháng trở thành khách mới, dạng YYYY-MM-01 (chỉ nhận ngày đầu tháng); null = khách cũ
+       * @example 2026-10-01
+       */
+      newSince?: string | null;
+      /** @example Page */
+      acquisitionSource?: string | null;
+      note?: string | null;
+      /** @description Hồ sơ kho/đối thủ. Gửi object: chỉ đổi các trường có mặt. Gửi null: xóa cả hồ sơ */
+      profile?: components['schemas']['CustomerProfileInputDto'] | null;
+      name?: string;
+      /** @description false = ngưng giao dịch */
+      isActive?: boolean;
+    };
+    SetCustomerTermsDto: {
+      /**
+       * @description Hạn mức công nợ (số nguyên đồng ≥ 0); null = không giới hạn
+       * @example 50000000
+       */
+      creditLimit: string | null;
+      /**
+       * @description Kỳ hạn thanh toán (ngày, 0–3650); null = không quy định
+       * @example 15
+       */
+      paymentTermDays: number | null;
+    };
+    CustomerTermsDto: {
+      branchId: string;
+      creditLimit: string | null;
+      paymentTermDays: number | null;
+    };
+    CustomerVisitDto: {
+      id: string;
+      /** @example 2026-11-03 */
+      visitedOn: string;
+      note: string | null;
+      createdByName: string | null;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    CreateCustomerVisitDto: {
+      /**
+       * @description Ngày tiếp khách (giờ Việt Nam), không được ở tương lai
+       * @example 2026-11-03
+       */
+      visitedOn: string;
+      note?: string | null;
+    };
     DocPartyDto: {
       id: string;
       /** @example NCC000001 */
@@ -1537,6 +1947,62 @@ export interface components {
       /** @description Chi nhánh mặc định mới. Bỏ qua = giữ nếu vẫn còn được gán, ngược lại bỏ */
       defaultBranchId?: string | null;
     };
+    TablePrefsDto: {
+      /**
+       * @description Id các cột đang ẩn (tối đa 100, mỗi id 1–64 ký tự)
+       * @example [
+       *       "description"
+       *     ]
+       */
+      hidden?: string[];
+      /**
+       * @description Thứ tự id cột; cột không có trong danh sách xếp sau, theo thứ tự mặc định
+       * @example [
+       *       "code",
+       *       "name",
+       *       "onHand"
+       *     ]
+       */
+      order?: string[];
+      /**
+       * @description Độ rộng cột (px, số nguyên 40..1000) theo id cột; tối đa 100 cột
+       * @example {
+       *       "name": 360
+       *     }
+       */
+      widths?: {
+        [key: string]: number;
+      };
+      /**
+       * @description Số dòng mỗi trang
+       * @example 50
+       * @enum {number}
+       */
+      pageSize?: 15 | 50 | 100;
+    };
+    TablePrefsMapDto: {
+      /**
+       * @example {
+       *       "products": {
+       *         "hidden": [
+       *           "description"
+       *         ],
+       *         "order": [
+       *           "code",
+       *           "name",
+       *           "onHand"
+       *         ],
+       *         "widths": {
+       *           "name": 360
+       *         },
+       *         "pageSize": 50
+       *       }
+       *     }
+       */
+      data: {
+        [key: string]: components['schemas']['TablePrefsDto'];
+      };
+    };
     GoogleLoginDto: {
       /** @description Access token (JWT) Supabase nhận được sau khi đăng nhập Google (`session.access_token`) */
       accessToken: string;
@@ -1780,6 +2246,8 @@ export interface components {
       failed: number;
       /** @description Lỗi từng dòng (tối đa 500 lỗi đầu) */
       errors: components['schemas']['ImportErrorDto'][];
+      /** @description Cảnh báo từng dòng, không chặn việc ghi (vd số điện thoại trùng khách khác); tối đa 500 cảnh báo đầu */
+      warnings: components['schemas']['ImportErrorDto'][];
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -2294,6 +2762,327 @@ export interface operations {
         };
       };
       /** @description Không tìm thấy nhà cung cấp */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  CustomersController_list: {
+    parameters: {
+      query?: {
+        page?: number;
+        limit?: number;
+        /** @description Tên cột cần sắp xếp; thêm `-` phía trước để giảm dần. Chỉ nhận các cột endpoint cho phép */
+        sort?: string;
+        /** @description Tìm không dấu theo mã, tên, SĐT */
+        q?: string;
+        priceLevel?: 'new' | 'medium' | 'large' | 'vip';
+        /** @description Nhân viên phụ trách (id người dùng) */
+        salesOwnerId?: string;
+        /** @description Đúng nguồn khách mới (không phân biệt hoa thường, dấu), vd Page */
+        acquisitionSource?: string;
+        /** @description Khách mới từ tháng này (YYYY-MM, gồm cả tháng này) */
+        newSinceFrom?: string;
+        /** @description Khách mới đến tháng này (YYYY-MM, gồm cả tháng này) */
+        newSinceTo?: string;
+        /** @description true = đang nợ (nợ > 0 TẠI chi nhánh làm việc), false = không nợ. Cần quyền debt.view; nếu debt.view chỉ "của mình" thì chỉ tính trong khách mình phụ trách */
+        hasDebt?: boolean;
+        isActive?: boolean;
+        /** @description true = gồm cả khách hệ thống đại diện chi nhánh (mặc định ẩn) */
+        includeInternal?: boolean;
+        /** @description xlsx = tải Excel theo đúng bộ lọc, tiêu đề như file TKS (bỏ qua page/limit, tối đa 10.000 dòng) */
+        format?: 'xlsx';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CustomerListDto'];
+        };
+      };
+      /** @description Lọc hasDebt khi thiếu debt.view */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  CustomersController_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateCustomerDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CustomerDto'];
+        };
+      };
+      /** @description DUPLICATE_CODE: mã đã tồn tại */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  CustomersController_lookup: {
+    parameters: {
+      query?: {
+        /** @description Tìm không dấu theo mã, tên, SĐT */
+        q?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CustomerLookupItemDto'][];
+        };
+      };
+    };
+  };
+  CustomersController_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CustomerDto'];
+        };
+      };
+      /** @description Không tìm thấy khách hàng */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  CustomersController_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateCustomerDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CustomerDto'];
+        };
+      };
+      /** @description Khách do nhân viên khác phụ trách */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Không tìm thấy khách hàng */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  CustomersController_ledger: {
+    parameters: {
+      query?: {
+        /** @description Từ ngày (giờ Việt Nam, tính cả ngày này); bỏ trống = từ đầu. Dạng YYYY-MM-DD */
+        from?: string;
+        /** @description Đến ngày (giờ Việt Nam, tính cả ngày này); bỏ trống = đến hiện tại */
+        to?: string;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LedgerDto'];
+        };
+      };
+      /** @description Không tìm thấy khách hàng */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  CustomersController_setTerms: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        branchId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetCustomerTermsDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CustomerTermsDto'];
+        };
+      };
+      /** @description Không tìm thấy khách hàng */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  CustomersController_visits: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CustomerVisitDto'][];
+        };
+      };
+      /** @description Không tìm thấy khách hàng */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  CustomersController_addVisit: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateCustomerVisitDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CustomerVisitDto'];
+        };
+      };
+      /** @description DUPLICATE_VISIT: đã ghi ngày này */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  CustomersController_removeVisit: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        visitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Không tìm thấy khách hoặc ngày tiếp khách */
       404: {
         headers: {
           [name: string]: unknown;
@@ -3009,6 +3798,128 @@ export interface operations {
       };
       /** @description Không tìm thấy người dùng */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  PreferencesController_list: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TablePrefsMapDto'];
+        };
+      };
+      /** @description `UNAUTHENTICATED`: chưa đăng nhập */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description `PASSWORD_CHANGE_REQUIRED`: cần đổi mật khẩu trước */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  PreferencesController_save: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Khóa bảng ở giao diện: chữ thường/số, có thể có `:` `_` `-`, tối đa 64 ký tự (vd `products`, `purchase-orders`) */
+        tableKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TablePrefsDto'];
+      };
+    };
+    responses: {
+      /** @description Đối tượng đã lưu */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TablePrefsDto'];
+        };
+      };
+      /** @description `VALIDATION_ERROR`: khóa bảng hoặc nội dung không hợp lệ */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description `UNAUTHENTICATED`: chưa đăng nhập */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description `PASSWORD_CHANGE_REQUIRED`: cần đổi mật khẩu trước */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  PreferencesController_remove: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Khóa bảng ở giao diện: chữ thường/số, có thể có `:` `_` `-`, tối đa 64 ký tự (vd `products`, `purchase-orders`) */
+        tableKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description `VALIDATION_ERROR`: khóa bảng sai */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description `UNAUTHENTICATED`: chưa đăng nhập */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description `PASSWORD_CHANGE_REQUIRED`: cần đổi mật khẩu trước */
+      403: {
         headers: {
           [name: string]: unknown;
         };

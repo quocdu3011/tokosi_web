@@ -3,8 +3,8 @@ import { IsIn, IsOptional, IsUUID } from 'class-validator';
 import { QueryBoolean } from '../../common/query.js';
 
 export const IMPORT_TYPES = ['products', 'customers', 'suppliers'] as const;
-/** Loại đã hỗ trợ; khách hàng và nhà cung cấp sẽ làm cùng phân hệ của chúng. */
-export const SUPPORTED_IMPORT_TYPES = ['products'] as const;
+/** Loại đã hỗ trợ; nhà cung cấp sẽ làm cùng đợt chuyển dữ liệu NCC. */
+export const SUPPORTED_IMPORT_TYPES = ['products', 'customers'] as const;
 export type SupportedImportType = (typeof SUPPORTED_IMPORT_TYPES)[number];
 
 /** `overwrite` (mặc định): đè thông tin theo mã. `add`: cộng thêm số lượng, giữ nguyên thông tin cũ. */
@@ -56,6 +56,11 @@ export class ImportJobDto {
     description: `Lỗi từng dòng (tối đa ${MAX_STORED_ERRORS} lỗi đầu)`,
   })
   errors!: ImportErrorDto[];
+  @ApiProperty({
+    type: [ImportErrorDto],
+    description: `Cảnh báo từng dòng, không chặn việc ghi (vd số điện thoại trùng khách khác); tối đa ${MAX_STORED_ERRORS} cảnh báo đầu`,
+  })
+  warnings!: ImportErrorDto[];
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
   @ApiProperty({ nullable: true, type: String, format: 'date-time' })
   finishedAt!: string | null;

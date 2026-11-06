@@ -141,14 +141,30 @@ export const PERMISSIONS = [
     code: 'customer.view',
     module: 'customer',
     label: 'Xem khách hàng',
-    description: 'Không gồm công nợ (cần "Xem công nợ")',
-    scopable: true,
+    description:
+      'Xem MỌI khách, kể cả khách của nhân viên khác (không có phạm vi "chỉ của mình"). Không gồm công nợ (cần "Xem công nợ")',
   },
   {
     code: 'customer.edit',
     module: 'customer',
     label: 'Thêm/sửa khách hàng',
+    description: '"Chỉ của mình" = chỉ sửa khách mình phụ trách; khách mới tạo luôn do mình phụ trách',
     scopable: true,
+    requires: ['customer.view'],
+  },
+  {
+    code: 'customer.debt.opening',
+    module: 'customer',
+    label: 'Ghi công nợ đầu kỳ khi nhập Excel khách',
+    description:
+      'Cho phép cột "Công nợ <chi nhánh>" của file nhập khách hàng ghi bút toán công nợ đầu kỳ (chỉ khách tạo mới, chỉ chi nhánh được phép). Mặc định chỉ Quản lý',
+    requires: ['customer.view', 'debt.view'],
+  },
+  {
+    code: 'customer.visit.edit',
+    module: 'customer',
+    label: 'Ghi ngày tiếp khách',
+    description: 'Thêm/xóa ngày tiếp khách của khách hàng (mặc định chỉ Quản lý); xem ngày tiếp khách chỉ cần "Xem khách hàng"',
     requires: ['customer.view'],
   },
   // ---- Đơn hàng
@@ -324,10 +340,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Exclude<Role, 'manager'>, RoleDefa
   ]),
   driver: all(['delivery.view']),
   sales: {
-    ...all(['product.view', 'delivery.view']),
+    ...all(['product.view', 'delivery.view', 'customer.view']),
     ...own([
       'return.create',
-      'customer.view',
       'customer.edit',
       'order.view',
       'order.create',

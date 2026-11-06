@@ -176,6 +176,8 @@ export const importJobs = pgTable(
     updated: integer().notNull().default(0),
     failed: integer().notNull().default(0),
     errors: jsonb(),
+    /** Cảnh báo mềm không chặn việc ghi (vd SĐT khách trùng); cùng dạng với `errors`. */
+    warnings: jsonb(),
     /** Chi nhánh của lần nhập (nếu có). */
     branchId: uuid().references(() => branches.id),
     /** SHA-256 của file; chỉ lưu cho lần Import thêm THẬT đã hoàn tất để chặn nạp lại cùng file (cộng tồn lần nữa). */

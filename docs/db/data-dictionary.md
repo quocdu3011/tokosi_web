@@ -200,6 +200,7 @@ Công việc import Excel chạy nền.
 | `updated` | integer |  | `0` |  |
 | `failed` | integer |  | `0` |  |
 | `errors` | jsonb | ✔ |  |  |
+| `warnings` | jsonb | ✔ |  |  |
 | `branch_id` | uuid | ✔ |  | → `branches.id` |
 | `file_hash` | text | ✔ |  |  |
 | `created_by` | uuid | ✔ |  | → `users.id` |
@@ -472,7 +473,7 @@ Khách hàng. Công nợ không lưu ở đây: số dư = tổng debt_ledger (c
 | `id` | uuid |  | `gen_random_uuid()` | **PK** |
 | `code` | text |  |  | unique |
 | `name` | text |  |  |  |
-| `phone` | text | ✔ |  | unique |
+| `phone` | text | ✔ |  |  |
 | `address` | text | ✔ |  |  |
 | `sales_owner_id` | uuid | ✔ |  | → `users.id`; Nhân viên phụ trách (ở KiotViet là "Nhóm khách hàng") |
 | `price_level` | customer_price_level |  | `'new'` | Level giá (Mới/Vừa/Lớn/Vip) để nhân viên tham chiếu khi báo giá; hệ thống không có bảng giá |
@@ -490,6 +491,8 @@ Khách hàng. Công nợ không lưu ở đây: số dư = tổng debt_ledger (c
 
 - `customers_search_trgm`: `f_search_text(code || ' ' || name || ' ' || coalesce(phone, '')) gin_trgm_ops`
 - `customers_sales_owner_idx`: `sales_owner_id`
+- `customers_phone_idx`: `phone`
+- `customers_code_lower_unique` (unique): `lower(code)`
 
 ### customer_branch_terms
 

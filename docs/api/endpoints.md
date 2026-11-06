@@ -582,91 +582,117 @@ Response: `id`, `code` (`THN…`), `status`, `branchId`, `supplier`, `goodsRecei
 
 ## 4. Khách hàng
 
-| Method | Đường dẫn                                           | Mô tả                                              | Quyền           | Mốc |
-| ------ | --------------------------------------------------- | -------------------------------------------------- | --------------- | --- |
-| GET    | `/customers`                                        | Danh sách                                          | `customer.view` | W3  |
-| GET    | `/customers/lookup?q=`                              | Tìm nhanh (tên/SĐT/mã) cho ô chọn khách, tối đa 20 | `customer.view` | W3  |
-| GET    | `/customers/:id`                                    | Chi tiết + `balance`                               | `customer.view` | W3  |
-| POST   | `/customers`                                        | Tạo                                                | `customer.edit` | W3  |
-| PATCH  | `/customers/:id`                                    | Sửa / ngưng                                        | `customer.edit` | W3  |
-| GET    | `/customers/:id/ledger?from&to`                     | Sổ công nợ (cấu trúc như mục 3.1)                  | `customer.view` | W6  |
-| GET    | `/customers/:id/orders`                             | Lịch sử đặt hàng (phân trang)                      | `customer.view` | W6  |
-| GET    | `/customers/:id/invoices`                           | Lịch sử hóa đơn (kèm `paid`, `debt`)               | `customer.view` | W6  |
-| GET    | `/customers/:id/sales-returns`                      | Lịch sử trả hàng                                   | `customer.view` | W6  |
-| GET    | `/customers/:id/aging`                              | Tuổi nợ                                            | `customer.view` | W6  |
-| POST   | `/customers/:id/receipts`                           | **Thu nợ nhanh** (**Idempotency-Key**)             | `cash.create`   | W6  |
-| GET    | `/customers/:id/statement?from&to&format=xlsx\|pdf` | Biên bản đối chiếu công nợ                         | `customer.view` | W6  |
+> **Trạng thái:** đã triển khai danh mục khách, công nợ và hạn mức theo chi nhánh, lịch tiếp khách, xuất/nhập Excel theo file TKS. **Chưa làm** (cùng Sổ quỹ và Đơn hàng): thu nợ nhanh, tuổi nợ, biên bản đối chiếu, lịch sử đơn/hóa đơn/trả hàng của khách; `totalSales`/`netSales`/`lastTransactionAt` hiện bằng `0`/`null` cho tới khi có hóa đơn.
 
-Bộ lọc `GET /customers`: `q`, `priceLevel`, `salesOwnerId`, `hasDebt` (`true` = đang nợ), `isActive`; sort: `code`, `name`, `balance`, `lastTransactionAt`.
+| Method | Đường dẫn                                       | Mô tả                                                                                          | Quyền                                          |
+| ------ | ----------------------------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| GET    | `/customers`                                    | Danh sách (lọc, tìm không dấu, phân trang; `?format=xlsx` tải Excel)                          | `customer.view`                                |
+| GET    | `/customers/lookup?q=`                          | Tìm nhanh cho ô chọn khách: tối đa 20, chỉ khách đang hoạt động, kèm nợ/hạn mức còn lại        | `customer.view`                                |
+| GET    | `/customers/:id`                                | Chi tiết (hồ sơ kho, số liệu từng chi nhánh, cảnh báo SĐT trùng)                               | `customer.view`                                |
+| POST   | `/customers`                                    | Tạo                                                                                            | `customer.edit`                                |
+| PATCH  | `/customers/:id`                                | Sửa / ngưng (`isActive`) / sửa hồ sơ kho (`profile`)                                           | `customer.edit`                                |
+| PUT    | `/customers/:id/branches/:branchId/terms`       | Đặt hạn mức + kỳ hạn công nợ của khách **tại một chi nhánh** (cả hai `null` = xóa)             | `customer.edit` + `debt.view`                  |
+| GET    | `/customers/:id/ledger?from&to`                 | Sổ công nợ tại chi nhánh làm việc (cấu trúc như sổ NCC, mục 3.1)                               | `customer.view` + `debt.view`                  |
+| GET    | `/customers/:id/visits`                         | Lịch tiếp khách (mới nhất trước)                                                               | `customer.view`                                |
+| POST   | `/customers/:id/visits`                         | Ghi một ngày tiếp khách `{ visitedOn, note? }`                                                 | `customer.visit.edit` (mặc định chỉ Quản lý)   |
+| DELETE | `/customers/:id/visits/:visitId`                | Xóa một ngày tiếp khách (`204`, có nhật ký)                                                    | `customer.visit.edit`                          |
+
+Dữ liệu theo file `TKS_Bao_cao_kinh_doanh_customers`. Các endpoint có số liệu theo chi nhánh cần header `X-Branch-Id` (như nhà cung cấp).
+
+Bộ lọc `GET /customers`: `q` (mã, tên, SĐT), `priceLevel`, `salesOwnerId`, `acquisitionSource`, `newSinceFrom` / `newSinceTo` (`YYYY-MM`, gồm cả tháng), `hasDebt` (`true` = đang nợ **tại chi nhánh làm việc**; cần `debt.view`), `isActive`, `includeInternal` (gồm khách đại diện chi nhánh, mặc định ẩn); sort: `code` (mặc định), `name`, `createdAt`, `newSince` (thêm `-` để giảm dần). `?format=xlsx` xuất đúng bộ lọc với tiêu đề **như file TKS** (nhập lại được; không có cột công nợ).
 
 ```json
 // Customer
 {
   "id": "…",
-  "code": "KH000001",
-  "name": "Cửa hàng Ví Dụ 1",
-  "phone": "0900000001",
+  "code": "KH006974",
+  "name": "HN - Cửa hàng Ví Dụ 1",
+  "phone": "0900000001", // đã chuẩn hóa, KHÔNG duy nhất
   "address": "12 Đường Ví Dụ, Quận 1, TP.HCM",
-  "salesOwner": { "id": "…", "fullName": "Trần Văn B" }, // nhân viên phụ trách (cột "Sale")
-  "priceLevel": "medium", // Level giá: new (Mới) | medium (Vừa) | large (Lớn) | vip (Vip); chỉ để tham chiếu
-  "newSince": "2026-10-01", // tháng trở thành khách mới; null = khách cũ/không rõ
-  "acquisitionSource": null, // vd "Page"
-  "profile": null, // hồ sơ kinh doanh, null nếu chưa có: { warehouseLocation, warehouseCount, warehouseArea, warehousePhotoUrl, competitors, salesMethods: ["Bán sàn", "FB live"], scale }
-  "lastVisitedOn": null, // ngày tiếp khách gần nhất; lịch đầy đủ ở customer_visits
-  "isInternalBranch": false, // true = khách hàng hệ thống đại diện một chi nhánh (chuyển kho nội bộ)
-  "terms": [
-    // hạn mức & kỳ hạn công nợ RIÊNG từng chi nhánh; không có dòng = không giới hạn
-    { "branchId": "…", "branchCode": "SG", "creditLimit": "50000000", "paymentTermDays": 15 },
-    { "branchId": "…", "branchCode": "HN", "creditLimit": null, "paymentTermDays": null }
-  ],
-  "balances": [
-    // công nợ TÁCH BIỆT theo chi nhánh; phải thu; ÂM = khách đang dư/ứng trước
-    { "branchId": "…", "branchCode": "SG", "balance": "12500000" },
-    { "branchId": "…", "branchCode": "HN", "balance": "0" }
-  ],
-  "lastTransactionAt": "…",
-  "totalSales": "1200000000",
+  "salesOwner": { "id": "…", "fullName": "Trần Văn B" }, // nhân viên phụ trách (cột "Sale"), null nếu chưa gán
+  "priceLevel": "medium", // Level giá: new (Mới) | medium (Vừa) | large (Lớn) | vip (Vip); chỉ để tham chiếu khi báo giá
+  "newSince": "2026-10-01", // tháng trở thành khách mới (luôn ngày đầu tháng); null = khách cũ/không rõ
+  "acquisitionSource": "Page", // nguồn khách mới; null nếu không có
   "note": null,
   "isActive": true,
+  "isInternalBranch": false, // true = khách hệ thống đại diện chi nhánh (chuyển kho); ẩn khỏi danh sách, không sửa được
+  "profile": {
+    // hồ sơ kinh doanh; null nếu chưa có gì
+    "warehouseLocation": "https://maps.example.com/…",
+    "warehouseCount": 2,
+    "warehouseArea": "600m2",
+    "warehousePhotoUrl": "https://example.com/kho.jpg",
+    "competitors": "Siêu thị A",
+    "salesMethods": ["FB live", "Bán sàn"], // Bán cửa hàng | FB live | Kho buôn | Bán sàn | Sang tay | FB ads | Khác
+    "scale": null // "Quy mô khách"; null = "Chưa có"
+  },
+  "lastVisitedOn": "2026-11-03", // ngày tiếp khách gần nhất
+  "branches": [
+    // số liệu TÁCH BIỆT từng chi nhánh, KHÔNG cộng gộp. Danh sách: chỉ chi nhánh làm việc. Chi tiết: mọi chi nhánh được phép
+    {
+      "branchId": "…", "branchCode": "SG", "branchName": "Chi nhánh Sài Gòn",
+      "totalSales": "1200000000", "netSales": "1150000000", "lastTransactionAt": "…",
+      "balance": "12500000", // công nợ phải thu; ÂM = khách dư/ứng trước. Chỉ có khi thấy được nợ (xem bên dưới)
+      "creditLimit": "50000000", // null = không giới hạn; cùng điều kiện với balance
+      "paymentTermDays": 15
+    }
+  ],
+  "createdByName": "…",
   "createdAt": "…",
-  "updatedAt": "…"
+  "updatedAt": "…",
+  "warnings": [
+    // chỉ ở chi tiết / tạo / sửa
+    { "code": "DUPLICATE_PHONE", "message": "…", "customers": [{ "id": "…", "code": "KH000010", "name": "…" }] }
+  ]
 }
 ```
 
-**Công nợ theo chi nhánh:** khách hàng và nhà cung cấp là dữ liệu dùng chung, nhưng **mỗi chi nhánh có sổ công nợ riêng**, không cấn trừ chéo (thu nợ ở Hà Nội không giảm nợ Sài Gòn). `balances` và `GET …/ledger`, `…/aging`, `…/statement` nhận `branchId` (mặc định = chi nhánh làm việc). Danh sách khách/nhà cung cấp mặc định **không gồm** các đối tác nội bộ (`isInternalBranch = true`); thêm `?includeInternal=true` nếu cần. `hasDebt` tính theo chi nhánh làm việc.
+**Phân quyền khách hàng**
 
-Quy ước: `phone` được chuẩn hóa về dạng `0xxxxxxxxx` và **không trùng** (lỗi `409 DUPLICATE_PHONE`, `details` kèm khách đã có). `balance` chỉ đọc.
+- `customer.view` xem **mọi** khách, kể cả khách của nhân viên khác (không có phạm vi "chỉ của mình").
+- `customer.edit` có thể là "chỉ của mình": chỉ sửa khách mình phụ trách (`403` nếu khác); **tạo khách thì luôn do chính mình phụ trách** (gửi `salesOwnerId` của người khác → `403`); không chuyển khách cho người khác.
+- Tiền (`balance`, `creditLimit`, `paymentTermDays`, sổ công nợ, lọc `hasDebt`) cần `debt.view`; nếu quyền này là "chỉ của mình" thì chỉ thấy tiền của khách mình phụ trách (khách khác: trường vắng mặt, sổ công nợ `403`). Thiếu `debt.view` thì mọi trường tiền vắng mặt và `hasDebt` → `403`.
+- Ngày tiếp khách chỉ ghi/xóa được bởi người có `customer.visit.edit` (mặc định chỉ Quản lý); Sale chỉ xem.
+
+**Tạo / sửa**
 
 ```json
-// GET /customers/:id/aging
+// POST /customers   (PATCH: mọi trường tùy chọn; mã không đổi được)
 {
-  "asOf": "2026-11-03",
-  "total": "12500000",
-  "buckets": {
-    "current": "5000000",
-    "d1_30": "4000000",
-    "d31_60": "2500000",
-    "d61_90": "1000000",
-    "over90": "0"
-  }
+  "code": "KH006974?", // bỏ trống = tự cấp KH000056…; trùng (kể cả khác hoa thường) → 409 DUPLICATE_CODE
+  "name": "HN - Cửa hàng Ví Dụ 1",
+  "phone": "0900 000 001", // chuẩn hóa; sai định dạng → 400; trùng khách khác vẫn lưu, trả warnings DUPLICATE_PHONE
+  "address": null,
+  "salesOwnerId": "…?", // người dùng đang hoạt động; quyền "chỉ của mình" → luôn là chính mình
+  "priceLevel": "medium",
+  "newSince": "2026-10-01", // chỉ nhận ngày đầu tháng; null = khách cũ
+  "acquisitionSource": "Page",
+  "note": null,
+  "isActive": true, // chỉ PATCH
+  "profile": { "warehouseCount": 2, "salesMethods": ["FB live"] } // object: chỉ đổi các trường có mặt (null xóa trường đó); null: xóa cả hồ sơ
 }
 ```
 
+Server từ chối trường lạ (`400`), ví dụ gửi công nợ hay tổng bán.
+
+**Hạn mức và công nợ**
+
 ```json
-// POST /customers/:id/receipts   — thu nợ nhanh
-{
-  "amount": "10000000",
-  "method": "bank",
-  "accountId": "…",
-  "occurredAt": "…?",
-  "note": "CK ngày 3/11",
-  "allocations": [{ "invoiceId": "…", "amount": "6000000" }] // tùy chọn; bỏ qua = tự cấn hóa đơn cũ nhất
-}
-// 201: { "cashTransaction": { "id": "…", "code": "TT019330", … },
-//        "allocations": [{ "invoiceId": "…", "invoiceCode": "HD016500", "amount": "6000000" }, …],
-//        "balanceAfter": "2500000" }
-// Lỗi: 422 ALLOCATION_EXCEEDS
+// PUT /customers/:id/branches/:branchId/terms     → 200 { "branchId": "…", "creditLimit": "50000000", "paymentTermDays": 15 }
+{ "creditLimit": "50000000", "paymentTermDays": 15 } // số nguyên đồng ≥ 0 hoặc null; cả hai null = không giới hạn
 ```
+
+`branchId` phải là chi nhánh người dùng được phép (`403 BRANCH_FORBIDDEN`). `GET /customers/lookup` trả thêm `balance`, `creditLimit` và `creditAvailable` (= hạn mức − công nợ, âm = đã vượt; `null` nếu không giới hạn) tại chi nhánh làm việc, cho màn hình đặt hàng. Hạn mức hiện chỉ để cảnh báo (hạn mức cứng làm sau go-live).
+
+**Công nợ theo chi nhánh:** khách hàng là dữ liệu dùng chung nhưng **mỗi chi nhánh có sổ công nợ riêng**, không cấn trừ chéo (thu nợ ở Hà Nội không giảm nợ Sài Gòn). Công nợ đầu kỳ nhập qua Excel (mục 9).
+
+```json
+// POST /customers/:id/visits   → 201
+{ "visitedOn": "2026-11-03", "note": "Đến kho khách" } // không được ở tương lai; trùng ngày → 409 DUPLICATE_VISIT
+// GET /customers/:id/visits → [{ "id": "…", "visitedOn": "2026-11-03", "note": "…", "createdByName": "…", "createdAt": "…" }]
+```
+
+**Còn lại trong bản nháp (chưa triển khai):** `GET /customers/:id/orders|invoices|sales-returns|aging|statement` và `POST /customers/:id/receipts` (thu nợ nhanh, `Idempotency-Key`, cấn trừ hóa đơn cũ nhất; lỗi `422 ALLOCATION_EXCEEDS`) làm cùng Sổ quỹ và Đơn hàng.
 
 ---
 
@@ -960,13 +986,13 @@ Cấu trúc chung cho dạng JSON: `{ "params": {…}, "columns": [{ "key": "…
 
 ## 9. Nhập dữ liệu từ Excel
 
-> **Trạng thái:** đã triển khai cho `products`; `customers`, `suppliers` trả `400 IMPORT_TYPE_NOT_SUPPORTED` (sẽ làm cùng phân hệ của chúng). Chỉ người có quyền `import.run` (mặc định chỉ Quản lý).
+> **Trạng thái:** đã triển khai cho `products` và `customers`; `suppliers` trả `400 IMPORT_TYPE_NOT_SUPPORTED` (sẽ làm cùng đợt chuyển dữ liệu NCC). Chỉ người có quyền `import.run` (mặc định chỉ Quản lý).
 
 Dùng cho import hàng loạt (chuyển dữ liệu từ KiotViet và nhập tay bằng file). **Xử lý ngay trong yêu cầu** (vài nghìn dòng), kết quả có sẵn trong phản hồi; vẫn xem lại được bằng `GET /imports/:id`.
 
 | Method | Đường dẫn                 | Mô tả                                                                                          | Quyền        |
 | ------ | ------------------------- | ---------------------------------------------------------------------------------------------- | ------------ |
-| POST   | `/imports/:type`          | Tải file lên (`multipart/form-data`, field `file`, ≤ 10 MB). `type`: `products` | `import.run` |
+| POST   | `/imports/:type`          | Tải file lên (`multipart/form-data`, field `file`, ≤ 10 MB). `type`: `products`, `customers` | `import.run` |
 | GET    | `/imports/:id`            | Kết quả và lỗi từng dòng của một lần nhập                                                      | `import.run` |
 | GET    | `/imports/:type/template` | Tải file Excel mẫu                                                                             | `import.run` |
 
@@ -985,6 +1011,7 @@ Tham số query của `POST`: `allowDuplicate` (xem "Chống nạp lại"), `dry
   "updated": 87, // chỉ tính bản ghi CÓ THAY ĐỔI THẬT → chạy lại cùng file cho 0
   "failed": 0, // số dòng có lỗi
   "errors": [], // [{ "row": 15, "field": "Mã hàng", "message": "Mã hàng trùng với dòng 12 trong file" }]
+  "warnings": [], // cảnh báo không chặn việc ghi (cùng dạng errors), vd SĐT khách trùng; chỉ khách hàng dùng
   "createdAt": "…",
   "finishedAt": "…"
 }
@@ -1029,6 +1056,30 @@ Chi tiết `add`: bắt buộc `branchId` và cột `Tồn kho`. `Tồn kho` là
 | `Mô tả`                                  |                                                                                                                                                     |
 | `Hình ảnh (url1,url2...)`                | Nhiều địa chỉ `http(s)` cách nhau dấu phẩy → **giữ nguyên URL gốc** (không tải về kho file); thêm ảnh chưa có, không xóa ảnh hiện có; tối đa 10 ảnh |
 
+
+**`customers`** — nhập theo file `TKS_Bao_cao_kinh_doanh_customers` (`GET /imports/customers/template`). Cần `import.run` **và** `customer.edit` ở phạm vi **tất cả** (nhập hàng loạt sửa khách của mọi nhân viên → `403` nếu không đủ). Chỉ có chế độ cập nhật (`mode=add` → `400`); không cần `branchId`.
+
+- **Ghép dòng với khách có sẵn:** theo `Mã Khách hàng` (không phân biệt hoa thường) nếu có, ngược lại theo `Tên khách` (bỏ dấu, không phân biệt hoa thường). Không ghép được → tạo mới (mã tự cấp `KH…` nếu ô mã trống). Tên trùng nhiều khách hoặc trùng giữa các dòng trong file mà không có mã → lỗi dòng (hãy ghi mã). Mã trùng khách hệ thống/đã xóa → lỗi.
+- **Ô trống** = giữ nguyên (khi cập nhật) hoặc mặc định (khi tạo). Chạy lại cùng file không tạo trùng (`updated = 0` nếu không có gì đổi).
+- **Các lần nhập khách chạy lần lượt** (khóa tư vấn trong CSDL): hai lần nhập cùng lúc (bấm đúp, hai người cùng nhập) không bao giờ nhân đôi khách hay công nợ đầu kỳ; lần đến sau thấy khách đã có và báo lỗi như chạy lại cùng file.
+
+| Cột | Ghi chú |
+| --- | --- |
+| `Tên khách` | **Bắt buộc** |
+| `Mã Khách hàng` | Chữ, số, `-` `_` `.`, ≤ 30 ký tự |
+| `Sale` | Ghép với **họ tên** (hoặc mã `NV…`) người dùng đang hoạt động, bỏ dấu và hoa thường; không thấy hoặc trùng nhiều người → lỗi dòng. Cần tạo tài khoản nhân viên trước |
+| `Level giá` | `Mới`, `Vừa`, `Lớn`, `Vip`; trống = `Mới` khi tạo |
+| `Khách mới` | `T6/26` (tháng 6/2026), `T6/26-Page` (thêm nguồn `Page`), `Cũ` (khách cũ: bỏ tháng khách mới) |
+| `Điện thoại` | Chuẩn hóa. Ô nhiều số (ngăn bằng `/ , ;`, có nhãn tên, hoặc 20/30 chữ số liền) → số đầu là SĐT, các số còn lại nối vào Ghi chú (`SĐT khác: …`). Số không hợp lệ → **cảnh báo** và giữ nguyên văn trong Ghi chú (`SĐT gốc: …`), không chặn. Trùng khách khác/trùng dòng khác → cảnh báo |
+| `Địa chỉ`, `Ghi chú` | |
+| `Trạng thái` | `1`/`0` hoặc "Đang hoạt động"/"Ngưng"; trống = đang hoạt động |
+| `Định vị kho`, `Số lượng kho`, `Diện tích`, `Đối thủ`, `Quy mô khách` | Hồ sơ kho. `Chưa có` ở Quy mô = xóa quy mô |
+| `Hình thức bán hàng` | Nhiều giá trị cách nhau dấu phẩy, thuộc: Bán cửa hàng, FB live, Kho buôn, Bán sàn, Sang tay, FB ads, Khác |
+| `Ảnh kho` | Đường link `http(s)`; giá trị khác → cảnh báo và bỏ qua |
+| `Tiếp khách lần cuối`, `Các ngày tiếp khách` | Ngày `dd/mm/yyyy`, nhiều ngày ngăn bằng dấu phẩy; không được ở tương lai. Thêm vào lịch tiếp khách, ngày đã có thì bỏ qua |
+| `Công nợ Hà Nội`, `Công nợ Sài Gòn` | **Công nợ đầu kỳ** của từng chi nhánh (số nguyên đồng, được âm = khách dư). Ghi bút toán `opening` vào sổ công nợ chi nhánh đó. **Chỉ cho khách tạo mới** (khách đã có mà ô nợ khác 0 → lỗi, tránh ghi đầu kỳ hai lần) và chỉ chi nhánh người nhập được phép; cần quyền riêng **`customer.debt.opening`** (mặc định chỉ Quản lý) |
+
+Nhập thật có thể chạy bằng dòng lệnh: `pnpm --filter @kiot/api kiotviet:import -- --type customers --file <file.xlsx> [--apply]` (mặc định chỉ chạy thử).
 
 - Nên cho người dùng chạy `dryRun=true` trước, xem lỗi rồi mới chạy thật (`dryRun=false`).
 - Import số dư đầu kỳ (tồn, nợ, quỹ) **không** mở cho giao diện; backend chạy bằng công cụ riêng khi chuyển đổi.

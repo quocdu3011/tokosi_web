@@ -305,7 +305,7 @@ Table customers {
   id uuid [pk, default: `gen_random_uuid()`]
   code text [not null, unique]
   name text [not null]
-  phone text [unique]
+  phone text
   address text
   sales_owner_id uuid [note: 'Nhân viên phụ trách (ở KiotViet là "Nhóm khách hàng")']
   price_level customer_price_level [not null, default: 'new', note: 'Level giá (Mới/Vừa/Lớn/Vip) để nhân viên tham chiếu khi báo giá; hệ thống không có bảng giá']
@@ -322,6 +322,8 @@ Table customers {
   indexes {
     (`f_search_text(code || ' ' || name || ' ' || coalesce(phone, '')) gin_trgm_ops`) [name: 'customers_search_trgm']
     (sales_owner_id) [name: 'customers_sales_owner_idx']
+    (phone) [name: 'customers_phone_idx']
+    (`lower(code)`) [name: 'customers_code_lower_unique', unique]
   }
 
   Note: '''Khách hàng. Công nợ không lưu ở đây: số dư = tổng debt_ledger (có thể âm). sales_owner_id = nhân viên phụ trách.'''
@@ -429,6 +431,7 @@ Table import_jobs {
   updated integer [not null, default: 0]
   failed integer [not null, default: 0]
   errors jsonb
+  warnings jsonb
   branch_id uuid
   file_hash text
   created_by uuid

@@ -204,6 +204,13 @@
       "when": 1793951924887,
       "tag": "0028_tuy_chon_bang_theo_nguoi_dung",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1793953000000,
+      "tag": "0029_khach_hang_theo_file_tks_va_nghiem_thu",
+      "breakpoints": true
     }
   ]
 }

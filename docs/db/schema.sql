@@ -735,3 +735,6 @@ CREATE TABLE "user_table_prefs" (
 	CONSTRAINT "user_table_prefs_user_id_table_key_pk" PRIMARY KEY("user_id","table_key")
 );
 ALTER TABLE "user_table_prefs" ADD CONSTRAINT "user_table_prefs_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+-- ===== 0029_khach_hang_theo_file_tks_va_nghiem_thu.sql =====
+ALTER TABLE "customers" DROP CONSTRAINT "customers_phone_unique";ALTER TABLE "import_jobs" ADD COLUMN "warnings" jsonb;CREATE INDEX "customers_phone_idx" ON "customers" USING btree ("phone");CREATE UNIQUE INDEX "customers_code_lower_unique" ON "customers" USING btree (lower("code"));-- Khách hàng: mọi nhân viên xem được khách của người khác (bỏ phạm vi "chỉ của mình" ở customer.view)
+UPDATE "role_permissions" SET "scope" = 'all' WHERE "permission_code" = 'customer.view';

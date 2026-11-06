@@ -59,7 +59,7 @@ describe('normalizeGrants', () => {
     const scope = (c: string) => r.grants.find((g) => g.code === c)?.scope;
     expect(scope('invoice.create')).toBe('own');
     expect(scope('invoice.view')).toBe('own');
-    expect(scope('customer.view')).toBe('own');
+    expect(scope('customer.view')).toBe('all'); // khách hàng ai cũng xem được, không có phạm vi own
     expect(scope('product.view')).toBe('all'); // product.view không có phạm vi
   });
 
@@ -128,7 +128,7 @@ describe('cấu hình mặc định', () => {
     expect(defaultGrantsFor('driver')).toEqual([{ code: 'delivery.view', scope: 'all' }]);
     const sales = defaultGrantsFor('sales');
     expect(sales.find((g) => g.code === 'invoice.view')?.scope).toBe('own');
-    expect(sales.find((g) => g.code === 'customer.view')?.scope).toBe('own');
+    expect(sales.find((g) => g.code === 'customer.view')?.scope).toBe('all');
     expect(defaultGrantsFor('warehouse').map((g) => g.code)).not.toContain('product.cost.view');
     expect(defaultGrantsFor('sales').map((g) => g.code)).not.toContain('product.cost.view');
   });

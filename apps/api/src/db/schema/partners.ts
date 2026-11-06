@@ -19,6 +19,7 @@ import { branches, users } from './system.js';
  * Khách hàng (theo file TKS của bộ phận kinh doanh). `salesOwnerId` = nhân viên phụ trách (cột "Sale"; ở KiotViet gọi nhầm là "Nhóm khách hàng").
  * `priceLevel` = "Level giá"; `newSince` = tháng trở thành khách mới (ngày đầu tháng; trống = khách cũ/không rõ);
  * `acquisitionSource` = nguồn khách mới ("Page"). Thông tin kho/đối thủ: `customer_profiles`; lịch tiếp khách: `customer_visits`.
+ * `phone` đã chuẩn hóa (`normalizeVnPhone`), KHÔNG duy nhất: file TKS có số dùng chung cho nhiều khách, API chỉ cảnh báo.
  * Công nợ KHÔNG lưu ở đây: số dư = tổng `debt_ledger` của khách THEO TỪNG CHI NHÁNH (có thể âm).
  * `linkedBranchId` có giá trị khi đây là khách hàng hệ thống đại diện cho một chi nhánh (chuyển kho nội bộ).
  * Hạn mức/kỳ hạn công nợ riêng từng chi nhánh: bảng `customer_branch_terms`.
@@ -29,7 +30,7 @@ export const customers = pgTable(
     id: pk(),
     code: text().notNull().unique(),
     name: text().notNull(),
-    phone: text().unique(),
+    phone: text(),
     address: text(),
     salesOwnerId: uuid().references(() => users.id),
     priceLevel: customerPriceLevel().notNull().default('new'),
@@ -47,6 +48,9 @@ export const customers = pgTable(
   (t) => [
     trgmIndex('customers_search_trgm', partySearchExpr(t)),
     index('customers_sales_owner_idx').on(t.salesOwnerId),
+    index('customers_phone_idx').on(t.phone),
+    // Mã không phân biệt hoa thường (như nhà cung cấp, migration 0024)
+    uniqueIndex('customers_code_lower_unique').on(sql`lower(${t.code})`),
   ],
 );
 

@@ -100,9 +100,9 @@ describe('Nhập/xuất Excel qua HTTP', () => {
     const file = await xlsx(KV_HEADERS, [
       kvRow({ 'Mã hàng': 'X1', 'Tên hàng': 'x' }),
     ]);
-    const cust = await post('customers', file);
-    expect(cust.status).toBe(400);
-    expect(cust.body.code).toBe('IMPORT_TYPE_NOT_SUPPORTED');
+    const supp = await post('suppliers', file);
+    expect(supp.status).toBe(400);
+    expect(supp.body.code).toBe('IMPORT_TYPE_NOT_SUPPORTED');
     expect((await post('khong-co', file)).status).toBe(404);
     expect((await post('products', null)).status).toBe(400);
     const junk = await post('products', Buffer.from('không phải file excel'));

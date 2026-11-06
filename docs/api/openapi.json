@@ -769,6 +769,587 @@
         ]
       }
     },
+    "/api/v1/customers": {
+      "get": {
+        "description": "Xem được MỌI khách, kể cả khách của nhân viên khác. Mặc định không gồm khách hệ thống đại diện chi nhánh (includeInternal=true để gồm). `branches[]` chỉ có chi nhánh làm việc (header X-Branch-Id); công nợ/hạn mức chỉ có khi có quyền debt.view (chỉ \"của mình\" thì chỉ với khách mình phụ trách). `?format=xlsx` tải Excel với tiêu đề như file TKS.",
+        "operationId": "CustomersController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Tên cột cần sắp xếp; thêm `-` phía trước để giảm dần. Chỉ nhận các cột endpoint cho phép",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Tìm không dấu theo mã, tên, SĐT",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "priceLevel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new",
+                "medium",
+                "large",
+                "vip"
+              ]
+            }
+          },
+          {
+            "name": "salesOwnerId",
+            "required": false,
+            "in": "query",
+            "description": "Nhân viên phụ trách (id người dùng)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "acquisitionSource",
+            "required": false,
+            "in": "query",
+            "description": "Đúng nguồn khách mới (không phân biệt hoa thường, dấu), vd Page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "newSinceFrom",
+            "required": false,
+            "in": "query",
+            "description": "Khách mới từ tháng này (YYYY-MM, gồm cả tháng này)",
+            "schema": {
+              "example": "2026-03",
+              "type": "string"
+            }
+          },
+          {
+            "name": "newSinceTo",
+            "required": false,
+            "in": "query",
+            "description": "Khách mới đến tháng này (YYYY-MM, gồm cả tháng này)",
+            "schema": {
+              "example": "2026-11",
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasDebt",
+            "required": false,
+            "in": "query",
+            "description": "true = đang nợ (nợ > 0 TẠI chi nhánh làm việc), false = không nợ. Cần quyền debt.view; nếu debt.view chỉ \"của mình\" thì chỉ tính trong khách mình phụ trách",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "includeInternal",
+            "required": false,
+            "in": "query",
+            "description": "true = gồm cả khách hệ thống đại diện chi nhánh (mặc định ẩn)",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "description": "xlsx = tải Excel theo đúng bộ lọc, tiêu đề như file TKS (bỏ qua page/limit, tối đa 10.000 dòng)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "xlsx"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerListDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Lọc hasDebt khi thiếu debt.view"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách khách hàng (lọc, tìm không dấu, phân trang)",
+        "tags": [
+          "Khách hàng"
+        ]
+      },
+      "post": {
+        "description": "Bỏ trống `code` thì hệ thống tự cấp (KH000056…). Số điện thoại được chuẩn hóa, có thể trùng khách khác (chỉ cảnh báo trong `warnings`). Quyền \"chỉ của mình\": khách luôn do chính mình phụ trách.",
+        "operationId": "CustomersController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCustomerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "DUPLICATE_CODE: mã đã tồn tại"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tạo khách hàng",
+        "tags": [
+          "Khách hàng"
+        ]
+      }
+    },
+    "/api/v1/customers/lookup": {
+      "get": {
+        "description": "Kèm công nợ, hạn mức và hạn mức còn lại TẠI chi nhánh làm việc nếu người gọi có quyền xem công nợ của khách đó.",
+        "operationId": "CustomersController_lookup",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Tìm không dấu theo mã, tên, SĐT",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerLookupItemDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tìm nhanh khách cho ô chọn khách (tối đa 20, chỉ khách đang hoạt động)",
+        "tags": [
+          "Khách hàng"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}": {
+      "get": {
+        "description": "`branches[]` gồm MỌI chi nhánh người dùng được phép, mỗi chi nhánh một bộ số riêng (không cộng gộp). `warnings` có DUPLICATE_PHONE nếu số điện thoại trùng khách khác.",
+        "operationId": "CustomersController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy khách hàng"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Chi tiết khách hàng",
+        "tags": [
+          "Khách hàng"
+        ]
+      },
+      "patch": {
+        "description": "Mã không đổi được. Khách hệ thống đại diện chi nhánh không sửa được. Quyền \"chỉ của mình\": chỉ sửa khách mình phụ trách và không chuyển cho người khác.",
+        "operationId": "CustomersController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCustomerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Khách do nhân viên khác phụ trách"
+          },
+          "404": {
+            "description": "Không tìm thấy khách hàng"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sửa khách hàng, hồ sơ kho; ngưng hoặc mở lại giao dịch (isActive)",
+        "tags": [
+          "Khách hàng"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}/ledger": {
+      "get": {
+        "description": "Số dư đầu kỳ (trước `from`), các dòng sổ cái trong khoảng ngày kèm số dư cộng dồn, số dư cuối kỳ. Mỗi chi nhánh một sổ riêng. Cần customer.view và debt.view (chỉ \"của mình\" thì chỉ khách mình phụ trách). `amount` dương = tăng nợ (khách nợ thêm), âm = giảm nợ.",
+        "operationId": "CustomersController_ledger",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Từ ngày (giờ Việt Nam, tính cả ngày này); bỏ trống = từ đầu. Dạng YYYY-MM-DD",
+            "schema": {
+              "example": "2026-11-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Đến ngày (giờ Việt Nam, tính cả ngày này); bỏ trống = đến hiện tại",
+            "schema": {
+              "example": "2026-11-30",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LedgerDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy khách hàng"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sổ công nợ khách hàng tại chi nhánh làm việc",
+        "tags": [
+          "Khách hàng"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}/branches/{branchId}/terms": {
+      "put": {
+        "description": "Riêng từng chi nhánh. Cả hai null = không giới hạn (xóa thiết lập). Cần customer.edit và debt.view; chi nhánh phải nằm trong chi nhánh người dùng được phép.",
+        "operationId": "CustomersController_setTerms",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetCustomerTermsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerTermsDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy khách hàng"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Đặt hạn mức và kỳ hạn công nợ của khách tại một chi nhánh",
+        "tags": [
+          "Khách hàng"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}/visits": {
+      "get": {
+        "operationId": "CustomersController_visits",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerVisitDto"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy khách hàng"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lịch tiếp khách (mới nhất trước)",
+        "tags": [
+          "Khách hàng"
+        ]
+      },
+      "post": {
+        "description": "Chỉ người có quyền \"Ghi ngày tiếp khách\" (mặc định Quản lý). Ngày không được ở tương lai.",
+        "operationId": "CustomersController_addVisit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCustomerVisitDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerVisitDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "DUPLICATE_VISIT: đã ghi ngày này"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ghi một ngày tiếp khách",
+        "tags": [
+          "Khách hàng"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}/visits/{visitId}": {
+      "delete": {
+        "operationId": "CustomersController_removeVisit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "visitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "404": {
+            "description": "Không tìm thấy khách hoặc ngày tiếp khách"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xóa một ngày tiếp khách (ghi nhật ký)",
+        "tags": [
+          "Khách hàng"
+        ]
+      }
+    },
     "/api/v1/purchase-orders": {
       "get": {
         "description": "`receiveState` (chưa nhập / nhập một phần / đã nhập đủ) tính từ các phiếu nhập hoàn tất. `?format=xlsx` tải Excel theo đúng bộ lọc.",
@@ -3834,6 +4415,646 @@
           }
         }
       },
+      "CustomerSalesOwnerDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "fullName"
+        ]
+      },
+      "CustomerProfileDto": {
+        "type": "object",
+        "properties": {
+          "warehouseLocation": {
+            "type": "string",
+            "nullable": true,
+            "description": "Định vị kho: link bản đồ, tọa độ hoặc địa chỉ chữ"
+          },
+          "warehouseCount": {
+            "type": "number",
+            "nullable": true
+          },
+          "warehouseArea": {
+            "type": "string",
+            "nullable": true,
+            "example": "600m2",
+            "description": "Diện tích kho, nhập tự do"
+          },
+          "warehousePhotoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "competitors": {
+            "type": "string",
+            "nullable": true
+          },
+          "salesMethods": {
+            "type": "array",
+            "description": "Hình thức bán hàng (chọn nhiều)",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Bán cửa hàng",
+                "FB live",
+                "Kho buôn",
+                "Bán sàn",
+                "Sang tay",
+                "FB ads",
+                "Khác"
+              ]
+            }
+          },
+          "scale": {
+            "type": "string",
+            "nullable": true,
+            "description": "Quy mô khách; null = \"Chưa có\""
+          }
+        },
+        "required": [
+          "warehouseLocation",
+          "warehouseCount",
+          "warehouseArea",
+          "warehousePhotoUrl",
+          "competitors",
+          "salesMethods",
+          "scale"
+        ]
+      },
+      "CustomerBranchFiguresDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string"
+          },
+          "branchCode": {
+            "type": "string",
+            "example": "SG"
+          },
+          "branchName": {
+            "type": "string"
+          },
+          "totalSales": {
+            "type": "string",
+            "example": "1200000000",
+            "description": "Tổng bán TẠI chi nhánh này = tổng hóa đơn hoàn tất (chưa có hóa đơn thì 0)"
+          },
+          "netSales": {
+            "type": "string",
+            "description": "Tổng bán trừ trả hàng TẠI chi nhánh này"
+          },
+          "lastTransactionAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Thời điểm hóa đơn hoàn tất gần nhất tại chi nhánh này"
+          },
+          "balance": {
+            "type": "string",
+            "example": "12500000",
+            "description": "Công nợ phải thu TẠI chi nhánh này (+ = khách còn nợ, có thể ÂM = khách dư/ứng trước). VẮNG MẶT nếu thiếu quyền debt.view (hoặc debt.view chỉ của mình và đây không phải khách mình phụ trách)"
+          },
+          "creditLimit": {
+            "type": "string",
+            "nullable": true,
+            "description": "Hạn mức công nợ tại chi nhánh này; null = không giới hạn. Vắng mặt như balance"
+          },
+          "paymentTermDays": {
+            "type": "number",
+            "nullable": true,
+            "description": "Kỳ hạn thanh toán (ngày) tại chi nhánh này. Vắng mặt như balance"
+          }
+        },
+        "required": [
+          "branchId",
+          "branchCode",
+          "branchName",
+          "totalSales",
+          "netSales",
+          "lastTransactionAt"
+        ]
+      },
+      "CustomerWarningDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "DUPLICATE_PHONE"
+          },
+          "message": {
+            "type": "string"
+          },
+          "customers": {
+            "description": "Các khách khác cùng số điện thoại",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ]
+      },
+      "CustomerDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "KH006974"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "example": "0901234567",
+            "description": "Đã chuẩn hóa; KHÔNG duy nhất (có thể trùng khách khác)"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "salesOwner": {
+            "nullable": true,
+            "description": "Nhân viên phụ trách (cột \"Sale\" của file TKS)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerSalesOwnerDto"
+              }
+            ]
+          },
+          "priceLevel": {
+            "type": "string",
+            "enum": [
+              "new",
+              "medium",
+              "large",
+              "vip"
+            ],
+            "description": "Level giá: new = Mới, medium = Vừa, large = Lớn, vip = Vip. Chỉ để nhân viên tham chiếu khi báo giá (hệ thống không có bảng giá)"
+          },
+          "newSince": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-10-01",
+            "description": "Tháng trở thành khách mới (ngày đầu tháng); null = khách cũ/không rõ"
+          },
+          "acquisitionSource": {
+            "type": "string",
+            "nullable": true,
+            "example": "Page"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "isInternalBranch": {
+            "type": "boolean",
+            "description": "true = khách hệ thống đại diện một chi nhánh (chuyển kho nội bộ); không sửa được"
+          },
+          "profile": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerProfileDto"
+              }
+            ]
+          },
+          "lastVisitedOn": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-11-03",
+            "description": "Ngày tiếp khách gần nhất (YYYY-MM-DD)"
+          },
+          "branches": {
+            "description": "Số liệu TÁCH BIỆT theo chi nhánh, không bao giờ cộng gộp. Danh sách: chỉ chi nhánh làm việc. Chi tiết: mọi chi nhánh người dùng được phép",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerBranchFiguresDto"
+            }
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Họ tên người tạo"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "warnings": {
+            "description": "Cảnh báo mềm (vd DUPLICATE_PHONE); chỉ có ở chi tiết, tạo và sửa",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerWarningDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "phone",
+          "address",
+          "salesOwner",
+          "priceLevel",
+          "newSince",
+          "acquisitionSource",
+          "note",
+          "isActive",
+          "isInternalBranch",
+          "profile",
+          "lastVisitedOn",
+          "branches",
+          "createdByName",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CustomerListMetaDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "totalPages": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages"
+        ]
+      },
+      "CustomerListDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/CustomerListMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "CustomerLookupItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "priceLevel": {
+            "type": "string",
+            "enum": [
+              "new",
+              "medium",
+              "large",
+              "vip"
+            ]
+          },
+          "salesOwner": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerSalesOwnerDto"
+              }
+            ]
+          },
+          "balance": {
+            "type": "string",
+            "description": "Công nợ tại chi nhánh làm việc; vắng mặt nếu thiếu quyền xem"
+          },
+          "creditLimit": {
+            "type": "string",
+            "nullable": true
+          },
+          "creditAvailable": {
+            "type": "string",
+            "nullable": true,
+            "description": "Hạn mức còn lại = hạn mức − công nợ (có thể âm = đã vượt); null nếu không giới hạn"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "phone",
+          "address",
+          "priceLevel",
+          "salesOwner"
+        ]
+      },
+      "CustomerProfileInputDto": {
+        "type": "object",
+        "properties": {
+          "warehouseLocation": {
+            "type": "string",
+            "nullable": true
+          },
+          "warehouseCount": {
+            "type": "number",
+            "nullable": true
+          },
+          "warehouseArea": {
+            "type": "string",
+            "nullable": true
+          },
+          "warehousePhotoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "competitors": {
+            "type": "string",
+            "nullable": true
+          },
+          "salesMethods": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Bán cửa hàng",
+                "FB live",
+                "Kho buôn",
+                "Bán sàn",
+                "Sang tay",
+                "FB ads",
+                "Khác"
+              ]
+            }
+          },
+          "scale": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CreateCustomerDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "example": "0901 234 567"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "salesOwnerId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Id nhân viên phụ trách (người dùng đang hoạt động)"
+          },
+          "priceLevel": {
+            "type": "string",
+            "enum": [
+              "new",
+              "medium",
+              "large",
+              "vip"
+            ]
+          },
+          "newSince": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-10-01",
+            "description": "Tháng trở thành khách mới, dạng YYYY-MM-01 (chỉ nhận ngày đầu tháng); null = khách cũ"
+          },
+          "acquisitionSource": {
+            "type": "string",
+            "nullable": true,
+            "example": "Page"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "profile": {
+            "nullable": true,
+            "description": "Hồ sơ kho/đối thủ. Gửi object: chỉ đổi các trường có mặt. Gửi null: xóa cả hồ sơ",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerProfileInputDto"
+              }
+            ]
+          },
+          "code": {
+            "type": "string",
+            "example": "KH006974",
+            "description": "Bỏ trống = hệ thống tự cấp. Chữ, số, \"-\", \"_\", \".\"; 1–30 ký tự; không trùng (kể cả khác hoa thường)"
+          },
+          "name": {
+            "type": "string",
+            "example": "HN - Cửa hàng Ví Dụ"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateCustomerDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "example": "0901 234 567"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "salesOwnerId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Id nhân viên phụ trách (người dùng đang hoạt động)"
+          },
+          "priceLevel": {
+            "type": "string",
+            "enum": [
+              "new",
+              "medium",
+              "large",
+              "vip"
+            ]
+          },
+          "newSince": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-10-01",
+            "description": "Tháng trở thành khách mới, dạng YYYY-MM-01 (chỉ nhận ngày đầu tháng); null = khách cũ"
+          },
+          "acquisitionSource": {
+            "type": "string",
+            "nullable": true,
+            "example": "Page"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "profile": {
+            "nullable": true,
+            "description": "Hồ sơ kho/đối thủ. Gửi object: chỉ đổi các trường có mặt. Gửi null: xóa cả hồ sơ",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerProfileInputDto"
+              }
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "false = ngưng giao dịch"
+          }
+        }
+      },
+      "SetCustomerTermsDto": {
+        "type": "object",
+        "properties": {
+          "creditLimit": {
+            "type": "string",
+            "nullable": true,
+            "example": "50000000",
+            "description": "Hạn mức công nợ (số nguyên đồng ≥ 0); null = không giới hạn"
+          },
+          "paymentTermDays": {
+            "type": "number",
+            "nullable": true,
+            "example": 15,
+            "description": "Kỳ hạn thanh toán (ngày, 0–3650); null = không quy định"
+          }
+        },
+        "required": [
+          "creditLimit",
+          "paymentTermDays"
+        ]
+      },
+      "CustomerTermsDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string"
+          },
+          "creditLimit": {
+            "type": "string",
+            "nullable": true
+          },
+          "paymentTermDays": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "branchId",
+          "creditLimit",
+          "paymentTermDays"
+        ]
+      },
+      "CustomerVisitDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "visitedOn": {
+            "type": "string",
+            "example": "2026-11-03"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "visitedOn",
+          "note",
+          "createdByName",
+          "createdAt"
+        ]
+      },
+      "CreateCustomerVisitDto": {
+        "type": "object",
+        "properties": {
+          "visitedOn": {
+            "type": "string",
+            "example": "2026-11-03",
+            "description": "Ngày tiếp khách (giờ Việt Nam), không được ở tương lai"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "visitedOn"
+        ]
+      },
       "DocPartyDto": {
         "type": "object",
         "properties": {
@@ -5676,6 +6897,13 @@
               "$ref": "#/components/schemas/ImportErrorDto"
             }
           },
+          "warnings": {
+            "description": "Cảnh báo từng dòng, không chặn việc ghi (vd số điện thoại trùng khách khác); tối đa 500 cảnh báo đầu",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportErrorDto"
+            }
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -5698,6 +6926,7 @@
           "updated",
           "failed",
           "errors",
+          "warnings",
           "createdAt",
           "finishedAt"
         ]

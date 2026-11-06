@@ -7,6 +7,9 @@
  *
  *   pnpm --filter @kiot/api kiotviet:import -- --file D:\tokosi-data\kiotviet-api-hang-hoa.xlsx --branch HN [--user quanly] [--apply]
  *
+ * `--type customers`: nhập khách hàng theo file TKS (cập nhật theo mã/tên, không cần --branch; công nợ đầu kỳ nằm trong
+ * các cột "Công nợ <chi nhánh>"), vd: kiotviet:import -- --type customers --file <file.xlsx> [--apply]
+ *
  * Chế độ "thêm" (cộng tồn): chạy lại cùng file bị từ chối (409). Nhật ký ghi theo người dùng `--user` (mặc định quanly).
  */
 import 'dotenv/config';
@@ -21,6 +24,7 @@ import { requestContext } from '../../common/request-context.js';
 import { buildPoolConfig, type Database } from '../../db/database.module.js';
 import * as schema from '../../db/schema/index.js';
 import { AuditService } from '../../modules/audit/audit.service.js';
+import { PermissionsService } from '../../modules/authorization/permissions.service.js';
 import { BranchAccessService } from '../../modules/branches/branch-access.service.js';
 import { ImportsService } from '../../modules/imports/imports.service.js';
 import { InventoryService } from '../../modules/inventory/inventory.service.js';
@@ -32,10 +36,13 @@ function arg(name: string): string | undefined {
 
 const fileArg = arg('file');
 const branchCode = arg('branch');
+const type = arg('type') ?? 'products';
 const username = arg('user') ?? 'quanly';
 const apply = process.argv.includes('--apply');
-if (!fileArg || !branchCode) {
-  console.error('Cần --file <đường dẫn .xlsx> và --branch <mã chi nhánh, vd HN>');
+if (!fileArg || (type === 'products' && !branchCode)) {
+  console.error(
+    'Cần --file <đường dẫn .xlsx>; với hàng hóa cần thêm --branch <mã chi nhánh, vd HN>',
+  );
   process.exit(2);
 }
 
@@ -52,11 +59,14 @@ try {
     .from(schema.users)
     .where(eq(schema.users.username, username));
   if (!user) throw new Error(`Không có người dùng "${username}"`);
-  const [branch] = await db
-    .select({ id: schema.branches.id, name: schema.branches.name })
-    .from(schema.branches)
-    .where(eq(schema.branches.code, branchCode.toUpperCase()));
-  if (!branch) throw new Error(`Không có chi nhánh mã "${branchCode}"`);
+  const [branch] = branchCode
+    ? await db
+        .select({ id: schema.branches.id, name: schema.branches.name })
+        .from(schema.branches)
+        .where(eq(schema.branches.code, branchCode.toUpperCase()))
+    : [];
+  if (branchCode && !branch)
+    throw new Error(`Không có chi nhánh mã "${branchCode}"`);
 
   const path = resolve(process.env.INIT_CWD ?? process.cwd(), fileArg);
   const buffer = readFileSync(path);
@@ -65,19 +75,22 @@ try {
     new AuditService(),
     new BranchAccessService(db),
     new InventoryService(db),
+    new PermissionsService(db),
   );
 
   console.log(
-    `${apply ? 'NHẬP THẬT' : 'CHẠY THỬ'} ${basename(path)} → chi nhánh ${branch.name}, người dùng ${username}`,
+    `${apply ? 'NHẬP THẬT' : 'CHẠY THỬ'} ${type} ${basename(path)} → ${branch ? `chi nhánh ${branch.name}, ` : ''}người dùng ${username}`,
   );
   const job = await requestContext.run(
-    { requestId: randomUUID(), userId: user.id, branchId: branch.id },
+    { requestId: randomUUID(), userId: user.id, branchId: branch?.id },
     () =>
       service.run(
         { id: user.id, role: user.role as UserRole },
-        'products',
+        type,
         { originalname: basename(path), size: buffer.length, buffer },
-        { dryRun: !apply, branchId: branch.id, mode: 'add' },
+        type === 'products'
+          ? { dryRun: !apply, branchId: branch!.id, mode: 'add' }
+          : { dryRun: !apply, mode: 'overwrite' },
       ),
   );
 
@@ -88,6 +101,13 @@ try {
   for (const e of job.errors)
     by.set(`${e.field}: ${e.message}`, (by.get(`${e.field}: ${e.message}`) ?? 0) + 1);
   for (const [k, n] of [...by].slice(0, 10)) console.log(`  ${n} × ${k}`);
+  if (job.warnings.length > 0) {
+    const w = new Map<string, number>();
+    for (const x of job.warnings) w.set(x.field, (w.get(x.field) ?? 0) + 1);
+    console.log(
+      `Cảnh báo: ${job.warnings.length} (${[...w].map(([f, n]) => `${f}: ${n}`).join(', ')})`,
+    );
+  }
   process.exitCode = job.status === 'completed' ? 0 : 1;
 } finally {
   await pool.end();

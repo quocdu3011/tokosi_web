@@ -8,6 +8,7 @@ import type { Database } from '../../db/database.module.js';
 import * as schema from '../../db/schema/index.js';
 import { runSeed } from '../../db/seed/index.js';
 import { AuditService } from '../audit/audit.service.js';
+import { PermissionsService } from '../authorization/permissions.service.js';
 import { BranchAccessService } from '../branches/branch-access.service.js';
 import { InventoryService } from '../inventory/inventory.service.js';
 import { ReconciliationService } from '../reconciliation/reconciliation.service.js';
@@ -101,6 +102,7 @@ describe.skipIf(!URL)('Import thêm: đồng thời trên PostgreSQL thật', ()
       new AuditService(),
       new BranchAccessService(db),
       inv,
+      new PermissionsService(db),
     );
     // Hàng thử, mỗi hàng tồn đầu 1000
     await runFile(codes.map((c) => [c, `Hàng ${c}`, 100, 1000]));
@@ -185,5 +187,46 @@ describe.skipIf(!URL)('Import thêm: đồng thời trên PostgreSQL thật', ()
     const report = await new ReconciliationService().run(db);
     expect(report.ok).toBe(true);
     await db.execute(sql`select 1`);
+  }, 120_000);
+
+  it('nhập khách: hai lần chạy cùng file ĐỒNG THỜI → chỉ một lần ghi, không nhân đôi khách và công nợ đầu kỳ', async () => {
+    const N = 300;
+    const buffer = await writeSheet(
+      'Sheet1',
+      ['Tên khách', 'Công nợ Hà Nội'].map((header) => ({ header })),
+      Array.from({ length: N }, (_, i) => [
+        `Khách đồng thời ${String(i).padStart(3, '0')}`,
+        1000,
+      ]),
+    );
+    const attempt = () =>
+      svc.run(
+        manager,
+        'customers',
+        { originalname: 'khach.xlsx', size: buffer.length, buffer },
+        { dryRun: false, mode: 'overwrite' },
+      );
+    const results = await Promise.all([attempt(), attempt()]);
+    expect(results.filter((r) => r.status === 'completed')).toHaveLength(1);
+    const failed = results.filter((r) => r.status === 'failed');
+    expect(failed).toHaveLength(1);
+    expect(failed[0]!.errors[0]!.message).toContain('chỉ ghi khi tạo khách mới');
+
+    const mine = sql`${schema.customers.name} like 'Khách đồng thời %'`;
+    const [{ n }] = await db
+      .select({ n: sql<string>`count(*)` })
+      .from(schema.customers)
+      .where(mine);
+    expect(Number(n)).toBe(N); // không bị tạo hai bản
+    const [{ debt }] = await db
+      .select({ debt: sql<string>`coalesce(sum(${schema.debtLedger.amount}), 0)` })
+      .from(schema.debtLedger)
+      .innerJoin(
+        schema.customers,
+        eq(schema.customers.id, schema.debtLedger.partyId),
+      )
+      .where(and(mine, eq(schema.debtLedger.partyType, 'customer')));
+    expect(Number(debt)).toBe(N * 1000); // công nợ đầu kỳ chỉ ghi một lần
+    expect((await new ReconciliationService().run(db)).ok).toBe(true);
   }, 120_000);
 });
