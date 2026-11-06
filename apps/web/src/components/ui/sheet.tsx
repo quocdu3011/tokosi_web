@@ -19,8 +19,12 @@ function SheetContent({
   className,
   children,
   side = 'left',
+  showCloseButton = true,
   ...props
-}: React.ComponentProps<typeof SheetPrimitive.Content> & { side?: 'left' | 'right' }) {
+}: React.ComponentProps<typeof SheetPrimitive.Content> & {
+  side?: 'left' | 'right';
+  showCloseButton?: boolean;
+}) {
   return (
     <SheetPrimitive.Portal>
       <SheetPrimitive.Overlay className="modal-overlay" />
@@ -31,10 +35,12 @@ function SheetContent({
         {...props}
       >
         {children}
-        <SheetPrimitive.Close className="modal-close">
-          <XIcon />
-          <span className="sr-only">Đóng</span>
-        </SheetPrimitive.Close>
+        {showCloseButton && (
+          <SheetPrimitive.Close className="modal-close">
+            <XIcon />
+            <span className="sr-only">Đóng</span>
+          </SheetPrimitive.Close>
+        )}
       </SheetPrimitive.Content>
     </SheetPrimitive.Portal>
   );

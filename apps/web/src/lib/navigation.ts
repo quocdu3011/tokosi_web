@@ -56,13 +56,19 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'Mua hàng',
     icon: Truck,
     items: [
-      { href: '/suppliers', label: 'Nhà cung cấp', permissions: ['purchase.view'], ready: false },
-      { href: '/goods-receipts', label: 'Nhập hàng', permissions: ['purchase.view'], ready: false },
+      { href: '/suppliers', label: 'Nhà cung cấp', permissions: ['purchase.view'], ready: true },
+      {
+        href: '/purchase-orders',
+        label: 'Đặt hàng nhập',
+        permissions: ['purchase.view'],
+        ready: true,
+      },
+      { href: '/goods-receipts', label: 'Nhập hàng', permissions: ['purchase.view'], ready: true },
       {
         href: '/purchase-returns',
         label: 'Trả hàng nhập',
         permissions: ['purchase.view'],
-        ready: false,
+        ready: true,
       },
     ],
   },

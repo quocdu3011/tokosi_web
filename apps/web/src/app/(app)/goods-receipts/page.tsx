@@ -1,10 +1,9 @@
 import type { Metadata } from 'next';
 
-import { PlaceholderPage } from '@/components/common/placeholder-page';
+import { PurchaseScreen } from '@/components/purchasing/purchase-screen';
 
 export const metadata: Metadata = { title: 'Nhập hàng' };
 
-// Backend chưa có API cho phân hệ này → để trống (không dùng dữ liệu giả).
 export default function Page() {
-  return <PlaceholderPage href="/goods-receipts" />;
+  return <PurchaseScreen kind="receipts" />;
 }

@@ -6,6 +6,24 @@ import type { components } from './schema';
 
 type Schemas = components['schemas'];
 
+export type Supplier = Schemas['SupplierDto'];
+export type SupplierList = Schemas['SupplierListDto'];
+export type SupplierBranch = Schemas['SupplierBranchDto'];
+export type SupplierLedger = Schemas['LedgerDto'];
+export type CreateSupplierInput = Schemas['CreateSupplierDto'];
+export type UpdateSupplierInput = Schemas['UpdateSupplierDto'];
+export type PurchaseOrder = Schemas['PurchaseOrderDto'];
+export type GoodsReceipt = Schemas['GoodsReceiptDto'];
+export type PurchaseReturn = Schemas['PurchaseReturnDto'];
+export type PurchaseDocument = PurchaseOrder | GoodsReceipt | PurchaseReturn;
+export type PurchaseDocumentList =
+  | Schemas['PurchaseOrderListDto']
+  | Schemas['GoodsReceiptListDto']
+  | Schemas['PurchaseReturnListDto'];
+export type CreatePurchaseOrderInput = Schemas['CreatePurchaseOrderDto'];
+export type CreateGoodsReceiptInput = Schemas['CreateGoodsReceiptDto'];
+export type CreatePurchaseReturnInput = Schemas['CreatePurchaseReturnDto'];
+
 export type AuthUser = Schemas['AuthUserDto'];
 export type BranchSummary = Schemas['BranchSummaryDto'];
 export type Branch = Schemas['BranchDto'];

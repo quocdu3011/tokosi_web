@@ -3,6 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { findNavItem, isNavActive } from './navigation';
 
 describe('isNavActive', () => {
+  it('các màn mua hàng đã nối API đều sẵn sàng, đặt hàng nhập tách khỏi đơn bán', () => {
+    for (const href of ['/suppliers', '/purchase-orders', '/goods-receipts', '/purchase-returns']) {
+      expect(findNavItem(href)).toMatchObject({ ready: true, permissions: ['purchase.view'] });
+    }
+    expect(findNavItem('/orders')?.ready).toBe(false);
+  });
   it('khớp chính xác và trang con', () => {
     expect(isNavActive('/products', '/products')).toBe(true);
     expect(isNavActive('/settings/users', '/settings/users')).toBe(true);
