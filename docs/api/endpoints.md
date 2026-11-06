@@ -577,7 +577,7 @@ Response: `id`, `code` (`THN…`), `status`, `branchId`, `supplier`, `goodsRecei
 | POST   | `/customers/:id/receipts`                           | **Thu nợ nhanh** (**Idempotency-Key**)             | `cash.create`   | W6  |
 | GET    | `/customers/:id/statement?from&to&format=xlsx\|pdf` | Biên bản đối chiếu công nợ                         | `customer.view` | W6  |
 
-Bộ lọc `GET /customers`: `q`, `type`, `salesOwnerId`, `hasDebt` (`true` = đang nợ), `isActive`; sort: `code`, `name`, `balance`, `lastTransactionAt`.
+Bộ lọc `GET /customers`: `q`, `priceLevel`, `salesOwnerId`, `hasDebt` (`true` = đang nợ), `isActive`; sort: `code`, `name`, `balance`, `lastTransactionAt`.
 
 ```json
 // Customer
@@ -585,11 +585,14 @@ Bộ lọc `GET /customers`: `q`, `type`, `salesOwnerId`, `hasDebt` (`true` = đ
   "id": "…",
   "code": "KH000001",
   "name": "Cửa hàng Ví Dụ 1",
-  "type": "individual",
   "phone": "0900000001",
   "address": "12 Đường Ví Dụ, Quận 1, TP.HCM",
-  "facebook": null,
-  "salesOwner": { "id": "…", "fullName": "Trần Văn B" }, // nhân viên phụ trách
+  "salesOwner": { "id": "…", "fullName": "Trần Văn B" }, // nhân viên phụ trách (cột "Sale")
+  "priceLevel": "medium", // Level giá: new (Mới) | medium (Vừa) | large (Lớn) | vip (Vip); chỉ để tham chiếu
+  "newSince": "2026-10-01", // tháng trở thành khách mới; null = khách cũ/không rõ
+  "acquisitionSource": null, // vd "Page"
+  "profile": null, // hồ sơ kinh doanh, null nếu chưa có: { warehouseLocation, warehouseCount, warehouseArea, warehousePhotoUrl, competitors, salesMethods: ["Bán sàn", "FB live"], scale }
+  "lastVisitedOn": null, // ngày tiếp khách gần nhất; lịch đầy đủ ở customer_visits
   "isInternalBranch": false, // true = khách hàng hệ thống đại diện một chi nhánh (chuyển kho nội bộ)
   "terms": [
     // hạn mức & kỳ hạn công nợ RIÊNG từng chi nhánh; không có dòng = không giới hạn
@@ -605,16 +608,6 @@ Bộ lọc `GET /customers`: `q`, `type`, `salesOwnerId`, `hasDebt` (`true` = đ
   "totalSales": "1200000000",
   "note": null,
   "isActive": true,
-  "invoiceProfile": {
-    "buyerName": null,
-    "companyName": null,
-    "taxCode": null,
-    "address": null,
-    "email": null,
-    "phone": null,
-    "bankName": null,
-    "bankAccount": null
-  },
   "createdAt": "…",
   "updatedAt": "…"
 }
@@ -676,11 +669,10 @@ Quy ước: `phone` được chuẩn hóa về dạng `0xxxxxxxxx` và **không 
   "customerId": "…",
   "sellerId": "…?", // người bán (NVKD); mặc định = người đang đăng nhập
   "items": [
-    { "productId": "…", "qty": "2000", "unitPrice": "12600", "discountPerUnit": "0", "isGift": false, "note": null }
+    { "productId": "…", "qty": "2000", "unitPrice": "12600", "discountPerUnit": "0", "note": null }
   ],
   "discount": "0", // giảm giá cả đơn (số tiền)
-  "deposit": { "accountId": "…", "method": "bank", "amount": "5000000" }, // đặt cọc, tùy chọn
-  "ship": { "name": null, "phone": null, "address": null, "packageCount": null, "weightG": null },
+  "ship": { "pickupAddress": null, "name": null, "phone": null, "address": null },
   "note": "thêm hàng"
 }
 ```
@@ -698,11 +690,11 @@ Quy ước: `phone` được chuẩn hóa về dạng `0xxxxxxxxx` và **không 
   "items": [{
     "id": "…", "productId": "…", "code": "T888LL", "name": "Lược lăn tinh dầu dưỡng tóc T888",
     "qty": "2000", "discountPerUnit": "0", "unitPrice": "12600",
-    "lineTotal": "25200000", "isGift": false, "note": null,
+    "lineTotal": "25200000", "note": null,
     "available": "3000"
   }],
   "subtotal": "44200000", "discount": "0", "total": "44200000",
-  "deposit": "5000000", "invoiceId": null, "invoiceCode": null,
+  "invoiceId": null, "invoiceCode": null,
   "ship": { … }, "note": "thêm hàng",
   "warnings": [{ "code": "CREDIT_LIMIT_EXCEEDED", "message": "Vượt hạn mức công nợ 6.000.000 ₫" }],
   "createdBy": { "id": "…", "fullName": "…" }, "createdAt": "…", "updatedAt": "…"
@@ -764,7 +756,6 @@ Quy ước: `phone` được chuẩn hóa về dạng `0xxxxxxxxx` và **không 
       "discountPerUnit": "500",
       "unitPrice": "33000",
       "lineTotal": "16995000",
-      "isGift": false,
       "unitCost": "21800.5000"
     }
   ], // vắng mặt nếu thiếu quyền xem giá vốn
@@ -804,17 +795,16 @@ Quy ước: `phone` được chuẩn hóa về dạng `0xxxxxxxxx` và **không 
       "productId": "…",
       "qty": "36",
       "returnPrice": "130000",
-      "restock": true, // true = nhập lại kho
-      "reason": "lô mới nhỏ hơn khách ko lấy"
+      "restockPrice": "120000", // Giá nhập lại; có thể khác returnPrice
+      "restock": true, // true = nhập lại kho (không đổi giá vốn bình quân)
+      "note": "lô mới nhỏ hơn khách ko lấy"
     }
   ],
-  "settlement": "offset_debt", // hoặc "refund" + refund.accountId
-  "refund": { "accountId": "…" },
   "note": null
 }
 ```
 
-Response có `code` (`TH001076`), `total`, `settlement`, `items[]` (kèm `restockCost` nếu có quyền xem giá vốn).
+Phiếu trả **luôn ghi giảm công nợ khách** (không có `settlement`/hoàn tiền trên phiếu; trả tiền mặt cho khách làm bằng phiếu chi ở Sổ quỹ). Hàng nhập lại kho không đổi giá vốn bình quân; chênh lệch `(returnPrice − restockPrice) × qty` tính vào lợi nhuận. Response có `code` (`TH001076`), `total`, `items[]`.
 
 ---
 

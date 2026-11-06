@@ -110,7 +110,6 @@ export async function runSeed(
           .values({
             code: `CN-${b.code}`,
             name,
-            type: 'company',
             linkedBranchId: b.id,
           })
           .onConflictDoNothing()

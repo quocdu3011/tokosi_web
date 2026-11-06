@@ -90,8 +90,7 @@ describe('runSeed (CSDL thật trong bộ nhớ)', () => {
     ).toEqual(rows.map((b) => b.id).sort((a, b) => a.localeCompare(b)));
     expect(custs.map((c) => c.code).sort()).toEqual(['CN-HN', 'CN-SG']);
     // không lẫn vào khách hàng thật
-    const sgCustomer = custs.find((c) => c.code === 'CN-SG');
-    expect(sgCustomer?.type).toBe('company');
+    expect(custs.find((c) => c.code === 'CN-SG')).toBeDefined();
   });
 
   it('danh mục thu chi: mã duy nhất, có đủ danh mục hệ thống cho cả hai chiều', async () => {

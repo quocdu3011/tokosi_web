@@ -79,7 +79,6 @@ describe('Hàng hóa qua HTTP', () => {
       lineNo: 1,
       productId: ids.QKBSP!,
       qty: '40',
-      listPrice: '33500',
       unitPrice: '33500',
       lineTotal: '1340000',
     });

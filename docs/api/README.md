@@ -185,7 +185,7 @@ Các thao tác tạo chứng từ ảnh hưởng tiền/kho/nợ phải gửi `I
 | Tên                                | Giá trị                                                                                                                                          |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `role`                             | `manager` (Quản lý), `assistant` (Trợ lý), `accountant` (Kế toán), `warehouse` (Kho), `driver` (Lái xe), `sales` (Sale), `marketing` (Marketing) |
-| `customer.type`                    | `individual`, `company`                                                                                                                          |
+| `customer.priceLevel`              | `new` (Mới), `medium` (Vừa), `large` (Lớn), `vip` (Vip)                                                                                                                          |
 | `supplier.kind`                    | `goods` (hàng hóa), `driver` (lái xe), `other`                                                                                                   |
 | `order.status`                     | `draft` (phiếu tạm), `completed` (đã xuất hóa đơn), `cancelled`                                                                                  |
 | `invoice.status`                   | `completed`, `cancelled`                                                                                                                         |
@@ -194,7 +194,6 @@ Các thao tác tạo chứng từ ảnh hưởng tiền/kho/nợ phải gửi `I
 | `cashAccount.type`                 | `cash`, `bank`                                                                                                                                   |
 | `cash.direction`                   | `in` (thu), `out` (chi)                                                                                                                          |
 | `party.type`                       | `customer`, `supplier`, `employee`                                                                                                               |
-| `return.settlement`                | `offset_debt` (bù trừ công nợ), `refund` (hoàn tiền)                                                                                             |
 | `ledger.entryType`                 | `opening`, `invoice`, `payment`, `return`, `adjustment`                                                                                          |
 
 ## 8. Phân quyền
@@ -229,7 +228,6 @@ Các thao tác tạo chứng từ ảnh hưởng tiền/kho/nợ phải gửi `I
 | ----------------------------------------------------------------- | --------------------------------------- |
 | `costPrice`, `lastPurchasePrice` (hàng hóa), `unitCost` (chuyển kho), lãi gộp | `product.cost.view`                     |
 | `balance`, `creditLimit`, `debt`, `paid` của khách / nhà cung cấp | `debt.view`                             |
-| Sửa `listPrice` trên dòng hàng khi tạo đơn                        | `price.override`                        |
 | Giá trên phiếu giao hàng                                          | luôn ẩn (`delivery.view` không gồm giá) |
 
 **Ngoại lệ có chủ đích (chủ dự án chốt 06/11):** giá nhập trên phiếu **đặt hàng nhập, nhập hàng, trả hàng nhập** (`unitCost`, `returnPrice`, `lineTotal`, `total`) là thông tin của nghiệp vụ mua hàng nên **ai có `purchase.view` đều xem được**, không cần `product.cost.view` (Kho cần giá để lập phiếu). Quyền `product.cost.view` chỉ ẩn giá vốn / giá nhập cuối ở màn hàng hóa và giá ở chuyển kho. Công nợ nhà cung cấp vẫn cần `debt.view`.
@@ -244,7 +242,6 @@ Dùng để khởi tạo lần đầu (`pnpm db:seed`) và cho nút "Khôi phụ
 | `product.view` Xem hàng hóa                                  |    ✔    |   ✔    |    ✔    |  ✔  |        |    ✔     |     ✔     |
 | `product.edit` Thêm/sửa hàng hóa                             |    ✔    |   ✔    |         |  ✔  |        |          |           |
 | `product.content.edit` Sửa mô tả, ảnh hàng hóa               |    ✔    |        |         |     |        |          |     ✔     |
-| `price.override` Sửa giá khi bán                             |    ✔    |        |         |     |        |          |           |
 | `product.cost.view` Xem giá vốn / giá nhập cuối              |    ✔    |        |    ✔    |     |        |          |           |
 | **Mua hàng**                                                 |         |        |         |     |        |          |           |
 | `purchase.view` Xem mua hàng                                 |    ✔    |   ✔    |    ✔    |  ✔  |        |          |           |
@@ -339,3 +336,6 @@ Dùng để khởi tạo lần đầu (`pnpm db:seed`) và cho nút "Khôi phụ
 | 2026-11-06 | **Sửa sau nghiệm thu nhà cung cấp:** mã tự cấp bỏ qua mã đã bị chiếm (không còn 409 mãi mãi khi mã nhập tay trùng số kế tiếp); ngày không có thật (`2026-02-31`) trả `400` ở sổ công nợ và thẻ kho; mã nhà cung cấp không trùng kể cả khác hoa thường (chỉ mục ở CSDL); Excel xuất `Ngày tạo` theo giờ Việt Nam |
 | 2026-11-06 | **Cấu trúc dữ liệu Mua hàng theo file KiotViet** (chưa có endpoint mới): thêm bảng `purchase_orders`/`purchase_order_items` (đặt hàng nhập); phiếu nhập: `poRef` → `purchaseOrderId`, bỏ `supplierInvoiceNo`, `discount`, `subtotal`, `paidAmount`; trả hàng nhập: thêm `returnedBy`, bỏ `reason`. Đã sửa ví dụ `POST /goods-receipts` trong `endpoints.md` cho khớp |
 | 2026-11-06 | **API Mua hàng:** `/purchase-orders` (đặt hàng nhập: tạo, sửa, xác nhận, kết thúc, hủy), `/goods-receipts` (nhập hàng: cộng tồn + giá vốn bình quân + ghi nợ NCC theo chi nhánh; hủy bằng bút toán đảo), `/purchase-returns` (trả hàng nhập: trừ tồn, giá vốn tính lại theo giá trả, giảm nợ; mã lỗi mới `RETURN_QTY_EXCEEDED`). Tiền trả NCC không nằm trên phiếu (làm ở Sổ quỹ). `onOrder` của hàng hóa nay tính thật. Chi tiết: `endpoints.md` mục 3.2–3.4 |
+| 2026-11-06 | **Cấu trúc dữ liệu Đơn hàng theo file KiotViet** (chưa có API, mục 5 là bản nháp hợp đồng đã chỉnh theo lược đồ mới): đơn đặt hàng **bỏ** `deposit`/`depositAmount` (0/168 phiếu tạm có tiền cọc; tiền thu nằm ở thanh toán hóa đơn), `packageCount`, `weightG`, **thêm** `ship.pickupAddress` (Địa chỉ lấy hàng); dòng đơn/hóa đơn **bỏ** `listPrice` và `isGift` (giá trước giảm = `unitPrice + discountPerUnit`; quà tặng = giá 0), một mặt hàng được lặp nhiều dòng; hóa đơn **bỏ** `ship*`; dòng trả hàng bán đổi `reason` → `note`. |
+| 2026-11-06 | **Trả hàng bán:** bỏ `settlement`/`refundAccountId`/enum `return_settlement` (phiếu trả luôn ghi giảm công nợ khách); dòng trả đổi `restockCost` → **`restockPrice`** (Giá nhập lại, có thể khác giá bán; không đổi giá vốn bình quân, chênh lệch tính vào lợi nhuận). **Bỏ quyền `price.override`** (còn 32 quyền; migration xóa dòng cấp quyền cũ). |
+| 2026-11-06 | **Cấu trúc dữ liệu Khách hàng theo file TKS** (chưa có API; mục 4 là bản nháp): `Customer` thêm `priceLevel` (`new`/`medium`/`large`/`vip` = Mới/Vừa/Lớn/Vip), `newSince` (`YYYY-MM-01` hoặc `null` = khách cũ), `acquisitionSource` (vd `Page`), `profile` (`warehouseLocation`, `warehouseCount`, `warehouseArea`, `warehousePhotoUrl`, `competitors`, `salesMethods[]`, `scale`; `null` nếu chưa có), `lastVisitedOn` (ngày tiếp khách gần nhất) và danh sách ngày tiếp khách. **Bỏ** `type` (cá nhân/công ty), `facebook`, `invoiceProfile` (file TKS không có); bộ lọc `type` đổi thành `priceLevel`. |

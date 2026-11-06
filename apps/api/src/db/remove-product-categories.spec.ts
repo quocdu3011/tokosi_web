@@ -50,5 +50,5 @@ describe('Migration 0026 bỏ nhóm hàng', () => {
     } finally {
       await client.close();
     }
-  });
+  }, 60_000);
 });

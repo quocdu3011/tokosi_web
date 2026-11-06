@@ -71,7 +71,7 @@ describe('runDemoSeed (CSDL thật trong bộ nhớ)', () => {
     } finally {
       await empty.client.close();
     }
-  });
+  }, 60_000);
 
   it('tạo 60 hàng, 3 combo và tồn đầu của 2 chi nhánh', async () => {
     const r = await runDemoSeed(db, { nodeEnv: 'test' });

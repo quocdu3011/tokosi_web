@@ -62,7 +62,8 @@ const GROUPS: Record<string, string[]> = {
   'Đối tác': [
     'customers',
     'customer_branch_terms',
-    'customer_invoice_profiles',
+    'customer_profiles',
+    'customer_visits',
     'suppliers',
     'supplier_branch_history',
   ],
@@ -131,7 +132,8 @@ const TABLE_NOTES: Record<string, string> = {
   stock_movements: 'Sổ cái kho — chỉ thêm. Phục vụ thẻ kho.',
   customers:
     'Khách hàng. Công nợ không lưu ở đây: số dư = tổng debt_ledger (có thể âm). sales_owner_id = nhân viên phụ trách.',
-  customer_invoice_profiles: 'Thông tin xuất hóa đơn VAT/điện tử của khách.',
+  customer_profiles: 'Hồ sơ kinh doanh của khách (kho, đối thủ, hình thức bán, quy mô) từ file TKS; quan hệ 1-1, hầu hết khách không có.',
+  customer_visits: 'Lịch tiếp khách: mỗi dòng một ngày; ngày tiếp khách gần nhất = ngày lớn nhất.',
   suppliers:
     'Nhà cung cấp; group_name là nhóm NCC (chuỗi tự do, có thể để trống). Số liệu tiền theo từng chi nhánh: xem supplier_branch_history và debt_ledger.',
   supplier_branch_history:
@@ -170,7 +172,11 @@ const COLUMN_NOTES: Record<string, string> = {
     'Loại hàng: goods = Hàng hóa (mặc định), combo = gói các hàng thành phần (không có tồn/giá vốn riêng)',
   'customers.sales_owner_id':
     'Nhân viên phụ trách (ở KiotViet là "Nhóm khách hàng")',
-  'customers.default_price_book_id': 'Bảng giá tự áp khi đặt hàng',
+  'customers.price_level': 'Level giá (Mới/Vừa/Lớn/Vip) để nhân viên tham chiếu khi báo giá; hệ thống không có bảng giá',
+  'customers.new_since': 'Tháng trở thành khách mới (ngày đầu tháng); trống = khách cũ hoặc không rõ',
+  'customers.acquisition_source': 'Nguồn khách mới (vd Page)',
+  'customer_profiles.sales_methods': 'Hình thức bán hàng (nhiều giá trị): Bán cửa hàng, FB live, Kho buôn, Bán sàn, Sang tay, FB ads, Khác',
+  'customer_profiles.warehouse_photo_url': 'Đường link ảnh kho từ file TKS',
   'customers.linked_branch_id':
     'Khách hàng hệ thống đại diện một chi nhánh (chuyển kho nội bộ)',
   'suppliers.linked_branch_id':
@@ -193,12 +199,16 @@ const COLUMN_NOTES: Record<string, string> = {
   'stock_transfers.debt_amount': 'Công nợ đối ứng đã ghi khi nhận hàng',
   'stock_transfer_items.unit_cost_received':
     'Giá nhập kho bên nhận = giá vốn gửi + phí phân bổ / số lượng',
-  'orders.deposit_amount': 'Tiền đặt cọc đã thu',
+  'orders.pickup_address': 'Địa chỉ lấy hàng (file KiotViet)',
+  'orders.seller_id': 'Người nhận đặt (khác người tạo)',
+  'orders.subtotal': 'Σ line_total của các dòng',
+  'orders.total': 'subtotal − discount (Khách cần trả)',
   'invoices.paid_total':
     'Đã thu khi tạo + đã cấn trừ về sau (cache của sổ cái)',
   'invoices.root_invoice_id': 'Hóa đơn gốc (bản sửa .nn)',
   'invoice_items.unit_cost': 'Giá vốn tại thời điểm bán (tính lãi gộp)',
-  'invoice_items.unit_price': 'list_price − discount_per_unit',
+  'invoice_items.unit_price': 'Giá bán sau giảm; giá trước giảm = unit_price + discount_per_unit',
+  'order_items.unit_price': 'Giá bán sau giảm; giá trước giảm = unit_price + discount_per_unit',
   'order_items.discount_per_unit':
     'Giảm giá tính trên 1 đơn vị (số tiền, không phải %)',
   'invoice_items.discount_per_unit':
@@ -210,6 +220,7 @@ const COLUMN_NOTES: Record<string, string> = {
   'debt_ledger.amount': '+ tăng nợ, − giảm nợ',
   'debt_ledger.party_id': 'Đa hình theo party_type (không có khóa ngoại)',
   'sales_return_items.restock': 'true = nhập lại kho',
+  'sales_return_items.restock_price': 'Giá nhập lại (file KiotViet), có thể khác giá bán; không đổi giá vốn bình quân, chênh lệch (giá bán − giá nhập lại) × SL tính vào lợi nhuận',
 };
 
 // ---------------------------------------------------------------- tiện ích

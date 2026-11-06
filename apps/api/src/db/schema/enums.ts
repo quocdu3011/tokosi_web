@@ -16,7 +16,13 @@ export const userRole = pgEnum('user_role', [
   'marketing',
   'pending',
 ]);
-export const customerType = pgEnum('customer_type', ['individual', 'company']);
+/** Level giá của khách theo file TKS (Mới / Vừa / Lớn / Vip). Chỉ để nhân viên tham chiếu khi báo giá: hệ thống không có bảng giá. */
+export const customerPriceLevel = pgEnum('customer_price_level', [
+  'new',
+  'medium',
+  'large',
+  'vip',
+]);
 /** Đơn đặt hàng: phiếu tạm → đã xuất hóa đơn / hủy. */
 export const orderStatus = pgEnum('order_status', [
   'draft',
@@ -41,11 +47,6 @@ export const partyType = pgEnum('party_type', [
   'supplier',
   'employee',
 ]);
-export const returnSettlement = pgEnum('return_settlement', [
-  'offset_debt',
-  'refund',
-]);
-
 export const ledgerEntryType = pgEnum('ledger_entry_type', [
   'opening',
   'invoice',

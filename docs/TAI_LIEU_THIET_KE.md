@@ -222,7 +222,7 @@ Không có Redis, không có tiến trình worker riêng, không có WebSocket �
 | Tìm kiếm | PostgreSQL `pg_trgm` + unaccent (đủ cho ~2.800 SKU / ~1.700 khách) | **Không cần Meilisearch** ở quy mô này |
 | File | Đĩa cục bộ hoặc **S3-compatible** (MinIO / Cloudflare R2) | Ảnh sản phẩm (tải về từ KiotViet), file import/export |
 | Xác thực | **Đã triển khai:** JWT HS256 (`jose`, 15 phút, chỉ chứa id) + refresh token ngẫu nhiên trong cookie httpOnly (14 ngày, lưu băm, xoay vòng, phát hiện dùng lại), argon2id | Chuẩn, an toàn; vai trò/quyền đọc từ CSDL mỗi yêu cầu |
-| Phân quyền | **RBAC cấu hình được** (bảng `role_permissions`, 34 quyền, phạm vi `all`/`own`) + giới hạn theo chi nhánh | Quản lý tự phân quyền, không hard-code |
+| Phân quyền | **RBAC cấu hình được** (bảng `role_permissions`, 32 quyền, phạm vi `all`/`own`) + giới hạn theo chi nhánh | Quản lý tự phân quyền, không hard-code |
 | API | **REST + OpenAPI (Swagger)** tại `/api/docs`; `docs/api/openapi.json` là hợp đồng cho frontend | Frontend có thể tự sinh client từ OpenAPI nếu muốn (không bắt buộc) |
 | Xuất Excel/PDF | **ExcelJS**, **Puppeteer/Playwright** hoặc **pdfmake** | Báo cáo, hóa đơn A4 |
 | In nhiệt | **ESC/POS** qua WebUSB/WebSerial hoặc dịch vụ in cục bộ (agent) ; hoặc in qua trình duyệt (CSS `@media print`) | Hóa đơn K80/K58, tem mã |
@@ -296,7 +296,7 @@ Các file chứng từ đều là dạng **phẳng**: thông tin phiếu lặp l
 - **"Nhóm khách hàng" (59 giá trị) thực chất là *tên nhân viên phụ trách***, không phải nhóm khách. → Không tạo `customer_groups`; dùng `customers.sales_owner_id`. Hạng giá là trường riêng (`default_price_book_id`).
 - Tên khách có tiền tố ("SG" 905, "MN" 537, "KH" 170, "NN" 27, "HN" 21…) — có vẻ là **khu vực/loại** nhưng chưa xác nhận → tạm giữ trong tên, hỏi lại để tách thành trường `region`.
 - Địa chỉ là chuỗi tự do (96% có); tỉnh/phường gần như rỗng → 1 cột `address`, không ép cấu trúc hành chính.
-- Thông tin xuất hóa đơn (MST, tên công ty…) gần như rỗng (MST chỉ 1 khách) → tách bảng `customer_invoice_profiles` (nullable) để dùng cho HĐ VAT/HĐĐT.
+- Thông tin xuất hóa đơn (MST, tên công ty…) gần như rỗng (MST chỉ 1 khách) và không có trong file TKS → **06/11/2026 bỏ bảng `customer_invoice_profiles`** (HĐ VAT/HĐĐT làm sau go-live thì thiết kế lại).
 - **Công nợ:** 85 khách nợ dương (tổng ≈ 6,61 tỷ) và **111 khách có số dư âm** (≈ −254 triệu, khách trả dư/ứng trước) → sổ công nợ phải cho phép số dư âm. 409 khách chưa từng giao dịch.
 
 **D. Quy trình bán hàng**
@@ -307,8 +307,8 @@ Các file chứng từ đều là dạng **phẳng**: thông tin phiếu lặp l
 - **Người bán ≠ người tạo:** 43 giá trị "người bán" khác nhau nhưng chỉ 4 "người tạo" → *người bán* là NVKD đứng tên (tính hoa hồng/doanh số), *người tạo* là nhân viên nhập liệu. Lưu riêng `seller_id` và `created_by`.
 - Giảm giá cấp hóa đơn dùng ít (4/129 HĐ); `Khách cần trả = Tổng tiền hàng − Giảm giá hóa đơn` đúng ở 129/129.
 - **Không dùng trong dữ liệu:** kênh bán (100% "Bán trực tiếp"), đối tác giao hàng/mã vận đơn (rỗng), thẻ/ví/điểm, khuyến mãi, giảm giá %. → bỏ `sales_channels`, `delivery_partners`, `loyalty`, `promotions` khỏi MVP.
-- Giao hàng thực tế: ~18% đơn có người nhận/địa chỉ nhận/trọng lượng/kích thước riêng → giữ khối thông tin giao hàng tối thiểu trên đơn. Chi phí vận chuyển đi qua sổ quỹ (xem E).
-- **Trả hàng bán:** 15/17 dòng có tham chiếu hóa đơn gốc → cho phép trả không tham chiếu. **"Đã trả khách" = 0** → trả hàng được **bù trừ vào công nợ** thay vì hoàn tiền. Có `Giá nhập lại` (giá vốn khi nhập kho lại) và ghi chú lý do theo dòng (94%) → `reason`, `restock`.
+- Giao hàng thực tế: ~20% đơn (82/415) có người nhận/điện thoại/địa chỉ nhận riêng, 80 đơn có địa chỉ lấy hàng → giữ khối thông tin giao hàng tối thiểu trên đơn (`pickup_address`, `ship_*`); số kiện/trọng lượng không có trong file nên bỏ. Chi phí vận chuyển đi qua sổ quỹ (xem E).
+- **Trả hàng bán:** 15/17 dòng có tham chiếu hóa đơn gốc → cho phép trả không tham chiếu. **"Đã trả khách" = 0** → trả hàng **luôn ghi giảm công nợ khách** (06/11/2026 chốt: bỏ `settlement`/hoàn tiền; tiền trả lại khách nếu có làm bằng phiếu chi ở Sổ quỹ). Có `Giá nhập lại` (`restock_price`, có thể khác giá bán) và ghi chú theo dòng (94%) → `note`, `restock`. **Hàng nhập lại kho không đổi giá vốn bình quân**; chênh lệch `(giá bán − giá nhập lại) × SL` tính vào lợi nhuận.
 
 **E. Mua hàng, nhà cung cấp, sổ quỹ**
 - **Đặt hàng nhập (`PDN…`) → Nhập hàng (`PN…`)**: 153/155 dòng nhập gắn phiếu đặt nhập. "Số hóa đơn đầu vào" và "Tiền đã trả NCC" đều rỗng/0 → thanh toán NCC đi qua sổ quỹ ("Phiếu chi CÔNG NỢ").
@@ -355,7 +355,8 @@ Hàng hóa  : categories (cây), products, product_components (combo), product_i
 Tồn kho   : stocks (chi nhánh + sản phẩm: tồn, giá vốn bình quân, giá nhập cuối, tối thiểu/tối đa, vị trí),
             stock_movements (sổ cái, chỉ thêm),
             stock_transfers, stock_transfer_items      -- chuyển kho 2 bước giữa HN và SG
-Đối tác   : customers, customer_invoice_profiles, customer_branch_terms (hạn mức/kỳ hạn theo chi nhánh),
+Đối tác   : customers, customer_profiles (kho/đối thủ/hình thức bán), customer_visits (lịch tiếp khách),
+            customer_branch_terms (hạn mức/kỳ hạn theo chi nhánh),
             suppliers (có group_name: nhóm NCC, có thể để trống)
 Bán hàng  : orders, order_items, invoices, invoice_items, invoice_payments,
             sales_returns, sales_return_items
@@ -376,16 +377,17 @@ Quy ước: `NUMERIC(18,0)` = tiền chứng từ (đồng); `NUMERIC(18,4)` = �
 | Bảng | Cột chính |
 |---|---|
 | `products` | **Chỉ thông tin dùng chung:** `code` (unique, ≤30), `name`, `category_id`, `product_type` (`goods` mặc định / `combo`), `description`, `is_active`. Combo có thành phần ở `product_components` (`combo_id`, `component_id`, `qty` nguyên dương), không có dòng `stocks` riêng. Giá bán ở `price_book_items`; tồn, giá vốn, giá nhập cuối, tồn min/max, vị trí kho ở `stocks` (theo chi nhánh) |
-| `customers` | `code`, `name`, `type` (`individual`/`company`), `phone` (unique, đã chuẩn hóa), `address`, `facebook`, `sales_owner_id` → `users` (nhân viên phụ trách), `default_price_book_id`, `note`, `is_active` |
-| `customer_invoice_profiles` | `customer_id`, `buyer_name`, `company_name`, `tax_code`, `address`, `email`, `phone`, `bank_name`, `bank_account` |
+| `customers` | `code`, `name`, `phone` (unique, đã chuẩn hóa), `address`, `sales_owner_id` → `users` (cột "Sale" file TKS), `price_level` ("Level giá": `new`/`medium`/`large`/`vip` = Mới/Vừa/Lớn/Vip; chỉ để tham chiếu, hệ thống không có bảng giá), `new_since` ("Khách mới": tháng trở thành khách mới, trống = cũ), `acquisition_source` (hậu tố `-Page`), `note`, `is_active` (cột "Trạng thái"). **Từ 06/11/2026** theo file TKS `TKS_Bao_cao_kinh_doanh_customers`: thêm các trường trên, **bỏ** `type`, `facebook` và bảng `customer_invoice_profiles` (file TKS không có); bỏ ghi chú `default_price_book_id` (không còn bảng giá) |
+| `customer_profiles` | 1-1 với khách (chỉ ~0,5% khách có): `warehouse_location` (Định vị kho), `warehouse_count`, `warehouse_area` (Diện tích, chữ tự do), `warehouse_photo_url` (Ảnh kho), `competitors` (Đối thủ), `sales_methods` (mảng: Hình thức bán hàng), `scale` (Quy mô khách; "Chưa có" = trống) |
+| `customer_visits` | `customer_id`, `visited_on` (ngày, duy nhất theo khách), `note`, `created_by`: "Các ngày tiếp khách"; "Tiếp khách lần cuối" = ngày lớn nhất, không lưu |
 | `suppliers` | `code`, `name`, `group_name` (nhóm, có thể trống), `linked_branch_id`, `is_active`. **Từ 06/11/2026 bỏ** `kind`, `phone`, `address`, `tax_code`, `note` (file KiotViet đã lược cột không dùng). **Tiền riêng từng chi nhánh**: nợ = sổ cái `debt_ledger` (có `branch_id`); số lịch sử tổng mua / trừ trả hàng ở `supplier_branch_history` (nhà cung cấp × chi nhánh) |
-| `orders` | `code`, `branch_id`, `customer_id`, `status` (`draft`/`completed`/`cancelled`), `order_date`, `seller_id`, `price_book_id`, `subtotal`, `discount`, `total`, `deposit_paid`, `note`; giao hàng: `ship_to_name`, `ship_to_phone`, `ship_to_address`, `package_count`, `weight_g` |
-| `order_items` | `order_id`, `product_id`, `qty`, `list_price`, `discount_per_unit` (tiền, không %), `unit_price`, `line_total`, `is_gift`, `note` |
-| `invoices` | `code`, `root_invoice_id`, `revision_no`, `branch_id`, `order_id` (unique), `customer_id`, `price_book_id`, `seller_id`, `invoice_date`, `subtotal`, `discount`, `total`, `paid_total` (dẫn xuất từ `invoice_payments`), `status`, `note`. **Giữ nguyên bản sao giá/tên SP tại thời điểm bán** |
-| `invoice_items` | như `order_items`, thêm `unit_cost` (giá vốn tại thời điểm bán, để tính lãi gộp) |
+| `orders` | `code`, `branch_id`, `customer_id`, `status` (`draft`/`completed`/`cancelled`), `ordered_at`, `seller_id` (Người nhận đặt), `subtotal` (= Σ dòng), `discount` (giảm giá phiếu, số tiền), `total` (Khách cần trả), `note`, `created_by`; giao hàng: `pickup_address`, `ship_name`, `ship_phone`, `ship_address`. **Từ 06/11/2026 bỏ** `deposit_amount` (0/168 phiếu tạm có tiền; tiền thu nằm ở `invoice_payments`), `package_count`, `weight_g` (file KiotViet không có) |
+| `order_items` | `order_id`, `line_no`, `product_id`, `qty`, `discount_per_unit` (tiền trên 1 đơn vị, không %), `unit_price` (giá bán sau giảm), `line_total`, `note`. **Bỏ** `list_price` ("Đơn giá" trong file là giá bảng giá KiotViet, 114/2010 dòng thấp hơn giá bán; hệ thống không có bảng giá) và `is_gift` (quà tặng = `unit_price` 0). Một mặt hàng có thể lặp nhiều dòng trong một đơn (18/415 đơn) |
+| `invoices` | `code`, `root_invoice_id`, `revision_no`, `branch_id`, `order_id` (unique), `customer_id`, `seller_id` (Người bán, khác người tạo), `invoiced_at`, `subtotal`, `discount`, `total`, `paid_total` (dẫn xuất từ `invoice_payments`), `status`, `note`, `created_by`. **Bỏ** `ship_*` (file hóa đơn không có; thông tin nhận hàng nằm ở đơn đặt). **Giữ nguyên bản sao giá/tên SP tại thời điểm bán** |
+| `invoice_items` | như `order_items`, thêm `product_code`, `product_name`, `unit_cost` (giá vốn tại thời điểm bán, để tính lãi gộp) |
 | `invoice_payments` | `invoice_id`, `method` (`cash`/`bank`), `amount`, `paid_at` |
-| `sales_returns` | `code`, `invoice_id` (nullable), `customer_id`, `status`, `total`, `settlement` (`offset_debt`/`refund`), `received_by`, `note` |
-| `sales_return_items` | `product_id`, `qty`, `return_price`, `restock_cost`, `restock` (bool), `reason` |
+| `sales_returns` | `code`, `invoice_id` (nullable), `customer_id`, `status`, `returned_at`, `total` (= Σ dòng; file không có giảm giá phiếu; ghi giảm công nợ khách), `received_by` (Người nhận trả), `note`, `created_by` |
+| `sales_return_items` | `product_id`, `qty`, `return_price`, `restock_price` (Giá nhập lại), `restock` (bool), `line_total`, `note` (ghi chú hàng hóa; trước là `reason`) |
 | `purchase_orders` (đặt hàng nhập) | `code` (PDN), `branch_id`, `supplier_id`, `status` (`draft`/`confirmed`/`completed`/`cancelled`), `ordered_at`, `ordered_by` (Người đặt), `created_by`, `total` (cần trả NCC), `note`; dòng: `product_id`, `qty`, `unit_cost` `NUMERIC(18,4)` (giá nhập), `line_total`. Chưa cộng tồn |
 | `goods_receipts` (nhập hàng) | `code` (PN), `branch_id`, `supplier_id`, `purchase_order_id` (tùy chọn), `status`, `received_at`, `received_by` (Người nhập), `created_by`, `total`, `note`; dòng như đặt hàng nhập. Không có giảm giá, số hóa đơn đầu vào, số đã trả (trả NCC qua Sổ quỹ) |
 | `purchase_returns` | `code` (THN), `branch_id`, `supplier_id`, `goods_receipt_id` (tùy chọn), `returned_at`, `returned_by` (Người trả), `total` (NCC cần trả), `note`; dòng: `product_id`, `qty`, `return_price`, `line_total`, `note` |
@@ -428,7 +430,7 @@ Sửa/đổi trả sau khi chốt → tạo bản mới HDxxxxxx.nn (revision), 
 
 **Nhập hàng:** đặt hàng nhập (`PDN`) → nhận hàng (`PN`) → cộng tồn → **tính lại giá vốn bình quân gia quyền** (`NUMERIC(18,4)`) → `debt_ledger` NCC (+). Trả NCC qua phiếu chi (`CTM`, loại "Công nợ").
 
-**Trả hàng bán:** (có/không tham chiếu hóa đơn) → mỗi dòng chọn `restock` → nếu nhập lại: cộng tồn theo `restock_cost`; mặc định bù trừ vào công nợ khách (`settlement = offset_debt`).
+**Trả hàng bán:** (có/không tham chiếu hóa đơn) → mỗi dòng chọn `restock` → nếu nhập lại: cộng tồn, **không đổi giá vốn bình quân**; tổng tiền trả luôn ghi giảm công nợ khách; chênh lệch giá bán − `restock_price` tính vào lợi nhuận.
 
 **Kiểm kho:** tạo phiếu kiểm → nhập số đếm thực tế → cân bằng → sinh `stock_movements` điều chỉnh (thay cho thủ thuật "NCC kiểm kê" đang dùng).
 
@@ -444,7 +446,7 @@ Thứ tự import (mỗi bước idempotent theo mã nghiệp vụ, chạy thử
 | 2 | SanPham (ảnh) | `product_images` | **Tải ảnh từ CDN KiotViet về kho file riêng**, ghi lại URL mới; chạy sớm vì phụ thuộc KiotViet còn hoạt động |
 | 3 | BangGia (+ 6 bảng cần xuất thêm) | `price_books`, `price_book_items` | Seed 7 bảng giá; thiếu giá → dùng bảng chung |
 | 4 | Danh sách nhân viên (cần xuất thêm) / giá trị distinct từ chứng từ | `users` | Tạo tài khoản, gán vai trò thủ công |
-| 5 | KhachHang | `customers`, `customer_invoice_profiles` | Chuẩn hóa SĐT; "Nhóm khách hàng" → `sales_owner_id`; **bỏ email giả**; suy `default_price_book_id` (sau khi xác nhận giả thuyết) |
+| 5 | KhachHang | `customers`, `customer_profiles`, `customer_visits` | Chuẩn hóa SĐT; "Nhóm khách hàng" → `sales_owner_id`; **bỏ email giả**; suy `default_price_book_id` (sau khi xác nhận giả thuyết) |
 | 6 | NhaCungCap | `suppliers` | Nhóm "Lái xe" → `kind=driver`; bỏ NCC kiểm kê ảo; nhân viên "tạm giữ lương" → `party_type=employee` |
 | 7 | Tồn kho (cột Tồn kho, Giá vốn) | `stock_movements` (`opening`) | Một bút toán tồn đầu kỳ cho mỗi SP, kèm giá vốn |
 | 8 | Nợ KH / Nợ NCC | `debt_ledger` (`opening`) | Một bút toán số dư đầu kỳ mỗi đối tác; cho phép âm. Đối chiếu tổng với file (≈ 6,61 tỷ phải thu; −254 triệu số dư âm) |
@@ -545,7 +547,7 @@ Gợi ý: dựng **design system** riêng (token màu, spacing, component) trư�
 ## 8. Phân quyền & bảo mật
 
 ### 8.1 Phân quyền (RBAC)
-- Quyền chi tiết theo `module.hành_động` (VD: `invoice.create`, `invoice.cancel`, `product.cost.view`); danh mục 34 quyền ở `packages/shared/src/permissions.ts`. Quyền có thể có **phạm vi** `all` hoặc `own` (chỉ dữ liệu của mình).
+- Quyền chi tiết theo `module.hành_động` (VD: `invoice.create`, `invoice.cancel`, `product.cost.view`); danh mục 32 quyền ở `packages/shared/src/permissions.ts`. Quyền có thể có **phạm vi** `all` hoặc `own` (chỉ dữ liệu của mình).
 - **7 vai trò cố định**: Quản lý, Trợ lý, Kế toán, Kho, Lái xe, Sale, Marketing. Quản lý luôn đủ quyền và **cấu hình quyền cho các vai trò còn lại** qua `/roles/...` (bảng `role_permissions`); chưa hỗ trợ tạo vai trò mới hay ngoại lệ riêng từng người.
 - Giới hạn theo **chi nhánh** (nhân viên chỉ thấy/thao tác chi nhánh được gán; Quản lý thấy cả hai).
 - Quyền nhạy cảm cần xác nhận: sửa giá, giảm giá vượt ngưỡng, hủy hóa đơn, xem giá vốn (có thể yêu cầu PIN quản lý).
@@ -660,7 +662,7 @@ Phạm vi theo đúng 7 phân hệ ở mục 2.2:
 
 | Phân hệ | Làm trong 2 tháng |
 |---|---|
-| Nền | **Đã xong ở backend (tuần 1):** đăng nhập JWT, 7 vai trò với **quyền do Quản lý cấu hình được** (34 quyền, phạm vi tất cả/chỉ của mình), **2 chi nhánh** (giá/tồn/nợ/quỹ riêng, chuyển kho 2 bước), tìm không dấu, bộ lọc lỗi toàn cục, seed. **Còn lại:** quản lý người dùng, nhật ký thao tác (ghi `requestId`/chi nhánh), backup |
+| Nền | **Đã xong ở backend (tuần 1):** đăng nhập JWT, 7 vai trò với **quyền do Quản lý cấu hình được** (32 quyền, phạm vi tất cả/chỉ của mình), **2 chi nhánh** (giá/tồn/nợ/quỹ riêng, chuyển kho 2 bước), tìm không dấu, bộ lọc lỗi toàn cục, seed. **Còn lại:** quản lý người dùng, nhật ký thao tác (ghi `requestId`/chi nhánh), backup |
 | Chuyển dữ liệu | Import sản phẩm, bảng giá, khách, NCC (giữ nhóm NCC vào `group_name`), **tồn đầu kỳ, nợ đầu kỳ, quỹ đầu kỳ** — có tham số **chi nhánh đích**; bỏ email thử của khách và NCC kiểm kê ảo; tải ảnh về kho file |
 | Hàng hóa | Danh sách hàng hóa (+ thẻ kho, tồn theo chi nhánh, nhập/xuất Excel), Thiết lập giá (7 bảng giá × 2 chi nhánh, lưới sửa giá, hàng loạt, sao chép giữa chi nhánh) |
 | Mua hàng | Nhà cung cấp (+ công nợ), Nhập hàng (giá vốn bình quân), Trả hàng nhập |

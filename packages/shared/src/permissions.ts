@@ -91,13 +91,6 @@ export const PERMISSIONS = [
     requires: ['product.view'],
   },
   {
-    code: 'price.override',
-    module: 'product',
-    label: 'Sửa giá khi bán',
-    description: 'Đổi giá niêm yết trên dòng hàng khi tạo đơn',
-    requires: ['product.view'],
-  },
-  {
     code: 'product.cost.view',
     module: 'product',
     label: 'Xem giá vốn / giá nhập cuối',

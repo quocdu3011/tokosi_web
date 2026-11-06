@@ -19,9 +19,11 @@ enum cash_direction {
   "out"
 }
 
-enum customer_type {
-  "individual"
-  "company"
+enum customer_price_level {
+  "new"
+  "medium"
+  "large"
+  "vip"
 }
 
 enum doc_status {
@@ -97,11 +99,6 @@ enum purchase_order_status {
   "confirmed"
   "completed"
   "cancelled"
-}
-
-enum return_settlement {
-  "offset_debt"
-  "refund"
 }
 
 enum shipping_payer {
@@ -275,29 +272,45 @@ Table customer_branch_terms {
   Note: '''Hạn mức và kỳ hạn công nợ của khách, riêng từng chi nhánh.'''
 }
 
-Table customer_invoice_profiles {
+Table customer_profiles {
   customer_id uuid [pk]
-  buyer_name text
-  company_name text
-  tax_code text
-  address text
-  email text
-  phone text
-  bank_name text
-  bank_account text
+  warehouse_location text
+  warehouse_count integer
+  warehouse_area text
+  warehouse_photo_url text [note: 'Đường link ảnh kho từ file TKS']
+  competitors text
+  sales_methods text[] [note: 'Hình thức bán hàng (nhiều giá trị): Bán cửa hàng, FB live, Kho buôn, Bán sàn, Sang tay, FB ads, Khác']
+  scale text
+  updated_at timestamptz [not null, default: `now()`]
 
-  Note: '''Thông tin xuất hóa đơn VAT/điện tử của khách.'''
+  Note: '''Hồ sơ kinh doanh của khách (kho, đối thủ, hình thức bán, quy mô) từ file TKS; quan hệ 1-1, hầu hết khách không có.'''
+}
+
+Table customer_visits {
+  id uuid [pk, default: `gen_random_uuid()`]
+  customer_id uuid [not null]
+  visited_on date [not null]
+  note text
+  created_by uuid
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (customer_id, visited_on) [name: 'customer_visits_uq', unique]
+  }
+
+  Note: '''Lịch tiếp khách: mỗi dòng một ngày; ngày tiếp khách gần nhất = ngày lớn nhất.'''
 }
 
 Table customers {
   id uuid [pk, default: `gen_random_uuid()`]
   code text [not null, unique]
   name text [not null]
-  type customer_type [not null, default: 'individual']
   phone text [unique]
   address text
-  facebook text
   sales_owner_id uuid [note: 'Nhân viên phụ trách (ở KiotViet là "Nhóm khách hàng")']
+  price_level customer_price_level [not null, default: 'new', note: 'Level giá (Mới/Vừa/Lớn/Vip) để nhân viên tham chiếu khi báo giá; hệ thống không có bảng giá']
+  new_since date [note: 'Tháng trở thành khách mới (ngày đầu tháng); trống = khách cũ hoặc không rõ']
+  acquisition_source text [note: 'Nguồn khách mới (vd Page)']
   linked_branch_id uuid [unique, note: 'Khách hàng hệ thống đại diện một chi nhánh (chuyển kho nội bộ)']
   note text
   is_active boolean [not null, default: true]
@@ -437,12 +450,10 @@ Table invoice_items {
   product_code text [not null]
   product_name text [not null]
   qty numeric(14,3) [not null]
-  list_price numeric(18,4) [not null]
   discount_per_unit numeric(18,4) [not null, default: 0, note: 'Giảm giá tính trên 1 đơn vị (số tiền, không phải %)']
-  unit_price numeric(18,4) [not null, note: 'list_price − discount_per_unit']
+  unit_price numeric(18,4) [not null, note: 'Giá bán sau giảm; giá trước giảm = unit_price + discount_per_unit']
   line_total numeric(18,0) [not null]
   unit_cost numeric(18,4) [not null, default: 0, note: 'Giá vốn tại thời điểm bán (tính lãi gộp)']
-  is_gift boolean [not null, default: false]
   note text
 
   indexes {
@@ -486,9 +497,6 @@ Table invoices {
   total numeric(18,0) [not null]
   paid_total numeric(18,0) [not null, default: 0, note: 'Đã thu khi tạo + đã cấn trừ về sau (cache của sổ cái)']
   status doc_status [not null, default: 'completed']
-  ship_name text
-  ship_phone text
-  ship_address text
   note text
   created_by uuid
   cancelled_at timestamptz
@@ -512,11 +520,9 @@ Table order_items {
   line_no integer [not null]
   product_id uuid [not null]
   qty numeric(14,3) [not null]
-  list_price numeric(18,4) [not null]
   discount_per_unit numeric(18,4) [not null, default: 0, note: 'Giảm giá tính trên 1 đơn vị (số tiền, không phải %)']
-  unit_price numeric(18,4) [not null]
+  unit_price numeric(18,4) [not null, note: 'Giá bán sau giảm; giá trước giảm = unit_price + discount_per_unit']
   line_total numeric(18,0) [not null]
-  is_gift boolean [not null, default: false]
   note text
 
   indexes {
@@ -534,17 +540,15 @@ Table orders {
   branch_id uuid [not null]
   customer_id uuid [not null]
   status order_status [not null, default: 'draft']
-  seller_id uuid
+  seller_id uuid [note: 'Người nhận đặt (khác người tạo)']
   ordered_at timestamptz [not null]
-  subtotal numeric(18,0) [not null, default: 0]
+  subtotal numeric(18,0) [not null, default: 0, note: 'Σ line_total của các dòng']
   discount numeric(18,0) [not null, default: 0]
-  total numeric(18,0) [not null, default: 0]
-  deposit_amount numeric(18,0) [not null, default: 0, note: 'Tiền đặt cọc đã thu']
+  total numeric(18,0) [not null, default: 0, note: 'subtotal − discount (Khách cần trả)']
+  pickup_address text [note: 'Địa chỉ lấy hàng (file KiotViet)']
   ship_name text
   ship_phone text
   ship_address text
-  package_count integer
-  weight_g numeric(12,2)
   note text
   created_by uuid
   cancelled_at timestamptz
@@ -754,8 +758,8 @@ Table sales_return_items {
   return_price numeric(18,4) [not null]
   line_total numeric(18,0) [not null]
   restock boolean [not null, default: true, note: 'true = nhập lại kho']
-  restock_cost numeric(18,4)
-  reason text
+  restock_price numeric(18,4) [note: 'Giá nhập lại (file KiotViet), có thể khác giá bán; không đổi giá vốn bình quân, chênh lệch (giá bán − giá nhập lại) × SL tính vào lợi nhuận']
+  note text
 
   indexes {
     (return_id) [name: 'sales_return_items_return_idx']
@@ -774,8 +778,6 @@ Table sales_returns {
   status doc_status [not null, default: 'completed']
   returned_at timestamptz [not null]
   total numeric(18,0) [not null]
-  settlement return_settlement [not null, default: 'offset_debt']
-  refund_account_id uuid
   received_by uuid
   note text
   created_by uuid
@@ -984,7 +986,9 @@ Ref: cash_transactions.account_id > cash_accounts.id
 Ref: cash_transactions.created_by > users.id
 Ref: customer_branch_terms.customer_id > customers.id [delete: cascade]
 Ref: customer_branch_terms.branch_id > branches.id
-Ref: customer_invoice_profiles.customer_id > customers.id [delete: cascade]
+Ref: customer_profiles.customer_id > customers.id [delete: cascade]
+Ref: customer_visits.customer_id > customers.id [delete: cascade]
+Ref: customer_visits.created_by > users.id
 Ref: customers.sales_owner_id > users.id
 Ref: customers.linked_branch_id > branches.id
 Ref: customers.created_by > users.id
@@ -1043,7 +1047,6 @@ Ref: sales_return_items.product_id > products.id
 Ref: sales_returns.branch_id > branches.id
 Ref: sales_returns.customer_id > customers.id
 Ref: sales_returns.invoice_id > invoices.id
-Ref: sales_returns.refund_account_id > cash_accounts.id
 Ref: sales_returns.received_by > users.id
 Ref: sales_returns.created_by > users.id
 Ref: stock_movements.branch_id > branches.id
@@ -1100,7 +1103,8 @@ TableGroup "Tồn kho & chuyển kho" {
 TableGroup "Đối tác" {
   customers
   customer_branch_terms
-  customer_invoice_profiles
+  customer_profiles
+  customer_visits
   suppliers
   supplier_branch_history
 }

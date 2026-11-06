@@ -82,7 +82,6 @@ describe('Combo qua HTTP', () => {
       lineNo: 1,
       productId: ids.A!,
       qty: '2',
-      listPrice: '2000',
       unitPrice: '2000',
       lineTotal: '4000',
     });
