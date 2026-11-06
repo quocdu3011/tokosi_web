@@ -13,6 +13,7 @@ Khi tài liệu và mã khác nhau: **mã là sự thật**, sửa tài liệu t
 5. **Tiền/số lượng là chuỗi thập phân**: hiển thị bằng `formatMoney` / `formatDecimal`, không đổi sang `number` để cộng (xem `apps/web/README.md`).
 6. **Ẩn/hiện theo quyền, không theo vai trò**: `can(me, 'mã.quyền')` (`lib/permissions.ts`).
 7. **Không dùng emoji làm icon**: dùng SVG Lucide (`lucide-react`) và gắn `aria-hidden="true"` nếu chỉ để trang trí.
+8. **Tiêu đề cột của mọi bảng luôn căn giữa**: áp dụng cho `DataTable`, bảng tĩnh, bảng gọn, bảng phân quyền và cả cột số/thao tác. Nhãn sắp xếp phải nằm giữa cột, biểu tượng có khoảng trống đối xứng để không làm lệch nhãn. Nội dung ô dữ liệu căn theo loại dữ liệu; tiền/số lượng vẫn căn phải.
 
 ## Ràng buộc cứng (có test)
 

@@ -34,7 +34,18 @@ lib/queries/           Hook TanStack Query theo phân hệ
 lib/navigation.ts      Sơ đồ menu + quyền + cờ `ready` (backend đã có API chưa)
 ```
 
-## Quy ước
+## Phân hệ Khách hàng
+
+`/customers` đã nối API Khách hàng theo OpenAPI hiện có:
+
+- Danh sách có tìm mã/tên/SĐT, lọc trạng thái, level giá, khách mình phụ trách, nguồn, tháng khách mới và công nợ; phân trang/sắp xếp trên server.
+- Bảng dùng `DataTable`, `TableToolbar`, `useTablePrefs('customers', ...)`, `useListState`, `Pagination`, `StatusBadge` theo Design System. Tùy chỉnh cột và số dòng lưu theo tài khoản.
+- Tạo/sửa khách, hồ sơ kho và hình thức bán hàng; ngưng/mở giao dịch có xác nhận. Quyền sửa và xem nợ có xét phạm vi `own`; khách không được xem nợ hiện `—`, không thay bằng 0.
+- Chi tiết có số liệu riêng từng chi nhánh, hạn mức/kỳ hạn, sổ công nợ theo khoảng ngày và lịch tiếp khách (quyền `customer.visit.edit` để ghi/xóa).
+- Import mẫu TKS chỉ có chế độ cập nhật, cần `import.run` và `customer.edit` phạm vi `all`; kiểm tra trước khi ghi và hiển thị cảnh báo từ BE. Quyền nhập nợ đầu kỳ do BE kiểm tra.
+- Xuất Excel dùng bộ lọc/sắp xếp hiện tại và định dạng TKS do BE cung cấp. API Khách hàng hiện chưa nhận tùy chọn cột xuất; nút xuất tải nguyên mẫu TKS, khác với API xuất Hàng hóa có chọn cột.
+
+## Quy ước chung
 
 - **Phân hệ backend chưa có API thì để trống** (trang "Chức năng đang được xây dựng"), không dùng
   dữ liệu giả. Khi backend xong: bật `ready: true` trong `lib/navigation.ts` và thay trang trống.

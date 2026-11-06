@@ -49,6 +49,61 @@ Mọi PR phải qua: `lint`, `typecheck`, `test`, `build`, và `openapi.json` + 
 - Swagger tại `/api/docs`. Mọi controller gắn `@ApiTags`, `@ApiOperation`, `@ApiOkResponse`; mọi DTO có `@ApiProperty` và validator `class-validator`. Sau khi đổi endpoint/DTO chạy `pnpm --filter @kiot/api openapi:export` rồi commit `docs/api/openapi.json`.
 - Backend phải khớp đúng cấu trúc trong `docs/api/endpoints.md`; nếu cần khác thì sửa tài liệu trước và báo frontend.
 
+## Nguyên tắc xây dựng Frontend (tuân thủ Design System)
+
+> Tài liệu chuẩn cho giao diện `apps/web` nằm tại [`docs/design-system/README.md`](docs/design-system/README.md). Trước khi viết mã giao diện, **bắt buộc đọc kỹ tài liệu này và các tài liệu liên quan ([tokens.md](docs/design-system/tokens.md), [components.md](docs/design-system/components.md), [list-page.md](docs/design-system/list-page.md), [checklist.md](docs/design-system/checklist.md))**.
+
+1. **Kiến trúc & CSS thuần theo token (TUYỆT ĐỐI KHÔNG Tailwind, KHÔNG shadcn/cva):**
+   - Next.js 16 (App Router) + React 19 + CSS thuần theo token CSS (`var(--...)`).
+   - Lớp CSS nằm tại `apps/web/src/styles/`. Component tại `components/ui/*` chỉ ánh xạ prop sang tên lớp bằng `cn()` (`lib/utils.ts`, chỉ là `clsx`). Không viết inline `style={{...}}` cho màu sắc hoặc khoảng cách.
+   - Thư viện hành vi: Dùng Radix UI cho hành vi phức tạp (Dialog, Select, Tabs, Dropdown...); Sonner cho toast notification (`toast`).
+   - Biểu tượng (Icon): **Chỉ dùng SVG Lucide (`lucide-react`)** và gắn `aria-hidden="true"` nếu chỉ để trang trí. **Tuyệt đối không dùng emoji làm icon** (kể cả trong chuỗi hoặc chú thích).
+   - Thêm CSS mới: Tạo file `styles/components/<tên>.css` và **bắt buộc thêm `@import './components/<tên>.css';` vào `styles/components.css`** (đây là cách duy nhất để CSS được nạp). CSS riêng theo màn hình đặt tiền tố cụ thể (vd `.purchase-...`, `.product-...`).
+
+2. **Quy chuẩn Theme & Token:**
+   - **Dark Obsidian là giao diện mặc định**, Light là phương án thứ hai (`data-theme="light"` trên `<html>`, do `next-themes` điều khiển). Mọi giao diện mới phải hoàn thiện và đẹp ở cả hai theme.
+   - Mọi màu sắc, nền, viền, bóng, khoảng cách, bo góc đều qua token CSS `var(--...)` (`var(--bg)`, `var(--panel)`, `var(--border)`, `var(--primary)`, `var(--space-md)`, `var(--radius-md)`...).
+   - Token mới phải được khai báo đủ cặp ở cả Dark (`:root`) và Light (`:root[data-theme='light']`) trong `styles/tokens.css`.
+   - Màu trong suốt dựng từ kênh RGB: `rgba(var(--primary-rgb), 0.14)`.
+
+3. **Ràng buộc kỹ thuật cứng (Automated Tests – `apps/web/src/styles/design-constraints.test.ts`):**
+   - Bộ test tự động quét mọi file `.css`, `.ts`, `.tsx` trong `apps/web/src` và **đánh rớt CI ngay lập tức** nếu vi phạm:
+     - Không `transform-style: preserve-3d`.
+     - Không `perspective`.
+     - Không biến đổi 3D (`translateZ`, `rotateX`, `rotateY`, `translate3d`). Chỉ dùng biến đổi 2D (`translate`, `translateY`, `rotate`).
+     - Không `background-attachment: fixed`.
+     - Không `transition: all` (bắt buộc liệt kê từng thuộc tính, vd: `transition: background-color 150ms ease, color 150ms ease`).
+     - `backdrop-filter` **chỉ** được phép ở `.app-header` và `.auth-card`; không dùng trên overlay, modal, drawer hay popover.
+     - Không `font-size` dưới `12px` (tính theo `px`, không dùng `rem`/`em` để lách).
+     - Không dùng màu hex thô (đặc biệt cấm `#ff0000`, `#00ff00`, `#0000ff`).
+     - Không chứa chuỗi `tailwind`, `@apply`, `tw-animate` (kể cả trong chú thích).
+     - Không dùng ký tự emoji (`\p{Extended_Pictographic}`) trong `.ts/.tsx`, kể cả trong chuỗi và chú thích.
+
+4. **Trang danh sách chuẩn (List Page Pattern - BẮT BUỘC):**
+   - Mọi trang danh sách mới (hoặc làm lại) **bắt buộc tuân thủ [`docs/design-system/list-page.md`](docs/design-system/list-page.md)**:
+     `PageHeader` → `TableToolbar` → `DataTable` (gắn `prefs` từ `useTablePrefs`) → `Pagination` (có chọn cỡ trang).
+   - Bắt buộc dùng `useTablePrefs('<tableKey>', columns)` để lưu trạng thái ẩn/hiện, thứ tự, độ rộng cột và số dòng/trang vào tài khoản (`/me/table-prefs`). Cột định danh chính (mã, tên) phải đặt `locked: true`.
+   - **Tuyệt đối không hard-code `PAGE_SIZE` hay `limit: 20`**: lấy `limit = list.pageSize` từ `useTablePrefs`.
+   - Quản lý bộ lọc, tìm kiếm, sắp xếp và phân trang tập trung qua `useListState` (tự động reset về trang 1 khi lọc hoặc sắp xếp).
+   - Phải xử lý đủ 3 trạng thái: Skeleton khi tải, Empty State (`emptyText`) rõ ràng khi rỗng, và `.alert .alert-error` khi lỗi (kèm nút "Thử lại").
+   - **Tiêu đề cột của mọi bảng luôn căn giữa**: áp dụng cho `DataTable`, bảng tĩnh, bảng gọn, ma trận phân quyền và cả cột số/thao tác. Nhãn sắp xếp căn giữa, icon căn đối xứng không làm lệch nhãn. Nội dung ô dữ liệu số/tiền căn phải (`.num`).
+   - Xuất Excel (`ColumnPicker` / `Export Column Picker`): áp dụng đúng bộ lọc đang hiển thị và lọc danh sách cột theo quyền hạn.
+
+5. **Quy chuẩn Component & Nghiệp vụ Frontend:**
+   - Dùng component có sẵn (`Button`, `Badge`/`StatusBadge`, `Field`, `Dialog`/`ConfirmDialog`, `Sheet`, `DataTable`...), không dựng lại bằng thẻ thô.
+   - Trạng thái bắt buộc dùng `StatusBadge` / `Badge` (biến thể đúng nghĩa); **tuyệt đối không viết** `<span className="badge …">`.
+   - Thao tác xóa, hủy, khóa, đặt lại bắt buộc qua `ConfirmDialog` (không dùng `window.confirm`).
+   - Ẩn/hiện tính năng, nút bấm, cột dữ liệu theo quyền qua `can(me, '<mã.quyền>')` (`lib/permissions.ts`), **không kiểm tra theo vai trò (`user.role`)**. Cột giá vốn chỉ hiển thị khi có quyền `product.cost.view`.
+   - Tiền và số lượng là chuỗi thập phân: bắt buộc dùng `formatMoney` / `formatDecimal` (`lib/format.ts`), không chuyển đổi sang kiểu `number` để cộng/trừ.
+   - Ngày giờ hiển thị theo múi giờ `Asia/Ho_Chi_Minh` qua `formatDate` / `formatDateTime`.
+   - Truy vấn dữ liệu theo chi nhánh (tồn kho, giá vốn, công nợ...) bắt buộc có `branchId` trong query key của TanStack Query.
+
+6. **Trợ năng (a11y) & Trải nghiệm:**
+   - Mọi văn bản hiển thị (nhãn, placeholder, thông báo lỗi, `aria-label`, title) là **tiếng Việt có dấu**.
+   - Input `id` phải có tiền tố riêng theo màn hình (vd `uf-username`, `pf-code`) vì Next.js 16 cache component trong DOM.
+   - Nút chỉ icon phải có `aria-label` tiếng Việt; ô bấm tối thiểu 44px trên thiết bị cảm ứng (`@media (pointer: coarse)`).
+   - Tôn trọng `prefers-reduced-motion` và không gây cuộn ngang toàn trang (bảng cuộn ngang trong khung riêng).
+
 ## Phân quyền (Quản lý cấu hình được)
 
 - Quyền của từng vai trò nằm trong bảng `role_permissions` (Quản lý chỉnh qua `/roles/...`), **không** hard-code theo vai trò trong mã. Vai trò `manager` luôn đủ quyền.

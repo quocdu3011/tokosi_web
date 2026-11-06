@@ -80,7 +80,7 @@ const columns = useMemo<AppColumnDef<Product>[]>(() => [ … ], [canSeeCost]);
 | `sort`             | `'server'` \| `'page'`; thiếu = không sắp xếp (xem 2.5)                                                         |
 | `sortHint`         | Tooltip nút sắp xếp (cột `page` có sẵn "Sắp xếp trong trang đang xem")                                          |
 
-- Tiêu đề cột là chuỗi tiếng Việt. Cột số: `header: () => <span className="num">Tồn kho</span>` và ô `<span className="num">…</span>` (canh phải).
+- Tiêu đề cột là chuỗi tiếng Việt và **luôn căn giữa**, kể cả cột số và cột thao tác. Cột số: dùng `header: 'Tồn kho'` và ô `<span className="num">…</span>` (nội dung căn phải). Nhãn trong nút sắp xếp vẫn ở giữa cột; biểu tượng nằm bên phải với khoảng trống đối xứng bên trái. Không ghi đè căn lề tiêu đề ở từng màn.
 - Cột Thao tác: `id: 'actions'`, `header: () => <span className="sr-only">Thao tác</span>`, `meta: { label: 'Thao tác', locked: true, width: 100 }`; nút trong ô là `Button variant="ghost" size="icon"` có `aria-label` nêu đối tượng.
 - Ô mở chi tiết (thường là cột mã): nút `className="link-button tabular"` có `aria-label` ("Xem hàng HH001"), xem ví dụ mục 3. Thêm `onRowClick` để bấm chỗ trống của dòng cũng mở (bấm vào nút/liên kết/ô nhập trong dòng thì dòng không kích hoạt).
 - Thứ tự cột trên màn do người dùng kéo thả tiêu đề (chuột/cảm ứng: kéo >= 6px; bàn phím: Tab tới nút tay nắm "Đổi chỗ cột …" → Phím cách nhấc, mũi tên trái/phải di chuyển, Phím cách thả, Esc hủy). Màn không cần code thêm.

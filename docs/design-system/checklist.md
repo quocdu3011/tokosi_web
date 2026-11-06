@@ -38,7 +38,8 @@ Copy khối này vào mô tả PR và tick. Mục nào không áp dụng thì gh
 
 **Nội dung**
 - [ ] Mọi chữ hiển thị là tiếng Việt có dấu: nhãn, placeholder, trạng thái rỗng, lỗi, `aria-label`, `title`
-- [ ] Tiền/số lượng đi qua `formatMoney` / `formatDecimal`, cột số canh phải (`.num`); ngày giờ qua `formatDate` / `formatDateTime`
+- [ ] Tiêu đề cột của mọi bảng căn giữa, kể cả cột số/thao tác, bảng gọn và ma trận phân quyền; nhãn có sắp xếp không lệch do biểu tượng
+- [ ] Tiền/số lượng đi qua `formatMoney` / `formatDecimal`, nội dung ô số căn phải (`.num`); ngày giờ qua `formatDate` / `formatDateTime`
 - [ ] Nút/menu/cột nhạy cảm ẩn theo `can(me, '<mã quyền>')` (không theo vai trò); cột giá vốn chỉ khi có `product.cost.view`; dữ liệu có phạm vi `own` đã được server lọc
 
 **Trang danh sách** (bỏ qua nếu không phải trang danh sách)

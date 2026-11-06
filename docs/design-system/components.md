@@ -296,8 +296,10 @@ Cách dựng — ưu tiên `Table, TableHeader, TableBody, TableRow, TableHead, 
 </div>
 ```
 
+Bảng nào cũng phải có **tiêu đề cột căn giữa**, gồm bảng tĩnh, bảng gọn và ma trận phân quyền. Quy tắc dùng chung nằm trong `styles/components/table.css`; không đặt căn trái/phải cho tiêu đề ở từng màn. Căn lề của nội dung ô dữ liệu độc lập với tiêu đề.
+
 Bẫy:
-- Cột số trong bảng thô: đặt `className="col-numeric"` lên `th`/`td` (canh phải + phông số + tabular). Trong `DataTable` thì dùng `<span className="num">` bên trong ô.
+- Cột số trong bảng thô: đặt `className="col-numeric"` lên `th`/`td` (phông số + tabular; chỉ `td` căn phải, `th` vẫn căn giữa). Trong `DataTable` thì dùng `<span className="num">` bên trong ô dữ liệu; tiêu đề dùng chuỗi tiếng Việt.
 - **Không** đặt `.num` thẳng lên `<td>`/`<th>` của `.data-table` — `.num` là `display: block` và làm vỡ ô. Trong `.mini-table` thì `td.num`/`th.num` đã được xử lý riêng.
 - Bảng thô chưa có kẻ cột, đổi độ rộng, sắp xếp — nếu cần các thứ đó, đó là dấu hiệu nên dùng `DataTable`.
 - Danh sách có thể lớn/lọc/xuất file thì KHÔNG làm bảng thô.
