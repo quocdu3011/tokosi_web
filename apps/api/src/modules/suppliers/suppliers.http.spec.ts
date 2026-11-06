@@ -75,7 +75,6 @@ describe('Nhà cung cấp qua HTTP', () => {
         branchId: t.sg,
         supplierId: ids.NCC000001!,
         receivedAt: new Date(),
-        subtotal: '5000000',
         total: '5000000',
       },
       {
@@ -83,7 +82,6 @@ describe('Nhà cung cấp qua HTTP', () => {
         branchId: t.hn,
         supplierId: ids.NCC000001!,
         receivedAt: new Date(),
-        subtotal: '2000000',
         total: '2000000',
       },
       {
@@ -92,7 +90,6 @@ describe('Nhà cung cấp qua HTTP', () => {
         supplierId: ids.NCC000001!,
         status: 'cancelled', // phiếu đã hủy không được tính
         receivedAt: new Date(),
-        subtotal: '999000',
         total: '999000',
       },
     ]);

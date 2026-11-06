@@ -3,6 +3,7 @@ import {
   lineTotal,
   roundMoney,
   roundUnitPrice,
+  removeAtCost,
   weightedAverageCost,
 } from './costing.js';
 
@@ -101,5 +102,21 @@ describe('allocateProportionally', () => {
       expect(sum(parts)).toBe(total);
       expect(parts.every((p) => Number(p) >= 0)).toBe(true);
     }
+  });
+});
+
+describe('removeAtCost', () => {
+  it('ví dụ của chủ: tồn 1000 @5000, nhập 500 @5500 → 5166,6667; trả 100 @5500 → 5142,8572', () => {
+    expect(weightedAverageCost('1000', '5000', '500', '5500')).toBe(
+      '5166.6667',
+    );
+    expect(removeAtCost('1500', '5166.6667', '100', '5500')).toBe('5142.8572');
+  });
+  it('hủy phiếu nhập 500 @5500 khi tồn 1500 @5166,6667 → về lại 5000 (lệch 0,0001 do giá vốn lưu đã làm tròn 4 chữ số)', () => {
+    expect(removeAtCost('1500', '5166.6667', '500', '5500')).toBe('5000.0001');
+  });
+  it('tồn còn lại bằng 0 → giữ giá vốn cũ; kết quả âm được giữ nguyên (không chặn về 0)', () => {
+    expect(removeAtCost('10', '1234.5', '10', '999')).toBe('1234.5000');
+    expect(removeAtCost('10', '100', '5', '1000')).toBe('-800.0000'); // (1000 − 5000) / 5
   });
 });

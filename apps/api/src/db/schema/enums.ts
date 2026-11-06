@@ -23,6 +23,13 @@ export const orderStatus = pgEnum('order_status', [
   'completed',
   'cancelled',
 ]);
+/** Đặt hàng nhập: nháp → đã xác nhận với NCC → hoàn thành (đã nhập đủ) hoặc hủy. "Nhập một phần" tính từ phiếu nhập, không lưu. */
+export const purchaseOrderStatus = pgEnum('purchase_order_status', [
+  'draft',
+  'confirmed',
+  'completed',
+  'cancelled',
+]);
 /** Hóa đơn, phiếu nhập, phiếu trả, phiếu thu chi: hoàn thành / hủy (không xóa). */
 export const docStatus = pgEnum('doc_status', ['completed', 'cancelled']);
 

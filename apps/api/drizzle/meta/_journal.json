@@ -176,6 +176,13 @@
       "when": 1793931308255,
       "tag": "0024_ncc_ma_khong_phan_biet_hoa_thuong",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793935369334,
+      "tag": "0025_mua_hang_theo_file_kiotviet",
+      "breakpoints": true
     }
   ]
 }

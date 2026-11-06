@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { check, index, pgTable, text, uuid } from 'drizzle-orm/pg-core';
-import { docStatus, returnSettlement } from './enums.js';
+import { docStatus, purchaseOrderStatus } from './enums.js';
 import {
   cancelInfo,
   money,
@@ -11,13 +11,61 @@ import {
   tstz,
 } from './_helpers.js';
 import { products } from './catalog.js';
-import { cashAccounts } from './finance.js';
 import { suppliers } from './partners.js';
 import { branches, users } from './system.js';
 
+/** Đặt hàng nhập (đặt với nhà cung cấp, chưa cộng tồn). `orderedBy` = Người đặt, `createdBy` = Người tạo. */
+export const purchaseOrders = pgTable(
+  'purchase_orders',
+  {
+    id: pk(),
+    code: text().notNull().unique(),
+    branchId: uuid()
+      .notNull()
+      .references(() => branches.id),
+    supplierId: uuid()
+      .notNull()
+      .references(() => suppliers.id),
+    status: purchaseOrderStatus().notNull().default('draft'),
+    orderedAt: tstz().notNull(),
+    orderedBy: uuid().references(() => users.id),
+    total: money().notNull(),
+    note: text(),
+    createdBy: uuid().references(() => users.id),
+    ...cancelInfo(),
+    ...timestamps(),
+  },
+  (t) => [
+    index('purchase_orders_supplier_idx').on(t.supplierId, t.orderedAt),
+    index('purchase_orders_branch_idx').on(t.branchId, t.orderedAt),
+  ],
+);
+
+export const purchaseOrderItems = pgTable(
+  'purchase_order_items',
+  {
+    id: pk(),
+    orderId: uuid()
+      .notNull()
+      .references(() => purchaseOrders.id, { onDelete: 'cascade' }),
+    productId: uuid()
+      .notNull()
+      .references(() => products.id),
+    qty: quantity().notNull(),
+    /** Giá nhập ("Đơn giá" trong file KiotViet luôn bằng giá nhập nên không lưu riêng); dùng tính giá vốn */
+    unitCost: price().notNull(),
+    lineTotal: money().notNull(),
+  },
+  (t) => [
+    index('purchase_order_items_order_idx').on(t.orderId),
+    index('purchase_order_items_product_idx').on(t.productId),
+    check('purchase_order_items_qty_pos', sql`${t.qty} > 0`),
+  ],
+);
+
 /**
- * Phiếu nhập hàng (nhập trực tiếp). `poRef` chỉ là mã phiếu đặt nhập dạng chữ để đối chiếu
- * (module Đặt hàng nhập thuộc Phase 2). Nhập hàng cộng tồn và tính lại giá vốn bình quân.
+ * Phiếu nhập hàng. `purchaseOrderId` trỏ tới phiếu đặt hàng nhập (nếu nhập theo đơn đặt).
+ * Nhập hàng cộng tồn và tính lại giá vốn bình quân. Tiền trả NCC đi qua Sổ quỹ, không lưu trên phiếu.
  */
 export const goodsReceipts = pgTable(
   'goods_receipts',
@@ -30,14 +78,10 @@ export const goodsReceipts = pgTable(
     supplierId: uuid()
       .notNull()
       .references(() => suppliers.id),
+    purchaseOrderId: uuid().references(() => purchaseOrders.id),
     status: docStatus().notNull().default('completed'),
     receivedAt: tstz().notNull(),
-    supplierInvoiceNo: text(),
-    poRef: text(),
-    subtotal: money().notNull(),
-    discount: money().notNull().default('0'),
     total: money().notNull(),
-    paidAmount: money().notNull().default('0'),
     receivedBy: uuid().references(() => users.id),
     note: text(),
     createdBy: uuid().references(() => users.id),
@@ -47,6 +91,7 @@ export const goodsReceipts = pgTable(
   (t) => [
     index('goods_receipts_supplier_idx').on(t.supplierId, t.receivedAt),
     index('goods_receipts_time_idx').on(t.receivedAt),
+    index('goods_receipts_po_idx').on(t.purchaseOrderId),
   ],
 );
 
@@ -61,6 +106,7 @@ export const goodsReceiptItems = pgTable(
       .notNull()
       .references(() => products.id),
     qty: quantity().notNull(),
+    /** Giá nhập ("Đơn giá" trong file KiotViet luôn bằng giá nhập nên không lưu riêng); dùng tính giá vốn */
     unitCost: price().notNull(),
     lineTotal: money().notNull(),
     note: text(),
@@ -87,10 +133,8 @@ export const purchaseReturns = pgTable(
     goodsReceiptId: uuid().references(() => goodsReceipts.id),
     status: docStatus().notNull().default('completed'),
     returnedAt: tstz().notNull(),
+    returnedBy: uuid().references(() => users.id),
     total: money().notNull(),
-    settlement: returnSettlement().notNull().default('offset_debt'),
-    refundAccountId: uuid().references(() => cashAccounts.id),
-    reason: text(),
     note: text(),
     createdBy: uuid().references(() => users.id),
     ...cancelInfo(),
@@ -114,6 +158,7 @@ export const purchaseReturnItems = pgTable(
     qty: quantity().notNull(),
     returnPrice: price().notNull(),
     lineTotal: money().notNull(),
+    note: text(),
   },
   (t) => [
     index('purchase_return_items_return_idx').on(t.returnId),

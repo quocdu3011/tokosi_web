@@ -57,6 +57,7 @@ import {
   type ComboComponent,
   type ComboFigures,
 } from './combo.js';
+import { onOrderByProduct } from '../purchasing/order-status.js';
 import { AuditService } from '../audit/audit.service.js';
 import { PermissionsService } from '../authorization/permissions.service.js';
 import { BranchAccessService } from '../branches/branch-access.service.js';
@@ -623,11 +624,16 @@ export class ProductsService {
     const comboIds = rows
       .filter((r) => r.p.productType === 'combo')
       .map((r) => r.p.id);
-    const [images, paths, figures, comps] = await Promise.all([
+    const [images, paths, figures, comps, onOrder] = await Promise.all([
       this.imagesOf(rows.map((r) => r.p.id)),
       this.categoryPaths(),
       comboFigures(this.db, branchId, comboIds),
       loadComponents(this.db, comboIds),
+      onOrderByProduct(
+        this.db,
+        branchId,
+        rows.map((r) => r.p.id),
+      ),
     ]);
     return rows.map((r) => {
       const fig = figures.get(r.p.id);
@@ -656,7 +662,7 @@ export class ProductsService {
         onHand: fig ? fig.onHand : onHand.toFixed(3),
         reserved: isCombo ? '0.000' : reserved.toFixed(3),
         available: fig ? fig.available : onHand.minus(reserved).toFixed(3),
-        onOrder: '0',
+        onOrder: dec(onOrder.get(r.p.id) ?? '0').toFixed(3),
         description: r.p.description,
         images: images.get(r.p.id) ?? [],
         isActive: r.p.isActive,

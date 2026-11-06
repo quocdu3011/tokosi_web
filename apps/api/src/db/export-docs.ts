@@ -65,6 +65,7 @@ const GROUPS: Record<string, string[]> = {
     'customer_branch_terms',
     'customer_invoice_profiles',
     'suppliers',
+    'supplier_branch_history',
   ],
   'Đơn hàng': [
     'orders',
@@ -76,6 +77,8 @@ const GROUPS: Record<string, string[]> = {
     'sales_return_items',
   ],
   'Mua hàng': [
+    'purchase_orders',
+    'purchase_order_items',
     'goods_receipts',
     'goods_receipt_items',
     'purchase_returns',
@@ -132,7 +135,9 @@ const TABLE_NOTES: Record<string, string> = {
     'Khách hàng. Công nợ không lưu ở đây: số dư = tổng debt_ledger (có thể âm). sales_owner_id = nhân viên phụ trách.',
   customer_invoice_profiles: 'Thông tin xuất hóa đơn VAT/điện tử của khách.',
   suppliers:
-    'Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng khác; group_name là nhóm NCC (chuỗi tự do, có thể để trống).',
+    'Nhà cung cấp; group_name là nhóm NCC (chuỗi tự do, có thể để trống). Số liệu tiền theo từng chi nhánh: xem supplier_branch_history và debt_ledger.',
+  supplier_branch_history:
+    'Tổng mua / mua thuần lịch sử (chuyển từ KiotViet) của NCC tại từng chi nhánh.',
   orders: 'Đặt hàng. draft = phiếu tạm giữ hàng; một đơn → tối đa một hóa đơn.',
   order_items: 'Dòng hàng của đơn đặt hàng.',
   invoices:
@@ -144,8 +149,11 @@ const TABLE_NOTES: Record<string, string> = {
   sales_returns:
     'Trả hàng bán. Có thể không tham chiếu hóa đơn; mặc định bù trừ công nợ.',
   sales_return_items: 'Dòng hàng trả lại của khách.',
+  purchase_orders:
+    'Đặt hàng nhập (chưa cộng tồn); ordered_by = Người đặt, created_by = Người tạo.',
+  purchase_order_items: 'Dòng hàng của đặt hàng nhập.',
   goods_receipts:
-    'Phiếu nhập hàng. po_ref chỉ là mã phiếu đặt nhập dạng chữ để đối chiếu.',
+    'Phiếu nhập hàng; purchase_order_id trỏ tới đặt hàng nhập (nếu có). Tiền trả NCC đi qua Sổ quỹ.',
   goods_receipt_items: 'Dòng hàng của phiếu nhập.',
   purchase_returns: 'Trả hàng nhập (trả lại nhà cung cấp).',
   purchase_return_items: 'Dòng hàng của phiếu trả nhập.',
@@ -203,8 +211,6 @@ const COLUMN_NOTES: Record<string, string> = {
   'cash_transactions.party_id': 'Đa hình theo party_type (không có khóa ngoại)',
   'debt_ledger.amount': '+ tăng nợ, − giảm nợ',
   'debt_ledger.party_id': 'Đa hình theo party_type (không có khóa ngoại)',
-  'goods_receipts.po_ref':
-    'Mã phiếu đặt nhập (PDN…) dạng chữ, chỉ để đối chiếu',
   'sales_return_items.restock': 'true = nhập lại kho',
 };
 

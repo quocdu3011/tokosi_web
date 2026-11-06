@@ -2,18 +2,17 @@
 
 > **Sinh tự động** từ `apps/api/src/db/schema` bằng `pnpm db:docs` — không sửa tay. Tổng quan và cách xem sơ đồ: [`README.md`](README.md).
 
-**41 bảng · 19 kiểu liệt kê (enum)**
+**43 bảng · 20 kiểu liệt kê (enum)**
 
 ## Mục lục
 
 - **Hệ thống**: [`branches`](#branches), [`users`](#users), [`refresh_tokens`](#refresh_tokens), [`audit_logs`](#audit_logs), [`code_sequences`](#code_sequences), [`company_profile`](#company_profile), [`idempotency_keys`](#idempotency_keys), [`import_jobs`](#import_jobs), [`user_branches`](#user_branches), [`role_permissions`](#role_permissions), [`user_identities`](#user_identities), [`system_settings`](#system_settings)
 - **Hàng hóa & giá**: [`categories`](#categories), [`products`](#products), [`product_images`](#product_images), [`product_components`](#product_components), [`price_books`](#price_books), [`price_book_items`](#price_book_items)
 - **Tồn kho & chuyển kho**: [`stocks`](#stocks), [`stock_movements`](#stock_movements), [`stock_transfers`](#stock_transfers), [`stock_transfer_items`](#stock_transfer_items)
-- **Đối tác**: [`customers`](#customers), [`customer_branch_terms`](#customer_branch_terms), [`customer_invoice_profiles`](#customer_invoice_profiles), [`suppliers`](#suppliers)
+- **Đối tác**: [`customers`](#customers), [`customer_branch_terms`](#customer_branch_terms), [`customer_invoice_profiles`](#customer_invoice_profiles), [`suppliers`](#suppliers), [`supplier_branch_history`](#supplier_branch_history)
 - **Đơn hàng**: [`orders`](#orders), [`order_items`](#order_items), [`invoices`](#invoices), [`invoice_items`](#invoice_items), [`invoice_payments`](#invoice_payments), [`sales_returns`](#sales_returns), [`sales_return_items`](#sales_return_items)
-- **Mua hàng**: [`goods_receipts`](#goods_receipts), [`goods_receipt_items`](#goods_receipt_items), [`purchase_returns`](#purchase_returns), [`purchase_return_items`](#purchase_return_items)
+- **Mua hàng**: [`purchase_orders`](#purchase_orders), [`purchase_order_items`](#purchase_order_items), [`goods_receipts`](#goods_receipts), [`goods_receipt_items`](#goods_receipt_items), [`purchase_returns`](#purchase_returns), [`purchase_return_items`](#purchase_return_items)
 - **Sổ quỹ & công nợ**: [`cash_accounts`](#cash_accounts), [`cash_categories`](#cash_categories), [`cash_transactions`](#cash_transactions), [`debt_ledger`](#debt_ledger), [`payment_allocations`](#payment_allocations)
-- **Khác**: [`supplier_branch_history`](#supplier_branch_history)
 
 ## Kiểu liệt kê (enum)
 
@@ -33,6 +32,7 @@
 | `payment_method` | `cash`, `bank` |
 | `permission_scope` | `all`, `own` |
 | `product_type` | `goods`, `combo` |
+| `purchase_order_status` | `draft`, `confirmed`, `completed`, `cancelled` |
 | `return_settlement` | `offset_debt`, `refund` |
 | `shipping_payer` | `sender`, `receiver` |
 | `stock_ref_type` | `opening`, `goods_receipt`, `invoice`, `sales_return`, `purchase_return`, `adjustment`, `transfer_out`, `transfer_in`, `transfer_cancel` |
@@ -530,7 +530,7 @@ Thông tin xuất hóa đơn VAT/điện tử của khách.
 
 ### suppliers
 
-Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng khác; group_name là nhóm NCC (chuỗi tự do, có thể để trống).
+Nhà cung cấp; group_name là nhóm NCC (chuỗi tự do, có thể để trống). Số liệu tiền theo từng chi nhánh: xem supplier_branch_history và debt_ledger.
 
 | Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
 | --- | --- | :-: | --- | --- |
@@ -549,6 +549,19 @@ Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng 
 
 - `suppliers_search_trgm`: `f_search_text(code || ' ' || name || ' ' || coalesce(groupName, '')) gin_trgm_ops`
 - `suppliers_code_lower_unique` (unique): `lower(code)`
+
+### supplier_branch_history
+
+Tổng mua / mua thuần lịch sử (chuyển từ KiotViet) của NCC tại từng chi nhánh.
+
+| Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
+| --- | --- | :-: | --- | --- |
+| `supplier_id` | uuid |  |  | **PK**; → `suppliers.id` (on delete cascade) |
+| `branch_id` | uuid |  |  | **PK**; → `branches.id` |
+| `purchase_total` | numeric(18,0) |  | `0` |  |
+| `purchase_net` | numeric(18,0) |  | `0` |  |
+
+**Khóa chính ghép:** (`supplier_id`, `branch_id`)
 
 ## Đơn hàng
 
@@ -757,9 +770,9 @@ Dòng hàng trả lại của khách.
 
 ## Mua hàng
 
-### goods_receipts
+### purchase_orders
 
-Phiếu nhập hàng. po_ref chỉ là mã phiếu đặt nhập dạng chữ để đối chiếu.
+Đặt hàng nhập (chưa cộng tồn); ordered_by = Người đặt, created_by = Người tạo.
 
 | Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
 | --- | --- | :-: | --- | --- |
@@ -767,14 +780,58 @@ Phiếu nhập hàng. po_ref chỉ là mã phiếu đặt nhập dạng chữ đ
 | `code` | text |  |  | unique |
 | `branch_id` | uuid |  |  | → `branches.id` |
 | `supplier_id` | uuid |  |  | → `suppliers.id` |
+| `status` | purchase_order_status |  | `'draft'` |  |
+| `ordered_at` | timestamptz |  |  |  |
+| `ordered_by` | uuid | ✔ |  | → `users.id` |
+| `total` | numeric(18,0) |  |  |  |
+| `note` | text | ✔ |  |  |
+| `created_by` | uuid | ✔ |  | → `users.id` |
+| `cancelled_at` | timestamptz | ✔ |  |  |
+| `cancel_reason` | text | ✔ |  |  |
+| `created_at` | timestamptz |  | `now()` |  |
+| `updated_at` | timestamptz |  | `now()` |  |
+
+**Chỉ mục:**
+
+- `purchase_orders_supplier_idx`: `supplier_id`, `ordered_at`
+- `purchase_orders_branch_idx`: `branch_id`, `ordered_at`
+
+### purchase_order_items
+
+Dòng hàng của đặt hàng nhập.
+
+| Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
+| --- | --- | :-: | --- | --- |
+| `id` | uuid |  | `gen_random_uuid()` | **PK** |
+| `order_id` | uuid |  |  | → `purchase_orders.id` (on delete cascade) |
+| `product_id` | uuid |  |  | → `products.id` |
+| `qty` | numeric(14,3) |  |  |  |
+| `unit_cost` | numeric(18,4) |  |  |  |
+| `line_total` | numeric(18,0) |  |  |  |
+
+**Chỉ mục:**
+
+- `purchase_order_items_order_idx`: `order_id`
+- `purchase_order_items_product_idx`: `product_id`
+
+**Ràng buộc CHECK:**
+
+- `purchase_order_items_qty_pos`: `qty > 0`
+
+### goods_receipts
+
+Phiếu nhập hàng; purchase_order_id trỏ tới đặt hàng nhập (nếu có). Tiền trả NCC đi qua Sổ quỹ.
+
+| Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
+| --- | --- | :-: | --- | --- |
+| `id` | uuid |  | `gen_random_uuid()` | **PK** |
+| `code` | text |  |  | unique |
+| `branch_id` | uuid |  |  | → `branches.id` |
+| `supplier_id` | uuid |  |  | → `suppliers.id` |
+| `purchase_order_id` | uuid | ✔ |  | → `purchase_orders.id` |
 | `status` | doc_status |  | `'completed'` |  |
 | `received_at` | timestamptz |  |  |  |
-| `supplier_invoice_no` | text | ✔ |  |  |
-| `po_ref` | text | ✔ |  | Mã phiếu đặt nhập (PDN…) dạng chữ, chỉ để đối chiếu |
-| `subtotal` | numeric(18,0) |  |  |  |
-| `discount` | numeric(18,0) |  | `0` |  |
 | `total` | numeric(18,0) |  |  |  |
-| `paid_amount` | numeric(18,0) |  | `0` |  |
 | `received_by` | uuid | ✔ |  | → `users.id` |
 | `note` | text | ✔ |  |  |
 | `created_by` | uuid | ✔ |  | → `users.id` |
@@ -787,6 +844,7 @@ Phiếu nhập hàng. po_ref chỉ là mã phiếu đặt nhập dạng chữ đ
 
 - `goods_receipts_supplier_idx`: `supplier_id`, `received_at`
 - `goods_receipts_time_idx`: `received_at`
+- `goods_receipts_po_idx`: `purchase_order_id`
 
 ### goods_receipt_items
 
@@ -824,10 +882,8 @@ Trả hàng nhập (trả lại nhà cung cấp).
 | `goods_receipt_id` | uuid | ✔ |  | → `goods_receipts.id` |
 | `status` | doc_status |  | `'completed'` |  |
 | `returned_at` | timestamptz |  |  |  |
+| `returned_by` | uuid | ✔ |  | → `users.id` |
 | `total` | numeric(18,0) |  |  |  |
-| `settlement` | return_settlement |  | `'offset_debt'` |  |
-| `refund_account_id` | uuid | ✔ |  | → `cash_accounts.id` |
-| `reason` | text | ✔ |  |  |
 | `note` | text | ✔ |  |  |
 | `created_by` | uuid | ✔ |  | → `users.id` |
 | `cancelled_at` | timestamptz | ✔ |  |  |
@@ -851,6 +907,7 @@ Dòng hàng của phiếu trả nhập.
 | `qty` | numeric(14,3) |  |  |  |
 | `return_price` | numeric(18,4) |  |  |  |
 | `line_total` | numeric(18,0) |  |  |  |
+| `note` | text | ✔ |  |  |
 
 **Chỉ mục:**
 
@@ -979,16 +1036,3 @@ Cấn trừ phiếu thu vào từng hóa đơn.
 **Ràng buộc CHECK:**
 
 - `payment_allocations_amount_pos`: `amount > 0`
-
-## Khác
-
-### supplier_branch_history
-
-| Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
-| --- | --- | :-: | --- | --- |
-| `supplier_id` | uuid |  |  | **PK**; → `suppliers.id` (on delete cascade) |
-| `branch_id` | uuid |  |  | **PK**; → `branches.id` |
-| `purchase_total` | numeric(18,0) |  | `0` |  |
-| `purchase_net` | numeric(18,0) |  | `0` |  |
-
-**Khóa chính ghép:** (`supplier_id`, `branch_id`)

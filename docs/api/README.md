@@ -156,7 +156,8 @@ Mọi lỗi có cùng cấu trúc:
 | 409  | `IDEMPOTENCY_CONFLICT`      | Cùng `Idempotency-Key` nhưng nội dung khác                                                                               |
 | 409  | `REQUEST_IN_PROGRESS`       | Yêu cầu cùng `Idempotency-Key` đang được xử lý; đợi rồi xem kết quả, đừng gửi lại                                        |
 | 409  | `VERSION_CONFLICT`          | Dữ liệu đã bị người khác sửa (gửi lại `updatedAt` mới nhất)                                                              |
-| 422  | `STOCK_NOT_ENOUGH`          | Không đủ tồn để xuất hóa đơn                                                                                             |
+| 422  | `STOCK_NOT_ENOUGH`          | Không đủ tồn để xuất hóa đơn, trả hàng nhập hoặc hủy phiếu nhập                                                          |
+| 422  | `RETURN_QTY_EXCEEDED`       | Trả hàng nhập vượt số đã nhập của phiếu gốc (`details[].field = items.N.qty`)                                              |
 | 422  | `CREDIT_LIMIT_EXCEEDED`     | Vượt hạn mức công nợ **(cảnh báo mềm ở MVP: xem `warnings` ở endpoint)**                                                 |
 | 422  | `ALLOCATION_EXCEEDS`        | Số tiền cấn trừ lớn hơn số còn nợ của hóa đơn                                                                            |
 | 400  | `BRANCH_REQUIRED`           | Cần chọn chi nhánh làm việc (gửi `X-Branch-Id`)                                                                          |
@@ -227,10 +228,12 @@ Các thao tác tạo chứng từ ảnh hưởng tiền/kho/nợ phải gửi `I
 
 | Trường                                                            | Cần quyền                               |
 | ----------------------------------------------------------------- | --------------------------------------- |
-| `costPrice`, `lastPurchasePrice`, `unitCost`, lãi gộp             | `product.cost.view`                     |
+| `costPrice`, `lastPurchasePrice` (hàng hóa), `unitCost` (chuyển kho), lãi gộp | `product.cost.view`                     |
 | `balance`, `creditLimit`, `debt`, `paid` của khách / nhà cung cấp | `debt.view`                             |
 | Sửa `listPrice` trên dòng hàng khi tạo đơn                        | `price.override`                        |
 | Giá trên phiếu giao hàng                                          | luôn ẩn (`delivery.view` không gồm giá) |
+
+**Ngoại lệ có chủ đích (chủ dự án chốt 06/11):** giá nhập trên phiếu **đặt hàng nhập, nhập hàng, trả hàng nhập** (`unitCost`, `returnPrice`, `lineTotal`, `total`) là thông tin của nghiệp vụ mua hàng nên **ai có `purchase.view` đều xem được**, không cần `product.cost.view` (Kho cần giá để lập phiếu). Quyền `product.cost.view` chỉ ẩn giá vốn / giá nhập cuối ở màn hàng hóa và giá ở chuyển kho. Công nợ nhà cung cấp vẫn cần `debt.view`.
 
 ### Cấu hình mặc định (đề xuất ban đầu)
 
@@ -243,11 +246,11 @@ Dùng để khởi tạo lần đầu (`pnpm db:seed`) và cho nút "Khôi phụ
 | `product.edit` Thêm/sửa hàng hóa                             |    ✔    |   ✔    |         |  ✔  |        |          |           |
 | `product.content.edit` Sửa mô tả, ảnh hàng hóa               |    ✔    |        |         |     |        |          |     ✔     |
 | `price.override` Sửa giá khi bán                             |    ✔    |        |         |     |        |          |           |
-| `product.cost.view` Xem giá vốn / giá nhập                   |    ✔    |        |    ✔    |     |        |          |           |
+| `product.cost.view` Xem giá vốn / giá nhập cuối              |    ✔    |        |    ✔    |     |        |          |           |
 | **Mua hàng**                                                 |         |        |         |     |        |          |           |
 | `purchase.view` Xem mua hàng                                 |    ✔    |   ✔    |    ✔    |  ✔  |        |          |           |
-| `purchase.edit` Nhập hàng / trả hàng nhập / sửa nhà cung cấp |    ✔    |   ✔    |    ✔    |  ✔  |        |          |           |
-| `purchase.cancel` Hủy phiếu nhập / phiếu trả nhập            |    ✔    |        |    ✔    |     |        |          |           |
+| `purchase.edit` Đặt hàng nhập / nhập hàng / trả hàng nhập / sửa nhà cung cấp |    ✔    |   ✔    |    ✔    |  ✔  |        |          |           |
+| `purchase.cancel` Hủy phiếu đặt nhập / phiếu nhập / phiếu trả nhập |    ✔    |        |    ✔    |     |        |          |           |
 | **Kho & chuyển kho**                                         |         |        |         |     |        |          |           |
 | `transfer.view` Xem phiếu chuyển kho                         |    ✔    |   ✔    |    ✔    |  ✔  |        |          |           |
 | `transfer.create` Lập/hủy phiếu chuyển kho (bên gửi)         |    ✔    |   ✔    |         |  ✔  |        |          |           |
@@ -333,3 +336,5 @@ Dùng để khởi tạo lần đầu (`pnpm db:seed`) và cho nút "Khôi phụ
 | 2026-11-06 | **Nhà cung cấp đã triển khai** (`GET/POST /suppliers`, `GET/PATCH /suppliers/:id`, `GET /suppliers/:id/branches`, Excel). Thuộc tính theo file KiotViet đã lược bớt: bỏ `phone`, `address`, `taxCode`, `note`, `kind`; thêm `createdByName`, `branchId`, `totalPurchase`, `netPurchase`, `balance` (tính ra; nợ cần `debt.view`). **Mọi số tiền riêng từng chi nhánh, không cộng gộp**: cần `X-Branch-Id`, số lịch sử lưu ở `supplier_branch_history`. Nhóm chỉ là `groupName`. Danh sách không gồm nhà cung cấp nội bộ |
 | 2026-11-06 | **Sổ công nợ nhà cung cấp:** `GET /suppliers/:id/ledger?from&to` (số dư đầu kỳ, dòng sổ cái kèm số dư cộng dồn, số dư cuối kỳ; theo chi nhánh làm việc; cần `purchase.view` + `debt.view`) |
 | 2026-11-06 | **Sửa sau nghiệm thu nhà cung cấp:** mã tự cấp bỏ qua mã đã bị chiếm (không còn 409 mãi mãi khi mã nhập tay trùng số kế tiếp); ngày không có thật (`2026-02-31`) trả `400` ở sổ công nợ và thẻ kho; mã nhà cung cấp không trùng kể cả khác hoa thường (chỉ mục ở CSDL); Excel xuất `Ngày tạo` theo giờ Việt Nam |
+| 2026-11-06 | **Cấu trúc dữ liệu Mua hàng theo file KiotViet** (chưa có endpoint mới): thêm bảng `purchase_orders`/`purchase_order_items` (đặt hàng nhập); phiếu nhập: `poRef` → `purchaseOrderId`, bỏ `supplierInvoiceNo`, `discount`, `subtotal`, `paidAmount`; trả hàng nhập: thêm `returnedBy`, bỏ `reason`. Đã sửa ví dụ `POST /goods-receipts` trong `endpoints.md` cho khớp |
+| 2026-11-06 | **API Mua hàng:** `/purchase-orders` (đặt hàng nhập: tạo, sửa, xác nhận, kết thúc, hủy), `/goods-receipts` (nhập hàng: cộng tồn + giá vốn bình quân + ghi nợ NCC theo chi nhánh; hủy bằng bút toán đảo), `/purchase-returns` (trả hàng nhập: trừ tồn, giá vốn tính lại theo giá trả, giảm nợ; mã lỗi mới `RETURN_QTY_EXCEEDED`). Tiền trả NCC không nằm trên phiếu (làm ở Sổ quỹ). `onOrder` của hàng hóa nay tính thật. Chi tiết: `endpoints.md` mục 3.2–3.4 |

@@ -86,7 +86,7 @@ Theo yêu cầu của công ty, hệ thống gồm **7 phân hệ**: Hàng hóa,
 
 **Phần nền bắt buộc** (không phải phân hệ, nhưng thiếu thì không chạy): đăng nhập, 7 vai trò (Quản lý, Trợ lý, Kế toán, Kho, Lái xe, Sale, Marketing) với **quyền do Quản lý cấu hình** (bảng `role_permissions`, phạm vi "chỉ của mình" cho Sale), nhật ký thao tác, công cụ import từ KiotViet, mã chứng từ tự tăng, backup.
 
-**Ngoài phạm vi (chưa xây):** Kiểm kho, Đặt hàng nhập (chỉ lưu mã tham chiếu), quản lý nhân viên/phân quyền chi tiết, POS, khuyến mãi, tích hợp (HĐĐT, vận chuyển, TMĐT), báo cáo tùy biến/nâng cao (so sánh kỳ, hàng chậm bán, hoa hồng).
+**Ngoài phạm vi (chưa xây):** Kiểm kho, quản lý nhân viên/phân quyền chi tiết, POS, khuyến mãi, tích hợp (HĐĐT, vận chuyển, TMĐT), báo cáo tùy biến/nâng cao (so sánh kỳ, hàng chậm bán, hoa hồng).
 
 ### 2.3 Phân giai đoạn (MVP → mở rộng)
 
@@ -359,10 +359,10 @@ Tồn kho   : stocks (chi nhánh + sản phẩm: tồn, giá vốn bình quân, 
             suppliers (có group_name: nhóm NCC, có thể để trống)
 Bán hàng  : orders, order_items, invoices, invoice_items, invoice_payments,
             sales_returns, sales_return_items
-Mua hàng  : goods_receipts, goods_receipt_items, purchase_returns, purchase_return_items
+Mua hàng  : purchase_orders, purchase_order_items, goods_receipts, goods_receipt_items,
+            purchase_returns, purchase_return_items
 Tiền/nợ   : cash_accounts, cash_categories, cash_transactions, debt_ledger, payment_allocations
-Chưa làm  (Phase 2): stock_takes/stock_take_items (kiểm kho, thay NCC ảo), purchase_orders (đặt hàng nhập),
-            product_unit_conversions, quotations, deliveries, landed_costs, commission_rules, customer_price_rules
+Chưa làm  (Phase 2): stock_takes/stock_take_items (kiểm kho, thay NCC ảo), product_unit_conversions, quotations, deliveries, landed_costs, commission_rules, customer_price_rules
 Bỏ/hoãn   : product_variants, product_combos, batches/lô-HSD, customer_groups, sales_channels,
             delivery_partners, loyalty, promotions
 ```
@@ -386,8 +386,9 @@ Quy ước: `NUMERIC(18,0)` = tiền chứng từ (đồng); `NUMERIC(18,4)` = �
 | `invoice_payments` | `invoice_id`, `method` (`cash`/`bank`), `amount`, `paid_at` |
 | `sales_returns` | `code`, `invoice_id` (nullable), `customer_id`, `status`, `total`, `settlement` (`offset_debt`/`refund`), `received_by`, `note` |
 | `sales_return_items` | `product_id`, `qty`, `return_price`, `restock_cost`, `restock` (bool), `reason` |
-| `purchase_orders` / `goods_receipts` | `code`, `supplier_id`, `purchase_order_id` (nhập), `status`, `total`, `discount`, `supplier_invoice_no`, `received_by`, `note`; dòng: `product_id`, `qty`, `unit_cost` `NUMERIC(18,4)`, `line_total` |
-| `purchase_returns` | như phiếu nhập, thêm `reason` |
+| `purchase_orders` (đặt hàng nhập) | `code` (PDN), `branch_id`, `supplier_id`, `status` (`draft`/`confirmed`/`completed`/`cancelled`), `ordered_at`, `ordered_by` (Người đặt), `created_by`, `total` (cần trả NCC), `note`; dòng: `product_id`, `qty`, `unit_cost` `NUMERIC(18,4)` (giá nhập), `line_total`. Chưa cộng tồn |
+| `goods_receipts` (nhập hàng) | `code` (PN), `branch_id`, `supplier_id`, `purchase_order_id` (tùy chọn), `status`, `received_at`, `received_by` (Người nhập), `created_by`, `total`, `note`; dòng như đặt hàng nhập. Không có giảm giá, số hóa đơn đầu vào, số đã trả (trả NCC qua Sổ quỹ) |
+| `purchase_returns` | `code` (THN), `branch_id`, `supplier_id`, `goods_receipt_id` (tùy chọn), `returned_at`, `returned_by` (Người trả), `total` (NCC cần trả), `note`; dòng: `product_id`, `qty`, `return_price`, `line_total`, `note` |
 | `stock_movements` | `branch_id`, `product_id`, `qty_delta`, `unit_cost`, `ref_type` (`invoice`/`receipt`/`sales_return`/`purchase_return`/`stock_take`/`opening`), `ref_id`, `occurred_at` |
 | `stock_takes` + items | `code`, `branch_id`, `status`, dòng: `product_id`, `system_qty`, `counted_qty`, `diff` — cân bằng sinh `stock_movements` |
 | `cash_accounts` | `name`, `type` (`cash`/`bank`), `branch_id` |
@@ -674,7 +675,6 @@ Phạm vi theo đúng 7 phân hệ ở mục 2.2:
 |---|---|
 | Báo cáo nâng cao (so sánh kỳ, hàng chậm bán, hoa hồng NVKD, báo cáo tùy biến) | Xuất Excel ở mọi danh sách rồi phân tích thêm |
 | Kiểm kho (phiếu kiểm, cân bằng) | Chỉ điều chỉnh tồn qua import/script có người duyệt |
-| Đặt hàng nhập (PDN) | Nhập hàng trực tiếp, lưu mã PDN dạng chữ để đối chiếu |
 | Bản sửa hóa đơn `.nn` | Hủy hóa đơn + tạo lại (có nhật ký) |
 | Phân quyền riêng cho từng người (ngoại lệ ngoài vai trò) | Gán quyền theo vai trò |
 | Import lịch sử chứng từ cũ | File Excel lưu trữ + KiotViet chỉ-đọc; chỉ import số dư đầu kỳ và đơn "phiếu tạm" còn mở |

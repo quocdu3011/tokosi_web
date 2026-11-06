@@ -92,6 +92,13 @@ enum product_type {
   "combo"
 }
 
+enum purchase_order_status {
+  "draft"
+  "confirmed"
+  "completed"
+  "cancelled"
+}
+
 enum return_settlement {
   "offset_debt"
   "refund"
@@ -372,14 +379,10 @@ Table goods_receipts {
   code text [not null, unique]
   branch_id uuid [not null]
   supplier_id uuid [not null]
+  purchase_order_id uuid
   status doc_status [not null, default: 'completed']
   received_at timestamptz [not null]
-  supplier_invoice_no text
-  po_ref text [note: 'Mã phiếu đặt nhập (PDN…) dạng chữ, chỉ để đối chiếu']
-  subtotal numeric(18,0) [not null]
-  discount numeric(18,0) [not null, default: 0]
   total numeric(18,0) [not null]
-  paid_amount numeric(18,0) [not null, default: 0]
   received_by uuid
   note text
   created_by uuid
@@ -391,9 +394,10 @@ Table goods_receipts {
   indexes {
     (supplier_id, received_at) [name: 'goods_receipts_supplier_idx']
     (received_at) [name: 'goods_receipts_time_idx']
+    (purchase_order_id) [name: 'goods_receipts_po_idx']
   }
 
-  Note: '''Phiếu nhập hàng. po_ref chỉ là mã phiếu đặt nhập dạng chữ để đối chiếu.'''
+  Note: '''Phiếu nhập hàng; purchase_order_id trỏ tới đặt hàng nhập (nếu có). Tiền trả NCC đi qua Sổ quỹ.'''
 }
 
 Table idempotency_keys {
@@ -646,6 +650,47 @@ Table products {
   Note: '''Hàng hóa — chỉ thông tin DÙNG CHUNG giữa các chi nhánh. Giá bán ở price_book_items, tồn kho/giá vốn/vị trí ở stocks (theo chi nhánh).'''
 }
 
+Table purchase_order_items {
+  id uuid [pk, default: `gen_random_uuid()`]
+  order_id uuid [not null]
+  product_id uuid [not null]
+  qty numeric(14,3) [not null]
+  unit_cost numeric(18,4) [not null]
+  line_total numeric(18,0) [not null]
+
+  indexes {
+    (order_id) [name: 'purchase_order_items_order_idx']
+    (product_id) [name: 'purchase_order_items_product_idx']
+  }
+
+  Note: '''Dòng hàng của đặt hàng nhập.
+CHECK purchase_order_items_qty_pos: qty > 0'''
+}
+
+Table purchase_orders {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code text [not null, unique]
+  branch_id uuid [not null]
+  supplier_id uuid [not null]
+  status purchase_order_status [not null, default: 'draft']
+  ordered_at timestamptz [not null]
+  ordered_by uuid
+  total numeric(18,0) [not null]
+  note text
+  created_by uuid
+  cancelled_at timestamptz
+  cancel_reason text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (supplier_id, ordered_at) [name: 'purchase_orders_supplier_idx']
+    (branch_id, ordered_at) [name: 'purchase_orders_branch_idx']
+  }
+
+  Note: '''Đặt hàng nhập (chưa cộng tồn); ordered_by = Người đặt, created_by = Người tạo.'''
+}
+
 Table purchase_return_items {
   id uuid [pk, default: `gen_random_uuid()`]
   return_id uuid [not null]
@@ -653,6 +698,7 @@ Table purchase_return_items {
   qty numeric(14,3) [not null]
   return_price numeric(18,4) [not null]
   line_total numeric(18,0) [not null]
+  note text
 
   indexes {
     (return_id) [name: 'purchase_return_items_return_idx']
@@ -670,10 +716,8 @@ Table purchase_returns {
   goods_receipt_id uuid
   status doc_status [not null, default: 'completed']
   returned_at timestamptz [not null]
+  returned_by uuid
   total numeric(18,0) [not null]
-  settlement return_settlement [not null, default: 'offset_debt']
-  refund_account_id uuid
-  reason text
   note text
   created_by uuid
   cancelled_at timestamptz
@@ -863,6 +907,8 @@ Table supplier_branch_history {
   indexes {
     (supplier_id, branch_id) [pk]
   }
+
+  Note: '''Tổng mua / mua thuần lịch sử (chuyển từ KiotViet) của NCC tại từng chi nhánh.'''
 }
 
 Table suppliers {
@@ -882,7 +928,7 @@ Table suppliers {
     (`lower(code)`) [name: 'suppliers_code_lower_unique', unique]
   }
 
-  Note: '''Nhà cung cấp; kind phân biệt NCC hàng hóa với lái xe/đối tượng khác; group_name là nhóm NCC (chuỗi tự do, có thể để trống).'''
+  Note: '''Nhà cung cấp; group_name là nhóm NCC (chuỗi tự do, có thể để trống). Số liệu tiền theo từng chi nhánh: xem supplier_branch_history và debt_ledger.'''
 }
 
 Table system_settings {
@@ -968,6 +1014,7 @@ Ref: goods_receipt_items.receipt_id > goods_receipts.id [delete: cascade]
 Ref: goods_receipt_items.product_id > products.id
 Ref: goods_receipts.branch_id > branches.id
 Ref: goods_receipts.supplier_id > suppliers.id
+Ref: goods_receipts.purchase_order_id > purchase_orders.id
 Ref: goods_receipts.received_by > users.id
 Ref: goods_receipts.created_by > users.id
 Ref: idempotency_keys.user_id > users.id
@@ -997,12 +1044,18 @@ Ref: product_components.component_id > products.id
 Ref: product_images.product_id > products.id [delete: cascade]
 Ref: products.category_id > categories.id
 Ref: products.created_by > users.id
+Ref: purchase_order_items.order_id > purchase_orders.id [delete: cascade]
+Ref: purchase_order_items.product_id > products.id
+Ref: purchase_orders.branch_id > branches.id
+Ref: purchase_orders.supplier_id > suppliers.id
+Ref: purchase_orders.ordered_by > users.id
+Ref: purchase_orders.created_by > users.id
 Ref: purchase_return_items.return_id > purchase_returns.id [delete: cascade]
 Ref: purchase_return_items.product_id > products.id
 Ref: purchase_returns.branch_id > branches.id
 Ref: purchase_returns.supplier_id > suppliers.id
 Ref: purchase_returns.goods_receipt_id > goods_receipts.id
-Ref: purchase_returns.refund_account_id > cash_accounts.id
+Ref: purchase_returns.returned_by > users.id
 Ref: purchase_returns.created_by > users.id
 Ref: refresh_tokens.user_id > users.id [delete: cascade]
 Ref: role_permissions.updated_by > users.id [delete: set null]
@@ -1071,6 +1124,7 @@ TableGroup "Đối tác" {
   customer_branch_terms
   customer_invoice_profiles
   suppliers
+  supplier_branch_history
 }
 
 TableGroup "Đơn hàng" {
@@ -1084,6 +1138,8 @@ TableGroup "Đơn hàng" {
 }
 
 TableGroup "Mua hàng" {
+  purchase_orders
+  purchase_order_items
   goods_receipts
   goods_receipt_items
   purchase_returns
@@ -1096,8 +1152,4 @@ TableGroup "Sổ quỹ & công nợ" {
   cash_transactions
   debt_ledger
   payment_allocations
-}
-
-TableGroup "Khác" {
-  supplier_branch_history
 }

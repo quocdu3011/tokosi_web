@@ -45,6 +45,9 @@ erDiagram
   invoices ||--o{ sales_returns : ""
   sales_returns ||--o{ sales_return_items : ""
 
+  suppliers ||--o{ purchase_orders : ""
+  purchase_orders ||--o{ purchase_order_items : ""
+  purchase_orders ||--o{ goods_receipts : ""
   suppliers ||--o{ goods_receipts : ""
   goods_receipts ||--o{ goods_receipt_items : ""
   suppliers ||--o{ purchase_returns : ""
