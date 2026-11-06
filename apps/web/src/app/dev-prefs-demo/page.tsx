@@ -46,7 +46,7 @@ declare global {
 
 function installFakeServer() {
   const original = window.fetch;
-  window.__demoServer ??= {};
+  window.__demoServer ??= JSON.parse(sessionStorage.getItem('demoServer') ?? '{}');
   window.__demoLog ??= [];
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -81,11 +81,13 @@ function installFakeServer() {
         }
         const body = JSON.parse(String(init?.body));
         window.__demoServer![key!] = body;
+        sessionStorage.setItem('demoServer', JSON.stringify(window.__demoServer));
         log(`PUT ${key} ${JSON.stringify(body)}`);
         return json(body);
       }
       if (method === 'DELETE') {
         delete window.__demoServer![key!];
+        sessionStorage.setItem('demoServer', JSON.stringify(window.__demoServer));
         log(`DELETE ${key}`);
         return new Response(null, { status: 204 });
       }
