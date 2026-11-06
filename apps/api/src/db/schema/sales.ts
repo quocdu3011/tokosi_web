@@ -105,9 +105,7 @@ export const invoices = pgTable(
     branchId: uuid()
       .notNull()
       .references(() => branches.id),
-    orderId: uuid()
-      .unique()
-      .references(() => orders.id),
+    orderId: uuid().references(() => orders.id),
     customerId: uuid()
       .notNull()
       .references(() => customers.id),
@@ -128,6 +126,10 @@ export const invoices = pgTable(
     index('invoices_time_idx').on(t.invoicedAt),
     index('invoices_status_idx').on(t.status),
     uniqueIndex('invoices_root_rev_uq').on(t.rootInvoiceId, t.revisionNo),
+    // Một đơn → tối đa MỘT hóa đơn còn hiệu lực; hóa đơn đã hủy không chặn xuất lại từ cùng đơn
+    uniqueIndex('invoices_order_completed_uq')
+      .on(t.orderId)
+      .where(sql`${t.status} = 'completed'`),
   ],
 );
 

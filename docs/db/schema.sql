@@ -738,3 +738,6 @@ ALTER TABLE "user_table_prefs" ADD CONSTRAINT "user_table_prefs_user_id_users_id
 -- ===== 0029_khach_hang_theo_file_tks_va_nghiem_thu.sql =====
 ALTER TABLE "customers" DROP CONSTRAINT "customers_phone_unique";ALTER TABLE "import_jobs" ADD COLUMN "warnings" jsonb;CREATE INDEX "customers_phone_idx" ON "customers" USING btree ("phone");CREATE UNIQUE INDEX "customers_code_lower_unique" ON "customers" USING btree (lower("code"));-- Khách hàng: mọi nhân viên xem được khách của người khác (bỏ phạm vi "chỉ của mình" ở customer.view)
 UPDATE "role_permissions" SET "scope" = 'all' WHERE "permission_code" = 'customer.view';
+
+-- ===== 0030_hoa_don_don_hang_duy_nhat_khi_hieu_luc.sql =====
+ALTER TABLE "invoices" DROP CONSTRAINT "invoices_orderId_unique";CREATE UNIQUE INDEX "invoices_order_completed_uq" ON "invoices" USING btree ("order_id") WHERE "invoices"."status" = 'completed';

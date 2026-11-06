@@ -700,128 +700,147 @@ Server từ chối trường lạ (`400`), ví dụ gửi công nợ hay tổng 
 
 ### 5.1 Đặt hàng (phiếu tạm)
 
-| Method | Đường dẫn             | Mô tả                                                             | Quyền            | Mốc |
-| ------ | --------------------- | ----------------------------------------------------------------- | ---------------- | --- |
-| GET    | `/orders`             | Danh sách (`q`, `status`, `customerId`, `sellerId`, `from`, `to`) | `order.view`     | W4  |
-| GET    | `/orders/:id`         | Chi tiết                                                          | `order.view`     | W4  |
-| POST   | `/orders`             | Tạo phiếu tạm (`draft`)                                           | `order.create`   | W4  |
-| PATCH  | `/orders/:id`         | Sửa — **chỉ khi `draft`** (thay toàn bộ `items`)                  | `order.create`   | W4  |
-| POST   | `/orders/:id/cancel`  | Hủy đơn `{ reason? }` (chỉ `draft`)                               | `order.create`   | W4  |
-| POST   | `/orders/:id/invoice` | **Xuất hóa đơn từ đơn** (**Idempotency-Key**)                     | `invoice.create` | W5  |
+> **Trạng thái:** đã triển khai (xuất hóa đơn từ phiếu ở mục 5.2).
+
+| Method | Đường dẫn             | Mô tả                                                                                            | Quyền            |
+| ------ | --------------------- | ------------------------------------------------------------------------------------------------ | ---------------- |
+| GET    | `/orders`             | Danh sách (`q`, `status`, `customerId`, `sellerId`, `from`, `to`, `sort`; `?format=xlsx`)        | `order.view`     |
+| GET    | `/orders/:id`         | Chi tiết (phiếu tạm kèm `available` từng dòng và `warnings`)                                      | `order.view`     |
+| POST   | `/orders`             | Tạo phiếu tạm `draft` (**Idempotency-Key**)                                                       | `order.create`   |
+| PATCH  | `/orders/:id`         | Sửa — **chỉ khi `draft`**, gửi lại toàn bộ (cùng body như tạo, thay hết dòng hàng)                | `order.create`   |
+| POST   | `/orders/:id/cancel`  | Hủy phiếu tạm `{ reason? }` (nhả hàng đang giữ)                                                   | `order.create`   |
+| POST   | `/orders/:id/invoice` | **Xuất hóa đơn từ phiếu** (**Idempotency-Key**) — mục 5.2                                         | `invoice.create` |
+
+Mọi endpoint cần `X-Branch-Id`; phiếu thuộc chi nhánh làm việc (phiếu chi nhánh khác → `404`). Quyền "chỉ của mình" (`order.view`/`order.create` của Sale): chỉ thấy và sửa phiếu có **người bán là chính mình**, không lập hộ người khác (`403`). Phiếu tạm **không chạm kho, công nợ, quỹ**; chỉ "giữ hàng" (làm giảm số **có thể bán** = tồn − hàng giữ cho các phiếu tạm khác tại chi nhánh).
 
 ```json
 // POST /orders   (cùng body cho PATCH)
 {
-  "customerId": "…",
-  "sellerId": "…?", // người bán (NVKD); mặc định = người đang đăng nhập
+  "customerId": "…", // khách đang hoạt động, không phải khách nội bộ chi nhánh (→ 404)
+  "sellerId": "…?", // người bán (Người nhận đặt); mặc định = người đang đăng nhập
+  "orderedAt": "…?", // mặc định bây giờ; không được ở tương lai
   "items": [
-    { "productId": "…", "qty": "2000", "unitPrice": "12600", "discountPerUnit": "0", "note": null }
+    // 1–500 dòng hàng hóa (combo → giao diện tách thành hàng thành phần; hàng ngưng kinh doanh → 422). Một mặt hàng có thể lặp nhiều dòng
+    { "productId": "…", "qty": "2000", "price": "13100", "discountPerUnit": "500", "note": null }
   ],
-  "discount": "0", // giảm giá cả đơn (số tiền)
-  "ship": { "pickupAddress": null, "name": null, "phone": null, "address": null },
+  "discount": "0", // giảm giá cả phiếu (số nguyên đồng) ≤ tổng tiền hàng
+  "ship": { "pickupAddress": null, "name": null, "phone": null, "address": null }, // địa chỉ lấy hàng, người nhận
   "note": "thêm hàng"
 }
 ```
 
-Đơn giá (`unitPrice`) do người lập đơn nhập (số nguyên đồng, không có bảng giá nên server không tự điền); không gửi `lineTotal`: server tự tính. Dòng chỉ chứa **hàng hóa** — nếu chọn Combo thì giao diện tách thành từng hàng thành phần × số lượng trước khi gửi.
+- `price` = **Đơn giá** (trước giảm), `discountPerUnit` = giảm giá **trên 1 đơn vị** (số tiền, ≤ đơn giá). Server tính **Giá bán** `unitPrice = price − discountPerUnit`, `lineTotal = qty × unitPrice` (làm tròn đồng), `subtotal = Σ lineTotal`, `total = subtotal − discount`. Mọi tiền là số nguyên đồng (gửi số lẻ → `400`); gửi `lineTotal`/`total` → `400`.
+- Không có bảng giá: đơn giá do người lập phiếu nhập.
 
 ```json
 // Order (response)
 {
-  "id": "…", "code": "DH022295", "status": "draft",
-  "branch": { "id": "…", "code": "SG", "name": "Chi nhánh Sài Gòn" }, // chi nhánh của đơn = X-Branch-Id lúc tạo; không đổi được
+  "id": "…", "code": "DH022295", "status": "draft", // draft (Phiếu tạm) | completed (đã xuất hóa đơn) | cancelled
+  "branchId": "…",
   "customer": { "id": "…", "code": "KH000002", "name": "Cửa hàng Ví Dụ 2", "phone": "…" },
   "seller": { "id": "…", "fullName": "…" },
   "orderedAt": "…",
-  "items": [{
-    "id": "…", "productId": "…", "code": "T888LL", "name": "Lược lăn tinh dầu dưỡng tóc T888",
-    "qty": "2000", "discountPerUnit": "0", "unitPrice": "12600",
-    "lineTotal": "25200000", "note": null,
-    "available": "3000"
-  }],
-  "subtotal": "44200000", "discount": "0", "total": "44200000",
-  "invoiceId": null, "invoiceCode": null,
-  "ship": { … }, "note": "thêm hàng",
-  "warnings": [{ "code": "CREDIT_LIMIT_EXCEEDED", "message": "Vượt hạn mức công nợ 6.000.000 ₫" }],
-  "createdBy": { "id": "…", "fullName": "…" }, "createdAt": "…", "updatedAt": "…"
+  "subtotal": "207500", "discount": "1000", "total": "206500", "totalQty": "23.000", "itemCount": 3,
+  "ship": { "pickupAddress": "Kho 3", "name": "Anh Nhận", "phone": "0909…", "address": "…" },
+  "note": "…",
+  "invoice": null, // { id, code } hóa đơn hoàn tất xuất từ phiếu
+  "createdBy": { "id": "…", "fullName": "…" }, "createdAt": "…", "updatedAt": "…",
+  "cancelledAt": null, "cancelReason": null,
+  "items": [ // chỉ ở chi tiết
+    {
+      "lineNo": 1, "productId": "…", "code": "T888LL", "name": "…",
+      "qty": "10.000", "price": "13100", "discountPerUnit": "500", "unitPrice": "12600", "lineTotal": "126000", "note": null,
+      "available": "100.000" // chỉ phiếu tạm: có thể bán tại chi nhánh (không tự trừ chính phiếu này)
+    }
+  ],
+  "warnings": [ // chi tiết/tạo/sửa phiếu tạm; CẢNH BÁO MỀM, không chặn
+    { "code": "STOCK_RESERVED", "message": "B: cần 8.000, chỉ còn có thể bán 5.000", "productId": "…", "productCode": "B", "requested": "8.000", "available": "5.000" },
+    { "code": "CREDIT_LIMIT_EXCEEDED", "message": "Vượt hạn mức công nợ …", "creditLimit": "100000", "balanceAfter": "206500" }
+  ]
 }
 ```
 
-- `warnings` là **cảnh báo mềm** (vượt hạn mức, thiếu tồn…); không chặn lưu đơn `draft`. Hiển thị cho người dùng.
-- Đơn `draft` **giữ hàng** (`reserved`). Hủy đơn thì nhả hàng.
+- `STOCK_RESERVED`: tổng số lượng một mặt hàng (cộng các dòng trùng) vượt số có thể bán. `CREDIT_LIMIT_EXCEEDED`: nợ hiện tại của khách **tại chi nhánh** + `total` vượt hạn mức (khách không có hạn mức thì không cảnh báo). Thiếu tồn thực tế chỉ bị chặn khi **xuất hóa đơn** (`422 STOCK_NOT_ENOUGH`).
+- Sửa/hủy phiếu không còn là phiếu tạm → `422 INVALID_STATE`.
+- `?format=xlsx`: mỗi dòng hàng một dòng, tiêu đề như file `DanhSachChiTietDatHang` của KiotViet.
 
 ### 5.2 Hóa đơn
 
-| Method | Đường dẫn                                    | Mô tả                                                                        | Quyền            | Mốc |
-| ------ | -------------------------------------------- | ---------------------------------------------------------------------------- | ---------------- | --- |
-| GET    | `/invoices`                                  | Danh sách (`q`, `status`, `customerId`, `sellerId`, `hasDebt`, `from`, `to`) | `invoice.view`   | W5  |
-| GET    | `/invoices/:id`                              | Chi tiết                                                                     | `invoice.view`   | W5  |
-| POST   | `/orders/:id/invoice`                        | Xuất hóa đơn từ đơn (mục 5.1)                                                | `invoice.create` | W5  |
-| POST   | `/invoices`                                  | Tạo hóa đơn trực tiếp, không qua đơn (**Idempotency-Key**)                   | `invoice.create` | W5  |
-| POST   | `/invoices/:id/cancel`                       | Hủy hóa đơn `{ reason }` (bắt buộc lý do)                                    | `invoice.cancel` | W5  |
-| GET    | `/invoices/:id/print?type=invoice\|delivery` | PDF A4: hóa đơn hoặc phiếu giao hàng                                         | `invoice.view`   | W5  |
+> **Trạng thái:** đã triển khai (in PDF A4 làm sau; thu nợ về sau và cấn trừ hóa đơn làm cùng Sổ quỹ).
+
+| Method | Đường dẫn               | Mô tả                                                                                      | Quyền            |
+| ------ | ----------------------- | ------------------------------------------------------------------------------------------ | ---------------- |
+| GET    | `/invoices`             | Danh sách (`q`, `status`, `customerId`, `sellerId`, `orderId`, `hasDebt`, `from`, `to`, `sort`; `?format=xlsx`) | `invoice.view`   |
+| GET    | `/invoices/:id`         | Chi tiết (dòng hàng, các khoản thu lúc xuất, `paid`/`debt`)                                 | `invoice.view`   |
+| POST   | `/orders/:id/invoice`   | **Xuất hóa đơn từ phiếu tạm** (**Idempotency-Key**)                                          | `invoice.create` |
+| POST   | `/invoices`             | Tạo hóa đơn trực tiếp, không qua phiếu (**Idempotency-Key**)                                 | `invoice.create` |
+| PATCH  | `/invoices/:id`         | Chỉ sửa ghi chú `{ note }`                                                                  | `invoice.create` |
+| POST   | `/invoices/:id/cancel`  | Hủy hóa đơn `{ reason }` (**bắt buộc lý do**)                                                | `invoice.cancel` |
+
+Mọi endpoint cần `X-Branch-Id`; hóa đơn thuộc chi nhánh làm việc (chi nhánh khác → `404`). Quyền "chỉ của mình": Sale chỉ thấy/sửa hóa đơn có **người bán là chính mình**, không lập hộ người khác (`403`) và chỉ xuất hóa đơn cho phiếu do mình bán.
 
 ```json
-// POST /orders/:id/invoice
+// POST /invoices   (hóa đơn trực tiếp)
 {
-  "payments": [
+  "customerId": "…",
+  "sellerId": "…?", // mặc định = người đang đăng nhập
+  "invoicedAt": "…?", // mặc định bây giờ; không ở tương lai
+  "items": [{ "productId": "…", "qty": "515", "price": "33500", "discountPerUnit": "500", "note": null }], // như đặt hàng (mục 5.1)
+  "discount": "0",
+  "note": null,
+  "payments": [ // thanh toán LÚC XUẤT, tùy chọn; bỏ trống = ghi nợ toàn bộ
     { "method": "bank", "accountId": "…", "amount": "10000000" },
     { "method": "cash", "accountId": "…", "amount": "2000000" }
-  ],
-  "note": null
+  ]
 }
-// Phần chưa thanh toán tự ghi vào công nợ khách. Bỏ trống payments = ghi nợ toàn bộ.
+
+// POST /orders/:id/invoice   (từ phiếu tạm: lấy đúng dòng hàng, giảm giá, người bán của phiếu)
+{ "payments": [ … ], "invoicedAt": "…?", "note": "…?" }
 ```
 
-`POST /invoices` nhận cùng body như tạo đơn (`customerId`, `items`, `discount`, `ship`, `note`) cộng `payments[]`.
+**Điều gì xảy ra khi tạo** (một transaction, nguyên tử; khóa nợ khách+chi nhánh trước, rồi phiếu, rồi dòng tồn):
+1. **Kho:** trừ tồn từng dòng; giá vốn tại lúc bán lưu vào dòng (`unitCost`). Thiếu tồn thực tế → `422 STOCK_NOT_ENOUGH` và **không ghi gì**.
+2. **Công nợ khách tại chi nhánh:** `+total` (hóa đơn), rồi `−` từng khoản thu.
+3. **Thu tiền:** mỗi khoản `payments[]` tạo phiếu thu ở Sổ quỹ (mã `TT…`, danh mục "Tiền khách trả", đối tượng là khách). Quỹ phải thuộc chi nhánh làm việc, đang hoạt động và đúng loại với `method` (`cash`/`bank`), nếu không `400`. Tổng thu không vượt `total` (khách trả dư làm ở Sổ quỹ).
+4. Phần chưa thu = `debt` tự nằm trong công nợ khách. Phiếu đặt hàng gốc → `completed`.
+5. `warnings[]` (mềm, không chặn, chỉ trong phản hồi tạo): `STOCK_RESERVED` (vượt có thể bán vì hàng đang giữ cho phiếu tạm khác), `CREDIT_LIMIT_EXCEEDED` (nợ tại chi nhánh sau hóa đơn vượt hạn mức).
 
 ```json
 // Invoice (response)
 {
-  "id": "…",
-  "code": "HD016890",
-  "status": "completed",
-  "branch": { "id": "…", "code": "SG", "name": "Chi nhánh Sài Gòn" }, // = chi nhánh của đơn gốc
-  "orderId": "…",
-  "orderCode": "DH022215",
-  "customer": {
-    "id": "…",
-    "code": "KH000003",
-    "name": "Cửa hàng Ví Dụ 3",
-    "phone": "…",
-    "address": "…"
-  },
+  "id": "…", "code": "HD016890", "status": "completed", // completed | cancelled
+  "branchId": "…",
+  "order": { "id": "…", "code": "DH022215" }, // null nếu hóa đơn trực tiếp
+  "customer": { "id": "…", "code": "KH000003", "name": "…", "phone": "…" },
   "seller": { "id": "…", "fullName": "…" },
   "invoicedAt": "2026-11-03T07:11:16.170Z",
-  "items": [
-    {
-      "productId": "…",
-      "code": "QKBSP",
-      "name": "Quạt kẹp bàn Super MST-A1",
-      "qty": "515",
-      "discountPerUnit": "500",
-      "unitPrice": "33000",
-      "lineTotal": "16995000",
-      "unitCost": "21800.5000"
-    }
-  ], // vắng mặt nếu thiếu quyền xem giá vốn
-  "subtotal": "33735000",
-  "discount": "0",
-  "total": "33735000",
-  "payments": [{ "method": "bank", "amount": "10000000", "paidAt": "…" }],
-  "paid": "10000000",
-  "debt": "23735000",
+  "subtotal": "33735000", "discount": "0", "total": "33735000",
+  "paid": "10000000", "debt": "23735000", // debt = total − paid (paid gồm cả khoản cấn trừ thu nợ về sau)
+  "totalQty": "515.000", "itemCount": 1,
   "note": "…",
-  "cancelledAt": null,
-  "cancelReason": null,
-  "createdBy": { "id": "…", "fullName": "…" },
-  "createdAt": "…"
+  "createdBy": { "id": "…", "fullName": "…" }, "createdAt": "…", "updatedAt": "…",
+  "cancelledAt": null, "cancelReason": null,
+  "items": [ // chỉ ở chi tiết
+    {
+      "lineNo": 1, "productId": "…", "code": "QKBSP", "name": "Quạt kẹp bàn Super MST-A1",
+      "qty": "515.000", "price": "33500", "discountPerUnit": "500", "unitPrice": "33000", "lineTotal": "16995000", "note": null,
+      "unitCost": "21800.5000" // CHỈ khi có quyền product.cost.view
+    }
+  ],
+  "payments": [ // chỉ ở chi tiết
+    { "method": "bank", "accountId": "…", "accountName": "Ngân hàng Sài Gòn", "amount": "10000000", "paidAt": "…", "cashCode": "TT019330" }
+  ],
+  "grossProfit": "…", // lãi gộp = total − Σ(qty × unitCost); CHỈ ở chi tiết và khi có product.cost.view
+  "warnings": []
 }
 ```
 
-- `debt = total − paid − (các khoản thu nợ đã cấn về sau)`. Hiển thị theo `debt` hiện tại.
-- Hóa đơn `completed` **không sửa**; hủy rồi tạo lại. Hủy sẽ hoàn kho và đảo công nợ/quỹ; lỗi `INVALID_STATE` nếu hóa đơn đã bị trả hàng hoặc đã hủy.
-- Lỗi khi xuất: `422 STOCK_NOT_ENOUGH` (kèm `details[]` từng mặt hàng thiếu).
+**Hủy hóa đơn** (`invoice.cancel`, không có phạm vi riêng): bút toán đảo, không xóa gì.
+- Cộng lại tồn đúng giá vốn đã xuất; đảo công nợ (`−total`, rồi `+` từng khoản đã thu); các phiếu thu lúc xuất chuyển `cancelled` ở Sổ quỹ.
+- Phiếu đặt hàng gốc **quay về phiếu tạm** để sửa và xuất lại hóa đơn.
+- `422 INVALID_STATE` nếu đã hủy. `409 INVALID_STATE` nếu còn **phiếu trả hàng hoàn tất** gắn hóa đơn (hủy phiếu trả trước) hoặc đã được **cấn trừ thu nợ** (hủy các phiếu thu liên quan trước).
+- Hóa đơn hoàn tất **không sửa** (chỉ ghi chú): hủy rồi lập lại.
+- `?format=xlsx`: mỗi dòng hàng một dòng, tiêu đề như file `DanhSachChiTietHoaDon` của KiotViet (có `Tiền mặt`, `Chuyển khoản` đã thu lúc xuất).
 
 ### 5.3 Trả hàng bán
 

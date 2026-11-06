@@ -491,7 +491,7 @@ Table invoices {
   root_invoice_id uuid [note: 'Hóa đơn gốc (bản sửa .nn)']
   revision_no integer [not null, default: 0]
   branch_id uuid [not null]
-  order_id uuid [unique]
+  order_id uuid
   customer_id uuid [not null]
   seller_id uuid
   invoiced_at timestamptz [not null]
@@ -512,6 +512,7 @@ Table invoices {
     (invoiced_at) [name: 'invoices_time_idx']
     (status) [name: 'invoices_status_idx']
     (root_invoice_id, revision_no) [name: 'invoices_root_rev_uq', unique]
+    (order_id) [name: 'invoices_order_completed_uq', unique]
   }
 
   Note: '''Hóa đơn bán. Không sửa sau khi tạo (hủy và tạo lại). root_invoice_id/revision_no dành cho bản sửa .nn.'''

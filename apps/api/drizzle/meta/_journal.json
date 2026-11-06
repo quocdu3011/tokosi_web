@@ -211,6 +211,13 @@
       "when": 1793953000000,
       "tag": "0029_khach_hang_theo_file_tks_va_nghiem_thu",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1793983911093,
+      "tag": "0030_hoa_don_don_hang_duy_nhat_khi_hieu_luc",
+      "breakpoints": true
     }
   ]
 }

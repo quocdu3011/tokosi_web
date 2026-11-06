@@ -1,0 +1,2 @@
+ALTER TABLE "invoices" DROP CONSTRAINT "invoices_orderId_unique";--> statement-breakpoint
+CREATE UNIQUE INDEX "invoices_order_completed_uq" ON "invoices" USING btree ("order_id") WHERE "invoices"."status" = 'completed';

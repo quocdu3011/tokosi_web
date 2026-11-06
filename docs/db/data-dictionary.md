@@ -646,7 +646,7 @@ Hóa đơn bán. Không sửa sau khi tạo (hủy và tạo lại). root_invoic
 | `root_invoice_id` | uuid | ✔ |  | → `invoices.id`; Hóa đơn gốc (bản sửa .nn) |
 | `revision_no` | integer |  | `0` |  |
 | `branch_id` | uuid |  |  | → `branches.id` |
-| `order_id` | uuid | ✔ |  | unique; → `orders.id` |
+| `order_id` | uuid | ✔ |  | → `orders.id` |
 | `customer_id` | uuid |  |  | → `customers.id` |
 | `seller_id` | uuid | ✔ |  | → `users.id` |
 | `invoiced_at` | timestamptz |  |  |  |
@@ -668,6 +668,7 @@ Hóa đơn bán. Không sửa sau khi tạo (hủy và tạo lại). root_invoic
 - `invoices_time_idx`: `invoiced_at`
 - `invoices_status_idx`: `status`
 - `invoices_root_rev_uq` (unique): `root_invoice_id`, `revision_no`
+- `invoices_order_completed_uq` (unique): `order_id` WHERE status = 'completed'
 
 ### invoice_items
 

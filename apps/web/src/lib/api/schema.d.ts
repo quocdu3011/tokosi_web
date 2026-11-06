@@ -435,6 +435,159 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/orders': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Danh sách phiếu đặt hàng của chi nhánh làm việc
+     * @description Quyền "chỉ của mình": chỉ phiếu có người bán là chính mình. `?format=xlsx` tải Excel theo đúng bộ lọc (tiêu đề như file chi tiết đặt hàng của KiotViet).
+     */
+    get: operations['OrdersController_list'];
+    put?: never;
+    /**
+     * Tạo phiếu tạm (đặt hàng)
+     * @description Không chạm kho, công nợ, quỹ; phiếu tạm giữ hàng. Server tính giá bán, thành tiền, tổng. Vượt có thể bán hoặc hạn mức chỉ trả `warnings`, không chặn.
+     */
+    post: operations['OrdersController_create'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/orders/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Chi tiết phiếu đặt hàng
+     * @description Phiếu tạm kèm `available` từng dòng (có thể bán = tồn − hàng giữ cho phiếu tạm khác) và `warnings` (vượt có thể bán, vượt hạn mức nếu chốt ngay).
+     */
+    get: operations['OrdersController_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Sửa phiếu tạm (thay toàn bộ, kể cả dòng hàng)
+     * @description Chỉ khi còn là phiếu tạm. Quyền "chỉ của mình": chỉ phiếu của mình.
+     */
+    patch: operations['OrdersController_update'];
+    trace?: never;
+  };
+  '/api/v1/orders/{id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Hủy phiếu tạm (nhả hàng đang giữ) */
+    post: operations['OrdersController_cancel'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/invoices': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Danh sách hóa đơn của chi nhánh làm việc
+     * @description Quyền "chỉ của mình": chỉ hóa đơn có người bán là chính mình. `hasDebt` lọc hóa đơn hoàn tất còn nợ. `?format=xlsx` tải Excel theo đúng bộ lọc (tiêu đề như file chi tiết hóa đơn của KiotViet).
+     */
+    get: operations['InvoicesController_list'];
+    put?: never;
+    /**
+     * Tạo hóa đơn trực tiếp (không qua phiếu đặt hàng)
+     * @description Nguyên tử: trừ kho (giá vốn lúc bán lưu trên dòng), ghi nợ khách theo chi nhánh, ghi phiếu thu cho các khoản `payments`. Thiếu tồn thực tế → 422 STOCK_NOT_ENOUGH. Vượt có thể bán / hạn mức chỉ trả `warnings`.
+     */
+    post: operations['InvoicesController_create'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/invoices/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Chi tiết hóa đơn
+     * @description Kèm dòng hàng, các khoản thu lúc xuất, `paid`/`debt`. `unitCost` từng dòng và `grossProfit` chỉ có khi người gọi có quyền product.cost.view.
+     */
+    get: operations['InvoicesController_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Sửa ghi chú hóa đơn
+     * @description Hóa đơn hoàn tất không sửa gì khác: hãy hủy rồi lập lại.
+     */
+    patch: operations['InvoicesController_updateNote'];
+    trace?: never;
+  };
+  '/api/v1/orders/{id}/invoice': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Xuất hóa đơn từ phiếu đặt hàng (phiếu tạm)
+     * @description Lấy đúng dòng hàng, giảm giá, người bán của phiếu; phiếu chuyển sang hoàn thành. Một phiếu chỉ có một hóa đơn còn hiệu lực: xuất lần hai → 422; hủy hóa đơn thì phiếu quay về phiếu tạm.
+     */
+    post: operations['InvoicesController_createFromOrder'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/invoices/{id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Hủy hóa đơn (bút toán đảo)
+     * @description Bắt buộc `reason`. Cộng lại tồn, đảo công nợ, hủy các phiếu thu lúc xuất; phiếu đặt hàng gốc quay về phiếu tạm. 409 nếu đã có phiếu trả hàng hoặc đã cấn trừ thu nợ.
+     */
+    post: operations['InvoicesController_cancel'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/purchase-orders': {
     parameters: {
       query?: never;
@@ -1544,15 +1697,291 @@ export interface components {
       visitedOn: string;
       note?: string | null;
     };
+    SaleCustomerDto: {
+      id: string;
+      /** @example KH000002 */
+      code: string;
+      name: string;
+      phone: string | null;
+    };
+    DocPersonDto: {
+      id: string;
+      fullName: string;
+    };
+    ShipDto: {
+      /** @description Địa chỉ lấy hàng */
+      pickupAddress?: string | null;
+      /** @description Người nhận */
+      name?: string | null;
+      phone?: string | null;
+      address?: string | null;
+    };
+    DocRefDto: {
+      id: string;
+      /** @example PDN000394 */
+      code: string;
+    };
+    OrderItemDto: {
+      lineNo: number;
+      productId: string;
+      /** @example T888LL */
+      code: string;
+      name: string;
+      /** @example 2000.000 */
+      qty: string;
+      /**
+       * @description Đơn giá trước giảm
+       * @example 13100
+       */
+      price: string;
+      /**
+       * @description Giảm giá trên 1 đơn vị
+       * @example 500
+       */
+      discountPerUnit: string;
+      /**
+       * @description Giá bán = đơn giá − giảm giá
+       * @example 12600
+       */
+      unitPrice: string;
+      /** @example 25200000 */
+      lineTotal: string;
+      note: string | null;
+      /** @description Chỉ ở chi tiết phiếu tạm: có thể bán tại chi nhánh = tồn − hàng giữ cho phiếu tạm khác */
+      available?: string;
+    };
+    SaleWarningDto: {
+      /** @enum {string} */
+      code: 'STOCK_RESERVED' | 'CREDIT_LIMIT_EXCEEDED';
+      message: string;
+      productId?: string;
+      productCode?: string;
+      /** @description Số lượng cần (cộng các dòng cùng mặt hàng) */
+      requested?: string;
+      /** @description Có thể bán = tồn − hàng đang giữ cho phiếu tạm khác */
+      available?: string;
+      creditLimit?: string;
+      /** @description Nợ của khách tại chi nhánh sau chứng từ */
+      balanceAfter?: string;
+    };
+    OrderDto: {
+      id: string;
+      /** @example DH022295 */
+      code: string;
+      /**
+       * @description draft = Phiếu tạm (giữ hàng), completed = đã xuất hóa đơn, cancelled = đã hủy
+       * @enum {string}
+       */
+      status: 'draft' | 'completed' | 'cancelled';
+      branchId: string;
+      customer: components['schemas']['SaleCustomerDto'];
+      /** @description Người bán (Người nhận đặt) */
+      seller: components['schemas']['DocPersonDto'] | null;
+      /** Format: date-time */
+      orderedAt: string;
+      /** @description Tổng tiền hàng = Σ thành tiền */
+      subtotal: string;
+      /** @description Giảm giá phiếu (số tiền) */
+      discount: string;
+      /** @description Khách cần trả = tổng tiền hàng − giảm giá */
+      total: string;
+      /** @description Tổng số lượng (tính khi đọc) */
+      totalQty: string;
+      /** @description Số dòng hàng */
+      itemCount: number;
+      ship: components['schemas']['ShipDto'];
+      note: string | null;
+      /** @description Hóa đơn (hoàn tất) xuất từ phiếu này */
+      invoice: components['schemas']['DocRefDto'] | null;
+      createdBy: components['schemas']['DocPersonDto'] | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      /** Format: date-time */
+      cancelledAt: string | null;
+      cancelReason: string | null;
+      /** @description Chỉ ở chi tiết */
+      items?: components['schemas']['OrderItemDto'][];
+      /** @description Cảnh báo mềm (không chặn): vượt có thể bán, vượt hạn mức nếu chốt ngay. Chỉ ở chi tiết/tạo/sửa phiếu tạm */
+      warnings?: components['schemas']['SaleWarningDto'][];
+    };
+    DocMetaDto: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+    OrderListDto: {
+      data: components['schemas']['OrderDto'][];
+      meta: components['schemas']['DocMetaDto'];
+    };
+    SaleLineDto: {
+      productId: string;
+      /**
+       * @description Số lượng > 0, tối đa 3 chữ số thập phân
+       * @example 2000
+       */
+      qty: string;
+      /**
+       * @description Đơn giá trước giảm (số nguyên đồng)
+       * @example 13100
+       */
+      price: string;
+      /**
+       * @description Giảm giá trên 1 đơn vị (số tiền, không phải %), ≤ đơn giá
+       * @default 0
+       * @example 500
+       */
+      discountPerUnit: string;
+      note?: string | null;
+    };
+    SaveOrderDto: {
+      customerId: string;
+      /** @description Người bán; mặc định = người đang đăng nhập. Quyền "chỉ của mình": luôn là chính mình */
+      sellerId?: string;
+      /** Format: date-time */
+      orderedAt?: string;
+      /**
+       * @description Giảm giá cả phiếu (số nguyên đồng), ≤ tổng tiền hàng
+       * @default 0
+       * @example 0
+       */
+      discount: string;
+      ship?: components['schemas']['ShipDto'];
+      note?: string | null;
+      /** @description 1–500 dòng hàng hóa (combo phải tách thành hàng thành phần). Một mặt hàng có thể lặp nhiều dòng */
+      items: components['schemas']['SaleLineDto'][];
+    };
+    CancelSaleDocDto: {
+      reason?: string;
+    };
+    InvoiceItemDto: {
+      lineNo: number;
+      productId: string;
+      code: string;
+      name: string;
+      /** @example 515.000 */
+      qty: string;
+      /** @description Đơn giá trước giảm */
+      price: string;
+      /** @description Giảm giá trên 1 đơn vị */
+      discountPerUnit: string;
+      /** @description Giá bán = đơn giá − giảm giá */
+      unitPrice: string;
+      lineTotal: string;
+      note: string | null;
+      /**
+       * @description Giá vốn tại lúc bán. VẮNG MẶT nếu thiếu quyền product.cost.view
+       * @example 21800.5000
+       */
+      unitCost?: string;
+    };
+    InvoicePaymentDto: {
+      /** @enum {string} */
+      method: 'cash' | 'bank';
+      accountId: string;
+      /** @description Tên quỹ */
+      accountName: string;
+      amount: string;
+      /** Format: date-time */
+      paidAt: string;
+      /** @description Mã phiếu thu (TT…) ở Sổ quỹ */
+      cashCode: string | null;
+    };
+    InvoiceDto: {
+      id: string;
+      /** @example HD016890 */
+      code: string;
+      /** @enum {string} */
+      status: 'completed' | 'cancelled';
+      branchId: string;
+      /** @description Phiếu đặt hàng gốc */
+      order: components['schemas']['DocRefDto'] | null;
+      customer: components['schemas']['SaleCustomerDto'];
+      seller: components['schemas']['DocPersonDto'] | null;
+      /** Format: date-time */
+      invoicedAt: string;
+      /** @description Tổng tiền hàng */
+      subtotal: string;
+      /** @description Giảm giá hóa đơn */
+      discount: string;
+      /** @description Khách cần trả */
+      total: string;
+      /** @description Khách đã trả (thu lúc xuất + cấn trừ thu nợ về sau) */
+      paid: string;
+      /** @description Còn nợ = khách cần trả − đã trả */
+      debt: string;
+      totalQty: string;
+      itemCount: number;
+      note: string | null;
+      createdBy: components['schemas']['DocPersonDto'] | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      /** Format: date-time */
+      cancelledAt: string | null;
+      cancelReason: string | null;
+      /** @description Chỉ ở chi tiết */
+      items?: components['schemas']['InvoiceItemDto'][];
+      /** @description Chỉ ở chi tiết */
+      payments?: components['schemas']['InvoicePaymentDto'][];
+      /** @description Lãi gộp = tổng tiền hàng − giảm giá − Σ(SL × giá vốn). Chỉ ở chi tiết và chỉ khi có product.cost.view */
+      grossProfit?: string;
+      /** @description Cảnh báo mềm lúc xuất (vượt có thể bán, vượt hạn mức); chỉ trong phản hồi tạo hóa đơn */
+      warnings?: components['schemas']['SaleWarningDto'][];
+    };
+    InvoiceListDto: {
+      data: components['schemas']['InvoiceDto'][];
+      meta: components['schemas']['DocMetaDto'];
+    };
+    PaymentInputDto: {
+      /** @enum {string} */
+      method: 'cash' | 'bank';
+      /** @description Quỹ nhận tiền: phải thuộc chi nhánh làm việc, đang hoạt động và đúng loại (cash/bank) */
+      accountId: string;
+      /**
+       * @description Số nguyên đồng > 0
+       * @example 10000000
+       */
+      amount: string;
+    };
+    CreateInvoiceDto: {
+      /** @description Các khoản thu lúc xuất (tiền mặt / chuyển khoản). Bỏ trống = ghi nợ toàn bộ. Tổng không vượt khách cần trả */
+      payments?: components['schemas']['PaymentInputDto'][];
+      customerId: string;
+      /** @description Người bán; mặc định = người đang đăng nhập. Quyền "chỉ của mình": luôn là chính mình */
+      sellerId?: string;
+      /** Format: date-time */
+      invoicedAt?: string;
+      /**
+       * @description Giảm giá cả hóa đơn (số nguyên đồng) ≤ tổng tiền hàng
+       * @default 0
+       * @example 0
+       */
+      discount: string;
+      note?: string | null;
+      /** @description 1–500 dòng hàng hóa; một mặt hàng có thể lặp nhiều dòng */
+      items: components['schemas']['SaleLineDto'][];
+    };
+    InvoiceFromOrderDto: {
+      /** @description Các khoản thu lúc xuất (tiền mặt / chuyển khoản). Bỏ trống = ghi nợ toàn bộ. Tổng không vượt khách cần trả */
+      payments?: components['schemas']['PaymentInputDto'][];
+      /** Format: date-time */
+      invoicedAt?: string;
+      /** @description Bỏ trống = lấy ghi chú của phiếu */
+      note?: string | null;
+    };
+    UpdateSaleNoteDto: {
+      /** @description Chỉ sửa được ghi chú */
+      note: string | null;
+    };
     DocPartyDto: {
       id: string;
       /** @example NCC000001 */
       code: string;
       name: string;
-    };
-    DocPersonDto: {
-      id: string;
-      fullName: string;
     };
     PurchaseOrderItemDto: {
       productId: string;
@@ -1576,11 +2005,6 @@ export interface components {
        * @example 500
        */
       remainingQty: string;
-    };
-    DocRefDto: {
-      id: string;
-      /** @example PDN000394 */
-      code: string;
     };
     PurchaseOrderDto: {
       id: string;
@@ -1621,12 +2045,6 @@ export interface components {
       items?: components['schemas']['PurchaseOrderItemDto'][];
       /** @description Các phiếu nhập hoàn tất của phiếu đặt này (chỉ ở chi tiết) */
       receipts?: components['schemas']['DocRefDto'][];
-    };
-    DocMetaDto: {
-      page: number;
-      limit: number;
-      total: number;
-      totalPages: number;
     };
     PurchaseOrderListDto: {
       data: components['schemas']['PurchaseOrderDto'][];
@@ -3084,6 +3502,362 @@ export interface operations {
       };
       /** @description Không tìm thấy khách hoặc ngày tiếp khách */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  OrdersController_list: {
+    parameters: {
+      query?: {
+        page?: number;
+        limit?: number;
+        /** @description Tên cột cần sắp xếp; thêm `-` phía trước để giảm dần. Chỉ nhận các cột endpoint cho phép */
+        sort?: string;
+        /** @description Tìm không dấu theo mã phiếu, mã/tên/SĐT khách */
+        q?: string;
+        customerId?: string;
+        /** @description Người bán (id người dùng) */
+        sellerId?: string;
+        /** @description YYYY-MM-DD giờ Việt Nam, gồm cả ngày */
+        from?: string;
+        to?: string;
+        /** @description xlsx = tải Excel theo đúng bộ lọc, mỗi dòng hàng một dòng, tiêu đề như file chi tiết của KiotViet (bỏ qua page/limit, tối đa 10.000 phiếu) */
+        format?: 'xlsx';
+        status?: 'draft' | 'completed' | 'cancelled';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrderListDto'];
+        };
+      };
+    };
+  };
+  OrdersController_create: {
+    parameters: {
+      query?: never;
+      header: {
+        'Idempotency-Key': string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SaveOrderDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrderDto'];
+        };
+      };
+    };
+  };
+  OrdersController_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrderDto'];
+        };
+      };
+      /** @description Không có phiếu (hoặc thuộc chi nhánh khác / không phải của mình) */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  OrdersController_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SaveOrderDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrderDto'];
+        };
+      };
+      /** @description Phiếu do người khác bán */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description INVALID_STATE: không còn là phiếu tạm */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  OrdersController_cancel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CancelSaleDocDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrderDto'];
+        };
+      };
+      /** @description INVALID_STATE: không còn là phiếu tạm */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  InvoicesController_list: {
+    parameters: {
+      query?: {
+        page?: number;
+        limit?: number;
+        /** @description Tên cột cần sắp xếp; thêm `-` phía trước để giảm dần. Chỉ nhận các cột endpoint cho phép */
+        sort?: string;
+        /** @description Tìm không dấu theo mã phiếu, mã/tên/SĐT khách */
+        q?: string;
+        customerId?: string;
+        /** @description Người bán (id người dùng) */
+        sellerId?: string;
+        /** @description YYYY-MM-DD giờ Việt Nam, gồm cả ngày */
+        from?: string;
+        to?: string;
+        /** @description xlsx = tải Excel theo đúng bộ lọc, mỗi dòng hàng một dòng, tiêu đề như file chi tiết của KiotViet (bỏ qua page/limit, tối đa 10.000 phiếu) */
+        format?: 'xlsx';
+        status?: 'completed' | 'cancelled';
+        /** @description true = còn nợ (khách cần trả > đã trả), false = đã trả đủ; chỉ tính hóa đơn hoàn tất */
+        hasDebt?: boolean;
+        /** @description Chỉ hóa đơn xuất từ phiếu đặt hàng này */
+        orderId?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['InvoiceListDto'];
+        };
+      };
+    };
+  };
+  InvoicesController_create: {
+    parameters: {
+      query?: never;
+      header: {
+        'Idempotency-Key': string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateInvoiceDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['InvoiceDto'];
+        };
+      };
+      /** @description STOCK_NOT_ENOUGH hoặc khách/hàng ngưng giao dịch */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  InvoicesController_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['InvoiceDto'];
+        };
+      };
+      /** @description Không có hóa đơn (hoặc thuộc chi nhánh khác / không phải của mình) */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  InvoicesController_updateNote: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateSaleNoteDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['InvoiceDto'];
+        };
+      };
+    };
+  };
+  InvoicesController_createFromOrder: {
+    parameters: {
+      query?: never;
+      header: {
+        'Idempotency-Key': string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['InvoiceFromOrderDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['InvoiceDto'];
+        };
+      };
+      /** @description Phiếu do người khác bán (quyền "chỉ của mình") */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Phiếu không còn là phiếu tạm; STOCK_NOT_ENOUGH */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  InvoicesController_cancel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CancelSaleDocDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['InvoiceDto'];
+        };
+      };
+      /** @description INVALID_STATE: còn phiếu trả hàng / đã cấn trừ thu nợ */
+      409: {
         headers: {
           [name: string]: unknown;
         };

@@ -1350,6 +1350,712 @@
         ]
       }
     },
+    "/api/v1/orders": {
+      "get": {
+        "description": "Quyền \"chỉ của mình\": chỉ phiếu có người bán là chính mình. `?format=xlsx` tải Excel theo đúng bộ lọc (tiêu đề như file chi tiết đặt hàng của KiotViet).",
+        "operationId": "OrdersController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Tên cột cần sắp xếp; thêm `-` phía trước để giảm dần. Chỉ nhận các cột endpoint cho phép",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Tìm không dấu theo mã phiếu, mã/tên/SĐT khách",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sellerId",
+            "required": false,
+            "in": "query",
+            "description": "Người bán (id người dùng)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "YYYY-MM-DD giờ Việt Nam, gồm cả ngày",
+            "schema": {
+              "example": "2026-11-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "description": "xlsx = tải Excel theo đúng bộ lọc, mỗi dòng hàng một dòng, tiêu đề như file chi tiết của KiotViet (bỏ qua page/limit, tối đa 10.000 phiếu)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "xlsx"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "completed",
+                "cancelled"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderListDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách phiếu đặt hàng của chi nhánh làm việc",
+        "tags": [
+          "Đặt hàng"
+        ]
+      },
+      "post": {
+        "description": "Không chạm kho, công nợ, quỹ; phiếu tạm giữ hàng. Server tính giá bán, thành tiền, tổng. Vượt có thể bán hoặc hạn mức chỉ trả `warnings`, không chặn.",
+        "operationId": "OrdersController_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tạo phiếu tạm (đặt hàng)",
+        "tags": [
+          "Đặt hàng"
+        ]
+      }
+    },
+    "/api/v1/orders/{id}": {
+      "get": {
+        "description": "Phiếu tạm kèm `available` từng dòng (có thể bán = tồn − hàng giữ cho phiếu tạm khác) và `warnings` (vượt có thể bán, vượt hạn mức nếu chốt ngay).",
+        "operationId": "OrdersController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không có phiếu (hoặc thuộc chi nhánh khác / không phải của mình)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Chi tiết phiếu đặt hàng",
+        "tags": [
+          "Đặt hàng"
+        ]
+      },
+      "patch": {
+        "description": "Chỉ khi còn là phiếu tạm. Quyền \"chỉ của mình\": chỉ phiếu của mình.",
+        "operationId": "OrdersController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Phiếu do người khác bán"
+          },
+          "422": {
+            "description": "INVALID_STATE: không còn là phiếu tạm"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sửa phiếu tạm (thay toàn bộ, kể cả dòng hàng)",
+        "tags": [
+          "Đặt hàng"
+        ]
+      }
+    },
+    "/api/v1/orders/{id}/cancel": {
+      "post": {
+        "operationId": "OrdersController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelSaleDocDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "INVALID_STATE: không còn là phiếu tạm"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hủy phiếu tạm (nhả hàng đang giữ)",
+        "tags": [
+          "Đặt hàng"
+        ]
+      }
+    },
+    "/api/v1/invoices": {
+      "get": {
+        "description": "Quyền \"chỉ của mình\": chỉ hóa đơn có người bán là chính mình. `hasDebt` lọc hóa đơn hoàn tất còn nợ. `?format=xlsx` tải Excel theo đúng bộ lọc (tiêu đề như file chi tiết hóa đơn của KiotViet).",
+        "operationId": "InvoicesController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Tên cột cần sắp xếp; thêm `-` phía trước để giảm dần. Chỉ nhận các cột endpoint cho phép",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Tìm không dấu theo mã phiếu, mã/tên/SĐT khách",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sellerId",
+            "required": false,
+            "in": "query",
+            "description": "Người bán (id người dùng)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "YYYY-MM-DD giờ Việt Nam, gồm cả ngày",
+            "schema": {
+              "example": "2026-11-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "description": "xlsx = tải Excel theo đúng bộ lọc, mỗi dòng hàng một dòng, tiêu đề như file chi tiết của KiotViet (bỏ qua page/limit, tối đa 10.000 phiếu)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "xlsx"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "cancelled"
+              ]
+            }
+          },
+          {
+            "name": "hasDebt",
+            "required": false,
+            "in": "query",
+            "description": "true = còn nợ (khách cần trả > đã trả), false = đã trả đủ; chỉ tính hóa đơn hoàn tất",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "orderId",
+            "required": false,
+            "in": "query",
+            "description": "Chỉ hóa đơn xuất từ phiếu đặt hàng này",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceListDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách hóa đơn của chi nhánh làm việc",
+        "tags": [
+          "Hóa đơn"
+        ]
+      },
+      "post": {
+        "description": "Nguyên tử: trừ kho (giá vốn lúc bán lưu trên dòng), ghi nợ khách theo chi nhánh, ghi phiếu thu cho các khoản `payments`. Thiếu tồn thực tế → 422 STOCK_NOT_ENOUGH. Vượt có thể bán / hạn mức chỉ trả `warnings`.",
+        "operationId": "InvoicesController_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInvoiceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "STOCK_NOT_ENOUGH hoặc khách/hàng ngưng giao dịch"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tạo hóa đơn trực tiếp (không qua phiếu đặt hàng)",
+        "tags": [
+          "Hóa đơn"
+        ]
+      }
+    },
+    "/api/v1/invoices/{id}": {
+      "get": {
+        "description": "Kèm dòng hàng, các khoản thu lúc xuất, `paid`/`debt`. `unitCost` từng dòng và `grossProfit` chỉ có khi người gọi có quyền product.cost.view.",
+        "operationId": "InvoicesController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không có hóa đơn (hoặc thuộc chi nhánh khác / không phải của mình)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Chi tiết hóa đơn",
+        "tags": [
+          "Hóa đơn"
+        ]
+      },
+      "patch": {
+        "description": "Hóa đơn hoàn tất không sửa gì khác: hãy hủy rồi lập lại.",
+        "operationId": "InvoicesController_updateNote",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSaleNoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sửa ghi chú hóa đơn",
+        "tags": [
+          "Hóa đơn"
+        ]
+      }
+    },
+    "/api/v1/orders/{id}/invoice": {
+      "post": {
+        "description": "Lấy đúng dòng hàng, giảm giá, người bán của phiếu; phiếu chuyển sang hoàn thành. Một phiếu chỉ có một hóa đơn còn hiệu lực: xuất lần hai → 422; hủy hóa đơn thì phiếu quay về phiếu tạm.",
+        "operationId": "InvoicesController_createFromOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoiceFromOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Phiếu do người khác bán (quyền \"chỉ của mình\")"
+          },
+          "422": {
+            "description": "Phiếu không còn là phiếu tạm; STOCK_NOT_ENOUGH"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xuất hóa đơn từ phiếu đặt hàng (phiếu tạm)",
+        "tags": [
+          "Hóa đơn"
+        ]
+      }
+    },
+    "/api/v1/invoices/{id}/cancel": {
+      "post": {
+        "description": "Bắt buộc `reason`. Cộng lại tồn, đảo công nợ, hủy các phiếu thu lúc xuất; phiếu đặt hàng gốc quay về phiếu tạm. 409 nếu đã có phiếu trả hàng hoặc đã cấn trừ thu nợ.",
+        "operationId": "InvoicesController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelSaleDocDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "INVALID_STATE: còn phiếu trả hàng / đã cấn trừ thu nợ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hủy hóa đơn (bút toán đảo)",
+        "tags": [
+          "Hóa đơn"
+        ]
+      }
+    },
     "/api/v1/purchase-orders": {
       "get": {
         "description": "`receiveState` (chưa nhập / nhập một phần / đã nhập đủ) tính từ các phiếu nhập hoàn tất. `?format=xlsx` tải Excel theo đúng bộ lọc.",
@@ -5055,6 +5761,818 @@
           "visitedOn"
         ]
       },
+      "SaleCustomerDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "KH000002"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "phone"
+        ]
+      },
+      "DocPersonDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "fullName"
+        ]
+      },
+      "ShipDto": {
+        "type": "object",
+        "properties": {
+          "pickupAddress": {
+            "type": "string",
+            "nullable": true,
+            "description": "Địa chỉ lấy hàng"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Người nhận"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "DocRefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "PDN000394"
+          }
+        },
+        "required": [
+          "id",
+          "code"
+        ]
+      },
+      "OrderItemDto": {
+        "type": "object",
+        "properties": {
+          "lineNo": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "T888LL"
+          },
+          "name": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "string",
+            "example": "2000.000"
+          },
+          "price": {
+            "type": "string",
+            "example": "13100",
+            "description": "Đơn giá trước giảm"
+          },
+          "discountPerUnit": {
+            "type": "string",
+            "example": "500",
+            "description": "Giảm giá trên 1 đơn vị"
+          },
+          "unitPrice": {
+            "type": "string",
+            "example": "12600",
+            "description": "Giá bán = đơn giá − giảm giá"
+          },
+          "lineTotal": {
+            "type": "string",
+            "example": "25200000"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "available": {
+            "type": "string",
+            "description": "Chỉ ở chi tiết phiếu tạm: có thể bán tại chi nhánh = tồn − hàng giữ cho phiếu tạm khác"
+          }
+        },
+        "required": [
+          "lineNo",
+          "productId",
+          "code",
+          "name",
+          "qty",
+          "price",
+          "discountPerUnit",
+          "unitPrice",
+          "lineTotal",
+          "note"
+        ]
+      },
+      "SaleWarningDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "STOCK_RESERVED",
+              "CREDIT_LIMIT_EXCEEDED"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "productId": {
+            "type": "string"
+          },
+          "productCode": {
+            "type": "string"
+          },
+          "requested": {
+            "type": "string",
+            "description": "Số lượng cần (cộng các dòng cùng mặt hàng)"
+          },
+          "available": {
+            "type": "string",
+            "description": "Có thể bán = tồn − hàng đang giữ cho phiếu tạm khác"
+          },
+          "creditLimit": {
+            "type": "string"
+          },
+          "balanceAfter": {
+            "type": "string",
+            "description": "Nợ của khách tại chi nhánh sau chứng từ"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ]
+      },
+      "OrderDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "DH022295"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "completed",
+              "cancelled"
+            ],
+            "description": "draft = Phiếu tạm (giữ hàng), completed = đã xuất hóa đơn, cancelled = đã hủy"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/SaleCustomerDto"
+          },
+          "seller": {
+            "nullable": true,
+            "description": "Người bán (Người nhận đặt)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DocPersonDto"
+              }
+            ]
+          },
+          "orderedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "subtotal": {
+            "type": "string",
+            "description": "Tổng tiền hàng = Σ thành tiền"
+          },
+          "discount": {
+            "type": "string",
+            "description": "Giảm giá phiếu (số tiền)"
+          },
+          "total": {
+            "type": "string",
+            "description": "Khách cần trả = tổng tiền hàng − giảm giá"
+          },
+          "totalQty": {
+            "type": "string",
+            "description": "Tổng số lượng (tính khi đọc)"
+          },
+          "itemCount": {
+            "type": "number",
+            "description": "Số dòng hàng"
+          },
+          "ship": {
+            "$ref": "#/components/schemas/ShipDto"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "invoice": {
+            "nullable": true,
+            "description": "Hóa đơn (hoàn tất) xuất từ phiếu này",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DocRefDto"
+              }
+            ]
+          },
+          "createdBy": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DocPersonDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cancelledAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "items": {
+            "description": "Chỉ ở chi tiết",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderItemDto"
+            }
+          },
+          "warnings": {
+            "description": "Cảnh báo mềm (không chặn): vượt có thể bán, vượt hạn mức nếu chốt ngay. Chỉ ở chi tiết/tạo/sửa phiếu tạm",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaleWarningDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "status",
+          "branchId",
+          "customer",
+          "seller",
+          "orderedAt",
+          "subtotal",
+          "discount",
+          "total",
+          "totalQty",
+          "itemCount",
+          "ship",
+          "note",
+          "invoice",
+          "createdBy",
+          "createdAt",
+          "updatedAt",
+          "cancelledAt",
+          "cancelReason"
+        ]
+      },
+      "DocMetaDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "totalPages": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages"
+        ]
+      },
+      "OrderListDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DocMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "SaleLineDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "string",
+            "example": "2000",
+            "description": "Số lượng > 0, tối đa 3 chữ số thập phân"
+          },
+          "price": {
+            "type": "string",
+            "example": "13100",
+            "description": "Đơn giá trước giảm (số nguyên đồng)"
+          },
+          "discountPerUnit": {
+            "type": "string",
+            "example": "500",
+            "default": "0",
+            "description": "Giảm giá trên 1 đơn vị (số tiền, không phải %), ≤ đơn giá"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "productId",
+          "qty",
+          "price"
+        ]
+      },
+      "SaveOrderDto": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string"
+          },
+          "sellerId": {
+            "type": "string",
+            "description": "Người bán; mặc định = người đang đăng nhập. Quyền \"chỉ của mình\": luôn là chính mình"
+          },
+          "orderedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "discount": {
+            "type": "string",
+            "example": "0",
+            "default": "0",
+            "description": "Giảm giá cả phiếu (số nguyên đồng), ≤ tổng tiền hàng"
+          },
+          "ship": {
+            "$ref": "#/components/schemas/ShipDto"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "items": {
+            "description": "1–500 dòng hàng hóa (combo phải tách thành hàng thành phần). Một mặt hàng có thể lặp nhiều dòng",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaleLineDto"
+            }
+          }
+        },
+        "required": [
+          "customerId",
+          "items"
+        ]
+      },
+      "CancelSaleDocDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "InvoiceItemDto": {
+        "type": "object",
+        "properties": {
+          "lineNo": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "string",
+            "example": "515.000"
+          },
+          "price": {
+            "type": "string",
+            "description": "Đơn giá trước giảm"
+          },
+          "discountPerUnit": {
+            "type": "string",
+            "description": "Giảm giá trên 1 đơn vị"
+          },
+          "unitPrice": {
+            "type": "string",
+            "description": "Giá bán = đơn giá − giảm giá"
+          },
+          "lineTotal": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "unitCost": {
+            "type": "string",
+            "example": "21800.5000",
+            "description": "Giá vốn tại lúc bán. VẮNG MẶT nếu thiếu quyền product.cost.view"
+          }
+        },
+        "required": [
+          "lineNo",
+          "productId",
+          "code",
+          "name",
+          "qty",
+          "price",
+          "discountPerUnit",
+          "unitPrice",
+          "lineTotal",
+          "note"
+        ]
+      },
+      "InvoicePaymentDto": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "bank"
+            ]
+          },
+          "accountId": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": "string",
+            "description": "Tên quỹ"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cashCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "Mã phiếu thu (TT…) ở Sổ quỹ"
+          }
+        },
+        "required": [
+          "method",
+          "accountId",
+          "accountName",
+          "amount",
+          "paidAt",
+          "cashCode"
+        ]
+      },
+      "InvoiceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "HD016890"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "cancelled"
+            ]
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "order": {
+            "nullable": true,
+            "description": "Phiếu đặt hàng gốc",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DocRefDto"
+              }
+            ]
+          },
+          "customer": {
+            "$ref": "#/components/schemas/SaleCustomerDto"
+          },
+          "seller": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DocPersonDto"
+              }
+            ]
+          },
+          "invoicedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "subtotal": {
+            "type": "string",
+            "description": "Tổng tiền hàng"
+          },
+          "discount": {
+            "type": "string",
+            "description": "Giảm giá hóa đơn"
+          },
+          "total": {
+            "type": "string",
+            "description": "Khách cần trả"
+          },
+          "paid": {
+            "type": "string",
+            "description": "Khách đã trả (thu lúc xuất + cấn trừ thu nợ về sau)"
+          },
+          "debt": {
+            "type": "string",
+            "description": "Còn nợ = khách cần trả − đã trả"
+          },
+          "totalQty": {
+            "type": "string"
+          },
+          "itemCount": {
+            "type": "number"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdBy": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DocPersonDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cancelledAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "items": {
+            "description": "Chỉ ở chi tiết",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceItemDto"
+            }
+          },
+          "payments": {
+            "description": "Chỉ ở chi tiết",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoicePaymentDto"
+            }
+          },
+          "grossProfit": {
+            "type": "string",
+            "description": "Lãi gộp = tổng tiền hàng − giảm giá − Σ(SL × giá vốn). Chỉ ở chi tiết và chỉ khi có product.cost.view"
+          },
+          "warnings": {
+            "description": "Cảnh báo mềm lúc xuất (vượt có thể bán, vượt hạn mức); chỉ trong phản hồi tạo hóa đơn",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaleWarningDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "status",
+          "branchId",
+          "order",
+          "customer",
+          "seller",
+          "invoicedAt",
+          "subtotal",
+          "discount",
+          "total",
+          "paid",
+          "debt",
+          "totalQty",
+          "itemCount",
+          "note",
+          "createdBy",
+          "createdAt",
+          "updatedAt",
+          "cancelledAt",
+          "cancelReason"
+        ]
+      },
+      "InvoiceListDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DocMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "PaymentInputDto": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "bank"
+            ]
+          },
+          "accountId": {
+            "type": "string",
+            "description": "Quỹ nhận tiền: phải thuộc chi nhánh làm việc, đang hoạt động và đúng loại (cash/bank)"
+          },
+          "amount": {
+            "type": "string",
+            "example": "10000000",
+            "description": "Số nguyên đồng > 0"
+          }
+        },
+        "required": [
+          "method",
+          "accountId",
+          "amount"
+        ]
+      },
+      "CreateInvoiceDto": {
+        "type": "object",
+        "properties": {
+          "payments": {
+            "description": "Các khoản thu lúc xuất (tiền mặt / chuyển khoản). Bỏ trống = ghi nợ toàn bộ. Tổng không vượt khách cần trả",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentInputDto"
+            }
+          },
+          "customerId": {
+            "type": "string"
+          },
+          "sellerId": {
+            "type": "string",
+            "description": "Người bán; mặc định = người đang đăng nhập. Quyền \"chỉ của mình\": luôn là chính mình"
+          },
+          "invoicedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "discount": {
+            "type": "string",
+            "example": "0",
+            "default": "0",
+            "description": "Giảm giá cả hóa đơn (số nguyên đồng) ≤ tổng tiền hàng"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "items": {
+            "description": "1–500 dòng hàng hóa; một mặt hàng có thể lặp nhiều dòng",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaleLineDto"
+            }
+          }
+        },
+        "required": [
+          "customerId",
+          "items"
+        ]
+      },
+      "InvoiceFromOrderDto": {
+        "type": "object",
+        "properties": {
+          "payments": {
+            "description": "Các khoản thu lúc xuất (tiền mặt / chuyển khoản). Bỏ trống = ghi nợ toàn bộ. Tổng không vượt khách cần trả",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentInputDto"
+            }
+          },
+          "invoicedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "description": "Bỏ trống = lấy ghi chú của phiếu"
+          }
+        }
+      },
+      "UpdateSaleNoteDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "description": "Chỉ sửa được ghi chú"
+          }
+        },
+        "required": [
+          "note"
+        ]
+      },
       "DocPartyDto": {
         "type": "object",
         "properties": {
@@ -5073,21 +6591,6 @@
           "id",
           "code",
           "name"
-        ]
-      },
-      "DocPersonDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "fullName": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "fullName"
         ]
       },
       "PurchaseOrderItemDto": {
@@ -5134,22 +6637,6 @@
           "lineTotal",
           "receivedQty",
           "remainingQty"
-        ]
-      },
-      "DocRefDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "code": {
-            "type": "string",
-            "example": "PDN000394"
-          }
-        },
-        "required": [
-          "id",
-          "code"
         ]
       },
       "PurchaseOrderDto": {
@@ -5274,29 +6761,6 @@
           "receiveState",
           "orderedAt",
           "orderedBy"
-        ]
-      },
-      "DocMetaDto": {
-        "type": "object",
-        "properties": {
-          "page": {
-            "type": "number"
-          },
-          "limit": {
-            "type": "number"
-          },
-          "total": {
-            "type": "number"
-          },
-          "totalPages": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "page",
-          "limit",
-          "total",
-          "totalPages"
         ]
       },
       "PurchaseOrderListDto": {
