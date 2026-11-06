@@ -32,7 +32,6 @@ erDiagram
   branches ||--o{ stocks : "tồn theo chi nhánh"
   products ||--o{ stocks : ""
   products ||--o{ stock_movements : "sổ cái kho"
-  categories ||--o{ products : ""
   products ||--o{ product_components : "combo gồm"
   users ||--o{ customers : "nhân viên phụ trách"
 

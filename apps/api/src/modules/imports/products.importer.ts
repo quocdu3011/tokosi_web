@@ -9,7 +9,6 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { normalizeHeader, type ParsedSheet } from '../../common/excel.js';
 import type { Tx } from '../../db/database.module.js';
 import {
-  categories,
   productComponents,
   productImages,
   products,
@@ -39,7 +38,6 @@ const COL = {
   name: ['ten hang'],
   type: ['loai hang'],
   components: ['hang thanh phan'],
-  category: ['nhom hang(3 cap)', 'nhom hang'],
   active: ['dang kinh doanh'],
   description: ['mo ta'],
   /** Chỉ dùng ở chế độ "thêm": số lượng CỘNG THÊM vào tồn (số âm = trừ) và giá vốn của lô cộng thêm. */
@@ -68,7 +66,6 @@ interface ParsedRow {
   name: string;
   type?: ProductType;
   components?: Array<{ code: string; qty: number }>;
-  categoryPath?: string[];
   active?: boolean;
   description?: string;
   /** Chế độ "thêm": số lượng cộng (>0) hoặc trừ (<0) vào tồn; bỏ trống/0 = không đổi tồn. */
@@ -194,22 +191,6 @@ export async function importProducts(
     if (type === 'combo' && !components && !compRaw)
       err('Hàng thành phần', 'Combo phải có ít nhất một hàng thành phần');
 
-    let categoryPath: string[] | undefined;
-    const categoryRaw = asText(pick(values, COL.category));
-    if (categoryRaw) {
-      categoryPath = categoryRaw.split('>>').map((p) => p.trim());
-      if (
-        categoryPath.some((p) => p === '' || p.length > 100) ||
-        categoryPath.length > 3
-      ) {
-        err(
-          'Nhóm hàng',
-          'Nhóm hàng tối đa 3 cấp, ngăn cách bằng ">>", mỗi cấp 1-100 ký tự',
-        );
-        categoryPath = undefined;
-      }
-    }
-
     const active = asFlag(pick(values, COL.active));
     if (active === undefined) err('Đang kinh doanh', 'Chỉ nhận 1/0');
 
@@ -266,7 +247,6 @@ export async function importProducts(
         name: name ?? '',
         type,
         components,
-        categoryPath,
         active: active ?? undefined,
         description: asText(pick(values, COL.description)) ?? undefined,
         qty,
@@ -316,27 +296,6 @@ export async function importProducts(
         });
     }
   }
-
-  // ---------- 3) nhóm hàng: tạo các nhóm còn thiếu
-  const categoryIds = new Map<string, string>(); // khóa = đường dẫn đã chuẩn hóa
-  for (const r of work) {
-    if (!r.categoryPath) continue;
-    let parentId: string | null = null;
-    let key = '';
-    for (const part of r.categoryPath) {
-      key += `>>${normalizeHeader(part)}`;
-      let id = categoryIds.get(key);
-      if (!id) {
-        id = await findOrCreateCategory(tx, parentId, part);
-        categoryIds.set(key, id);
-      }
-      parentId = id;
-    }
-  }
-  const categoryOf = (path: string[] | undefined): string | undefined => {
-    if (!path) return undefined;
-    return categoryIds.get(path.map((p) => `>>${normalizeHeader(p)}`).join(''));
-  };
 
   // Loại hàng của hàng đã có không đổi qua Excel (đổi trên giao diện, có kiểm tra giao dịch)
   const typeOfRow = new Map<string, ProductType>(); // loại hàng sau khi nhập, theo mã (chữ thường)
@@ -443,7 +402,6 @@ export async function importProducts(
           code: r.code,
           name: r.name,
           productType: r.type ?? ('goods' as const),
-          categoryId: categoryOf(r.categoryPath) ?? null,
           description: r.description ?? null,
           isActive: r.active ?? true,
           liquidationStatus: r.liquidation ?? ('normal' as const),
@@ -461,8 +419,6 @@ export async function importProducts(
     if (!cur) continue; // hàng vừa tạo ở trên
     const patch: Partial<typeof products.$inferInsert> = {};
     if (cur.name !== r.name) patch.name = r.name;
-    const cat = categoryOf(r.categoryPath);
-    if (cat !== undefined && cur.categoryId !== cat) patch.categoryId = cat;
     if (r.description !== undefined && cur.description !== r.description)
       patch.description = r.description;
     if (r.active !== undefined && cur.isActive !== r.active)
@@ -591,40 +547,4 @@ export async function importProducts(
   const createdCodes = new Set(toInsert.map((r) => r.code.toLowerCase()));
   const updated = [...changed].filter((c) => !createdCodes.has(c)).length;
   return { created, updated, errors: [] };
-}
-
-async function findOrCreateCategory(
-  tx: Tx,
-  parentId: string | null,
-  name: string,
-): Promise<string> {
-  const [found] = await tx
-    .select({ id: categories.id })
-    .from(categories)
-    .where(
-      and(
-        isNull(categories.deletedAt),
-        parentId
-          ? eq(categories.parentId, parentId)
-          : isNull(categories.parentId),
-        sql`f_search_text(${categories.name}) = f_search_text(${name})`,
-      ),
-    );
-  if (found) return found.id;
-  const [last] = await tx
-    .select({ max: sql<number>`coalesce(max(${categories.sortOrder}), 0)` })
-    .from(categories)
-    .where(
-      and(
-        isNull(categories.deletedAt),
-        parentId
-          ? eq(categories.parentId, parentId)
-          : isNull(categories.parentId),
-      ),
-    );
-  const [row] = await tx
-    .insert(categories)
-    .values({ name, parentId, sortOrder: (last?.max ?? 0) + 1 })
-    .returning({ id: categories.id });
-  return row!.id;
 }

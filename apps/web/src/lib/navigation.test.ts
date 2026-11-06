@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest';
 
-import { isNavActive } from './navigation';
+import { findNavItem, isNavActive } from './navigation';
 
 describe('isNavActive', () => {
   it('khớp chính xác và trang con', () => {
     expect(isNavActive('/products', '/products')).toBe(true);
     expect(isNavActive('/settings/users', '/settings/users')).toBe(true);
   });
-  it('mục cha không sáng khi đang ở mục con có đường dẫn dài hơn', () => {
-    expect(isNavActive('/products/categories', '/products/categories')).toBe(true);
-    expect(isNavActive('/products/categories', '/products')).toBe(false);
+  it('hàng hóa không còn mục nhóm và vẫn sáng ở trang con', () => {
+    expect(findNavItem('/products/categories')).toBeUndefined();
+    expect(isNavActive('/products/example', '/products')).toBe(true);
+  });
+  it('mục cha không sáng khi có mục menu con khớp dài hơn', () => {
+    expect(isNavActive('/settings/users', '/settings/users')).toBe(true);
+    expect(isNavActive('/settings/users', '/settings')).toBe(false);
   });
   it('trang chủ chỉ sáng ở đúng "/"', () => {
     expect(isNavActive('/', '/')).toBe(true);

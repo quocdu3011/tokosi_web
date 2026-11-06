@@ -1,5 +1,5 @@
 /**
- * Kéo hàng hóa + nhóm hàng + tồn kho từ API công khai KiotViet và ghi ra file .xlsx theo đúng tiêu đề file KiotViet,
+ * Kéo hàng hóa + tồn kho từ API công khai KiotViet và ghi ra file .xlsx theo đúng tiêu đề file KiotViet,
  * để nhập bằng chính bộ Import hiện có (Hàng hóa → Import, chế độ "Thêm", chọn chi nhánh) — có chạy thử, nhật ký thao
  * tác và ghi tồn qua InventoryService. Công cụ chỉ ĐỌC từ KiotViet và KHÔNG chạm CSDL.
  *
@@ -12,13 +12,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { writeSheet } from '../../common/excel.js';
-import {
-  PRODUCT_COLUMNS,
-  buildCategoryPaths,
-  mapProducts,
-  type KvCategory,
-  type KvProduct,
-} from './mapper.js';
+import { PRODUCT_COLUMNS, mapProducts, type KvProduct } from './mapper.js';
 
 const TOKEN_URL = 'https://id.kiotviet.vn/connect/token';
 const API_URL = 'https://public.kiotapi.com';
@@ -157,8 +151,6 @@ async function main(): Promise<void> {
   }
   console.log(`Chi nhánh KiotViet: ${branch.branchName} (${branch.id})`);
 
-  const cats = await kv.all<KvCategory>('/categories');
-  console.log(`Nhóm hàng: ${cats.length}`);
   const products = await kv.all<KvProduct>(
     '/products',
     '&includeInventory=true',
@@ -167,21 +159,27 @@ async function main(): Promise<void> {
 
   const report = mapProducts(products, {
     branchId: branch.id,
-    categoryPaths: buildCategoryPaths(cats),
   });
 
   mkdirSync(dirname(out), { recursive: true });
-  writeFileSync(out, await writeSheet('Hàng hóa', PRODUCT_COLUMNS, report.rows));
+  writeFileSync(
+    out,
+    await writeSheet('Hàng hóa', PRODUCT_COLUMNS, report.rows),
+  );
 
   const withStock = report.rows.filter((r) => r[4] !== null).length;
   console.log(`\nĐã ghi ${report.rows.length} dòng → ${out}`);
   console.log(`  có tồn kho: ${withStock} dòng`);
   if (report.negativeStock)
-    console.log(`  tồn âm ở KiotViet (không nhập tồn): ${report.negativeStock}`);
+    console.log(
+      `  tồn âm ở KiotViet (không nhập tồn): ${report.negativeStock}`,
+    );
   if (report.imagesTrimmed)
     console.log(`  cắt bớt ảnh quá 10 ảnh: ${report.imagesTrimmed} hàng`);
   if (report.skipped.length > 0) {
-    console.log(`\nBỎ QUA ${report.skipped.length} hàng (không sửa mã tự động):`);
+    console.log(
+      `\nBỎ QUA ${report.skipped.length} hàng (không sửa mã tự động):`,
+    );
     for (const s of report.skipped) console.log(`  ${s.reason}: "${s.code}"`);
   }
 }

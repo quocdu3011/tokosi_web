@@ -2,11 +2,6 @@ import { PRODUCT_CODE_PATTERN } from '../../modules/catalog/products.dto.js';
 import type { CellValue, SheetColumn } from '../../common/excel.js';
 
 /** Dạng dữ liệu tối thiểu của API công khai KiotViet mà công cụ dùng (các trường khác bị bỏ qua). */
-export interface KvCategory {
-  categoryId: number;
-  categoryName: string;
-  parentId?: number | null;
-}
 export interface KvInventory {
   branchId: number;
   branchName?: string;
@@ -18,7 +13,6 @@ export interface KvProduct {
   name: string;
   /** Tên kèm quy cách "(T24)": khớp cột "Tên hàng" của file Excel KiotViet. */
   fullName?: string;
-  categoryId?: number | null;
   /** 1 = combo/đóng gói, 2 = hàng hóa, 3 = dịch vụ. */
   type: number;
   isActive?: boolean;
@@ -31,7 +25,6 @@ export interface KvProduct {
 export const PRODUCT_COLUMNS: SheetColumn[] = [
   { header: 'Mã hàng', width: 16 },
   { header: 'Tên hàng', width: 40 },
-  { header: 'Nhóm hàng(3 Cấp)', width: 30 },
   { header: 'Loại hàng', width: 12 },
   { header: 'Tồn kho', width: 12 },
   { header: 'Giá vốn', width: 14 },
@@ -43,25 +36,6 @@ export const PRODUCT_COLUMNS: SheetColumn[] = [
 const GOODS_TYPE = 2;
 const MAX_NAME = 255;
 const MAX_IMAGES = 10;
-const MAX_CATEGORY_DEPTH = 3;
-
-/** id nhóm → đường dẫn "Cha>>Con" (đã bỏ khoảng trắng thừa). Nhóm có vòng lặp cha-con bị cắt ở chỗ lặp. */
-export function buildCategoryPaths(cats: KvCategory[]): Map<number, string[]> {
-  const byId = new Map(cats.map((c) => [c.categoryId, c]));
-  const out = new Map<number, string[]>();
-  for (const c of cats) {
-    const path: string[] = [];
-    const seen = new Set<number>();
-    let cur: KvCategory | undefined = c;
-    while (cur && !seen.has(cur.categoryId)) {
-      seen.add(cur.categoryId);
-      path.unshift(cur.categoryName.replace(/>>/g, '>').trim());
-      cur = cur.parentId ? byId.get(cur.parentId) : undefined;
-    }
-    out.set(c.categoryId, path);
-  }
-  return out;
-}
 
 /** Số lượng → chuỗi tối đa 3 chữ số thập phân, không đuôi 0 ("592.722", "2123.6", "50"). */
 export function formatQty(n: number): string {
@@ -69,20 +43,17 @@ export function formatQty(n: number): string {
 }
 /** Giá vốn → chuỗi tối đa 4 chữ số thập phân (CSDL lưu NUMERIC(18,4)). */
 export function formatCost(n: number): string {
-  return Number(n.toFixed(4)).toFixed(4).replace(/\.?0+$/, '');
+  return Number(n.toFixed(4))
+    .toFixed(4)
+    .replace(/\.?0+$/, '');
 }
 
 export type SkipReason =
-  | 'ma-khong-hop-le'
-  | 'ma-trung'
-  | 'khong-phai-hang-hoa'
-  | 'ten-qua-dai'
-  | 'nhom-qua-3-cap';
+  'ma-khong-hop-le' | 'ma-trung' | 'khong-phai-hang-hoa' | 'ten-qua-dai';
 
 export interface MapContext {
   /** id chi nhánh KiotViet cần lấy tồn/giá vốn. */
   branchId: number;
-  categoryPaths: Map<number, string[]>;
 }
 
 export interface MapReport {
@@ -105,8 +76,7 @@ export function mapProducts(products: KvProduct[], ctx: MapContext): MapReport {
   const seen = new Set<string>();
   for (const p of products) {
     const code = p.code.trim();
-    const skip = (reason: SkipReason) =>
-      report.skipped.push({ code, reason });
+    const skip = (reason: SkipReason) => report.skipped.push({ code, reason });
 
     if (!PRODUCT_CODE_PATTERN.test(code)) {
       skip('ma-khong-hop-le');
@@ -124,13 +94,6 @@ export function mapProducts(products: KvProduct[], ctx: MapContext): MapReport {
     const name = (p.fullName ?? p.name).trim();
     if (!name || name.length > MAX_NAME) {
       skip('ten-qua-dai');
-      continue;
-    }
-    const path = p.categoryId
-      ? ctx.categoryPaths.get(p.categoryId)
-      : undefined;
-    if (path && path.length > MAX_CATEGORY_DEPTH) {
-      skip('nhom-qua-3-cap');
       continue;
     }
     seen.add(key);
@@ -153,7 +116,6 @@ export function mapProducts(products: KvProduct[], ctx: MapContext): MapReport {
     report.rows.push([
       code,
       name,
-      path ? path.join('>>') : null,
       'Hàng hóa',
       qty,
       cost,

@@ -2,7 +2,6 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { readSheet, writeSheet, type CellValue } from '../../common/excel.js';
 import {
-  categories,
   importJobs,
   productImages,
   products,
@@ -33,6 +32,14 @@ const KV_HEADERS = [
 ];
 const kvRow = (o: Partial<Record<string, CellValue>>): CellValue[] =>
   KV_HEADERS.map((h) => o[h] ?? null);
+const binaryParser = (
+  r: { on: (e: string, cb: (x: Buffer) => void) => void },
+  cb: (e: null, b: Buffer) => void,
+) => {
+  const chunks: Buffer[] = [];
+  r.on('data', (c: Buffer) => chunks.push(c));
+  r.on('end', () => cb(null, Buffer.concat(chunks)));
+};
 const xlsx = (headers: string[], rows: CellValue[][]) =>
   writeSheet(
     'Sheet1',
@@ -120,6 +127,10 @@ describe('Nhập/xuất Excel qua HTTP', () => {
     );
     const sheet = await readSheet(res.body as Buffer);
     expect(sheet.headers).toContain('ma hang');
+    expect(sheet.headers).not.toContain('nhom hang(3 cap)');
+    expect(sheet.rows[0]!.values['loai hang']).toBe('Hàng hóa');
+    expect(sheet.rows[1]!.values['loai hang']).toBe('Combo');
+    expect(sheet.rows[1]!.values['hang thanh phan']).toBe('VD001/2');
     expect(sheet.headers).not.toContain('gia ban'); // hệ thống không còn giá bán
   });
 
@@ -143,7 +154,6 @@ describe('Nhập/xuất Excel qua HTTP', () => {
       errors: [],
     });
     expect(await countProducts()).toBe(0);
-    expect(await t.db.select().from(categories)).toHaveLength(0);
     // vẫn có bản ghi lần nhập để xem lại
     const again = await (
       await t.as('quanly')
@@ -153,7 +163,7 @@ describe('Nhập/xuất Excel qua HTTP', () => {
     expect(again.body.created).toBe(2);
   });
 
-  it('nhập thật theo cột KiotViet: tạo nhóm hàng, hàng, min/max/vị trí, ảnh URL ngoài', async () => {
+  it('nhập thật theo cột KiotViet: bỏ qua nhóm cũ, tạo hàng và ảnh URL ngoài', async () => {
     const file = await xlsx(KV_HEADERS, [
       kvRow({
         'Loại hàng': 'Hàng hóa',
@@ -179,7 +189,7 @@ describe('Nhập/xuất Excel qua HTTP', () => {
         'Đang kinh doanh': 0,
       }),
       kvRow({
-        'Nhóm hàng(3 Cấp)': 'ORDER RIÊNG',
+        'Nhóm hàng(3 Cấp)': 'Cột cũ>>bị bỏ qua>>kể cả>>hơn ba cấp',
         'Mã hàng': 'ORD01',
         'Tên hàng': 'Hàng order',
       }),
@@ -201,18 +211,6 @@ describe('Nhập/xuất Excel qua HTTP', () => {
       isActive: true,
     });
     expect((await productByCode('NOI01'))!.isActive).toBe(false);
-
-    // nhóm hàng: NHÀ BẾP (gốc) > Dao kéo, Nồi chảo; ORDER RIÊNG (gốc)
-    const cats = await t.db.select().from(categories);
-    expect(cats.map((c) => c.name).sort()).toEqual([
-      'Dao kéo',
-      'NHÀ BẾP',
-      'Nồi chảo',
-      'ORDER RIÊNG',
-    ]);
-    const bep = cats.find((c) => c.name === 'NHÀ BẾP')!;
-    expect(cats.find((c) => c.name === 'Dao kéo')!.parentId).toBe(bep.id);
-    expect(dao.categoryId).toBe(cats.find((c) => c.name === 'Dao kéo')!.id);
 
     // tồn kho và giá vốn KHÔNG bị đụng; các cột tồn nhỏ nhất/lớn nhất/vị trí của KiotViet bị bỏ qua
     expect(
@@ -267,7 +265,6 @@ describe('Nhập/xuất Excel qua HTTP', () => {
         .from(productImages)
         .where(eq(productImages.productId, dao.id)),
     ).toHaveLength(2);
-    expect(await t.db.select().from(categories)).toHaveLength(4);
   });
 
   it('cập nhật theo mã KHÔNG phân biệt hoa thường; chỉ tính hàng thật sự thay đổi; ô trống giữ nguyên', async () => {
@@ -342,11 +339,10 @@ describe('Nhập/xuất Excel qua HTTP', () => {
     expect(await productByCode('OK01')).toBeUndefined();
   });
 
-  it('lỗi phát hiện SAU khi đã bắt đầu ghi (mã thuộc hàng đã xóa) → hoàn tác cả nhóm hàng vừa tạo, không để lại gì', async () => {
+  it('lỗi phát hiện SAU khi đã bắt đầu ghi (mã thuộc hàng đã xóa) → hoàn tác toàn bộ, không để lại gì', async () => {
     await t.db
       .insert(products)
       .values({ code: 'DAXOA', name: 'Hàng đã xóa', deletedAt: new Date() });
-    const cats = (await t.db.select().from(categories)).length;
     const file = await xlsx(KV_HEADERS, [
       kvRow({
         'Nhóm hàng(3 Cấp)': 'NHÓM MỚI>>CON MỚI',
@@ -358,7 +354,6 @@ describe('Nhập/xuất Excel qua HTTP', () => {
     const res = await post('products', file, `?dryRun=false&branchId=${t.sg}`);
     expect(res.body.status).toBe('failed');
     expect(res.body.errors[0].row).toBe(3);
-    expect((await t.db.select().from(categories)).length).toBe(cats); // nhóm vừa tạo đã được hoàn tác
     expect(await productByCode('MOI01')).toBeUndefined();
   });
 
@@ -414,7 +409,7 @@ describe('Nhập/xuất Excel qua HTTP', () => {
     expect(sheet.rows).toHaveLength(1); // theo bộ lọc q=dao
     expect(sheet.rows[0]!.values['ma hang']).toBe('DAO01');
     expect(sheet.headers).toContain('gia von'); // Quản lý có quyền xem giá vốn
-    expect(sheet.rows[0]!.values['nhom hang(3 cap)']).toBe('NHÀ BẾP>>Dao kéo');
+    expect(sheet.headers).not.toContain('nhom hang(3 cap)');
 
     // nhập lại đúng file vừa xuất (chạy thật nhưng không có gì đổi)
     const again = await post(
@@ -448,6 +443,42 @@ describe('Nhập/xuất Excel qua HTTP', () => {
     const sheet = await readSheet(res.body as Buffer);
     expect(sheet.headers).not.toContain('gia von');
     expect(sheet.headers).not.toContain('gia nhap cuoi');
+  });
+
+  it('xuất đúng cột đã chọn, giữ thứ tự và kiểu số theo bộ lọc', async () => {
+    const api = await t.as('quanly', t.sg);
+    const res = await api
+      .get('/products?format=xlsx&q=dao&columns=onHand,code')
+      .buffer(true)
+      .parse(binaryParser);
+    expect(res.status).toBe(200);
+    const sheet = await readSheet(res.body as Buffer);
+    expect(sheet.headers).toEqual(['ma hang', 'ton kho']);
+    expect(sheet.rows).toHaveLength(1);
+    expect(sheet.rows[0]!.values['ma hang']).toBe('DAO01');
+    expect(typeof sheet.rows[0]!.values['ton kho']).toBe('number');
+  });
+
+  it('từ chối lựa chọn cột rỗng hoặc không hợp lệ', async () => {
+    const api = await t.as('quanly', t.sg);
+    for (const columns of ['', 'unknown', 'code,', 'code,,name']) {
+      const res = await api.get(`/products?format=xlsx&columns=${columns}`);
+      expect(res.status).toBe(400);
+    }
+  });
+
+  it('chọn cột không vượt quyền xem giá vốn', async () => {
+    await t.makeUser('export-sale', 'sales', [t.sg]);
+    const api = await t.as('export-sale', t.sg);
+    const res = await api
+      .get('/products?format=xlsx&columns=code,costPrice,lastPurchasePrice')
+      .buffer(true)
+      .parse(binaryParser);
+    expect(res.status).toBe(200);
+    const sheet = await readSheet(res.body as Buffer);
+    expect(sheet.headers).toEqual(['ma hang']);
+    const forbidden = await api.get('/products?format=xlsx&columns=costPrice');
+    expect(forbidden.status).toBe(400);
   });
 
   // ------------------------------------------------------------------ combo

@@ -1,12 +1,18 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { ImageIcon, Info, Layers } from 'lucide-react';
 
 import { toast } from 'sonner';
 
-import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,7 +20,7 @@ import { errorMessage } from '@/lib/api';
 import { useAuthStore } from '@/lib/auth/store';
 import { useBranchStore } from '@/lib/branch';
 import { can } from '@/lib/permissions';
-import { useCategories, useProduct, useUpdateProduct } from '@/lib/queries/products';
+import { useProduct, useUpdateProduct } from '@/lib/queries/products';
 
 import { ImageManager } from './image-manager';
 import { ProductStockSummary } from './product-stock-summary';
@@ -22,7 +28,7 @@ import { ProductInfoForm } from './product-info-form';
 import { StockCardTab } from './stock-card-tab';
 
 export type DrawerTarget = { kind: 'create' } | { kind: 'view'; id: string; tab?: DrawerTab };
-export type DrawerTab = 'info' | 'images' | 'stock-card';
+export type DrawerTab = 'info' | 'stock-card';
 
 /**
  * Ngăn kéo hàng hóa bên phải: tạo mới (chỉ tab Thông tin) hoặc xem/sửa một hàng (các tab).
@@ -37,11 +43,9 @@ export function ProductDrawer({ target, onClose }: { target: DrawerTarget; onClo
   );
   const id = current.kind === 'view' ? current.id : null;
   const canEdit = can(me, 'product.edit');
-  const [confirmToggle, setConfirmToggle] = useState(false);
   const updateProduct = useUpdateProduct();
 
   const { data: product, isLoading, isError, error } = useProduct(id);
-  const { data: categories = [] } = useCategories();
 
   const branchId = useBranchStore((s) => s.branchId);
   const openedAt = useRef(branchId);
@@ -51,42 +55,26 @@ export function ProductDrawer({ target, onClose }: { target: DrawerTarget; onClo
 
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
-      <SheetContent side="right" className="sheet-wide" aria-describedby={undefined}>
-        <div className="drawer">
-          <header className="drawer-header">
-            <SheetTitle>
-              {product ? `${product.code} · ${product.name}` : 'Thêm hàng hóa'}
-            </SheetTitle>
+      <SheetContent side="right" className="product-workspace" aria-describedby={undefined}>
+        <div className="product-workspace-header">
+          <header>
+            <SheetTitle>{product ? product.name : 'Thêm hàng hóa'}</SheetTitle>
             {product && (
-              <div className="cell-badges">
-                {product.isActive ? (
-                  <Badge variant="success">Đang kinh doanh</Badge>
-                ) : (
-                  <Badge variant="destructive">Ngừng kinh doanh</Badge>
-                )}
+              <div className="product-header-meta">
+                <span>{product.code}</span>
                 {product.productType === 'combo' && <Badge variant="info">Combo</Badge>}
               </div>
             )}
-            {product && canEdit && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="drawer-status-action"
-                onClick={() => setConfirmToggle(true)}
-              >
-                {product.isActive ? 'Ngừng kinh doanh' : 'Cho phép kinh doanh'}
-              </Button>
-            )}
           </header>
-
+        </div>
+        <div className="product-workspace-body">
           {current.kind === 'create' ? (
             <ProductInfoForm
               product={null}
-              categories={categories}
               onCancel={onClose}
-              onSaved={(created, opts) => {
+              onSaved={(created) => {
                 setCurrent({ kind: 'view', id: created.id });
-                setTab(opts?.imagesFailed ? 'images' : 'info');
+                setTab('info');
               }}
             />
           ) : isError ? (
@@ -96,55 +84,93 @@ export function ProductDrawer({ target, onClose }: { target: DrawerTarget; onClo
           ) : isLoading || !product ? (
             <Skeleton className="skeleton-block" />
           ) : (
-            <Tabs value={tab} onValueChange={(v) => setTab(v as DrawerTab)}>
+            <Tabs
+              className="product-workspace-tabs"
+              orientation="horizontal"
+              value={tab}
+              onValueChange={(v) => setTab(v as DrawerTab)}
+            >
               <TabsList aria-label="Thông tin hàng hóa">
-                <TabsTrigger value="info">Thông tin</TabsTrigger>
-                <TabsTrigger value="images">Ảnh ({product.images.length})</TabsTrigger>
+                <TabsTrigger value="info">
+                  <Info aria-hidden="true" />
+                  Thông tin
+                </TabsTrigger>
                 {product.productType === 'goods' && (
-                  <TabsTrigger value="stock-card">Thẻ kho</TabsTrigger>
+                  <TabsTrigger value="stock-card">
+                    <Layers aria-hidden="true" />
+                    Thẻ kho
+                  </TabsTrigger>
                 )}
               </TabsList>
-              <TabsContent value="info">
-                <ProductStockSummary product={product} />
-                <ProductInfoForm
-                  key={product.updatedAt}
-                  product={product}
-                  categories={categories}
-                  onCancel={onClose}
-                  onSaved={() => undefined}
-                />
-              </TabsContent>
-              <TabsContent value="images">
-                <ImageManager product={product} canEdit={canEditImages} />
-              </TabsContent>
-              {product.productType === 'goods' && (
-                <TabsContent value="stock-card">
-                  <StockCardTab product={product} />
+              <div className="product-workspace-editor">
+                <TabsContent value="info">
+                  <ProductInfoForm
+                    key={product.id}
+                    product={product}
+                    onCancel={onClose}
+                    onSaved={() => undefined}
+                    summary={
+                      <aside
+                        className="product-workspace-summary"
+                        aria-label="Trạng thái và tồn kho"
+                      >
+                        <Select
+                          value={product.isActive ? 'active' : 'inactive'}
+                          disabled={!canEdit || updateProduct.isPending}
+                          onValueChange={async (value) => {
+                            const isActive = value === 'active';
+                            if (isActive === product.isActive || updateProduct.isPending) return;
+                            try {
+                              await updateProduct.mutateAsync({
+                                id: product.id,
+                                patch: { isActive },
+                              });
+                              toast.success(
+                                isActive ? 'Đã cho phép kinh doanh' : 'Đã ngừng kinh doanh',
+                              );
+                            } catch (error) {
+                              toast.error(errorMessage(error));
+                            }
+                          }}
+                        >
+                          <SelectTrigger
+                            className={`product-status ${product.isActive ? 'is-active' : 'is-inactive'}`}
+                            aria-label="Trạng thái kinh doanh"
+                            aria-busy={updateProduct.isPending}
+                          >
+                            <span className="product-status-dot" aria-hidden="true" />
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="active">Đang kinh doanh</SelectItem>
+                            <SelectItem value="inactive">Ngừng kinh doanh</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <ProductStockSummary product={product} />
+                      </aside>
+                    }
+                  >
+                    <section
+                      className="product-info-images"
+                      aria-labelledby="product-images-heading"
+                    >
+                      <h3 id="product-images-heading">
+                        <ImageIcon aria-hidden="true" />
+                        Ảnh hàng hóa <span>({product.images.length})</span>
+                      </h3>
+                      <ImageManager product={product} canEdit={canEditImages} />
+                    </section>
+                  </ProductInfoForm>
                 </TabsContent>
-              )}
+                {product.productType === 'goods' && (
+                  <TabsContent value="stock-card">
+                    <StockCardTab product={product} />
+                  </TabsContent>
+                )}
+              </div>
             </Tabs>
           )}
         </div>
-        {product && confirmToggle && (
-          <ConfirmDialog
-            title={product.isActive ? 'Ngừng kinh doanh hàng này?' : 'Cho phép kinh doanh lại?'}
-            description={
-              product.isActive
-                ? `${product.code} · ${product.name} sẽ không còn được chọn khi lập đơn. Dữ liệu và lịch sử giữ nguyên, có thể bật lại bất cứ lúc nào.`
-                : `${product.code} · ${product.name} sẽ được kinh doanh trở lại.`
-            }
-            confirmLabel={product.isActive ? 'Ngừng kinh doanh' : 'Cho phép kinh doanh'}
-            destructive={product.isActive}
-            onConfirm={async () => {
-              await updateProduct.mutateAsync({
-                id: product.id,
-                patch: { isActive: !product.isActive },
-              });
-              toast.success(product.isActive ? 'Đã ngừng kinh doanh' : 'Đã cho phép kinh doanh');
-            }}
-            onClose={() => setConfirmToggle(false)}
-          />
-        )}
       </SheetContent>
     </Sheet>
   );

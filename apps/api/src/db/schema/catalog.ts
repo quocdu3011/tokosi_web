@@ -1,6 +1,5 @@
 import { sql } from 'drizzle-orm';
 import {
-  type AnyPgColumn,
   boolean,
   check,
   index,
@@ -16,29 +15,6 @@ import { pk, softDelete, timestamps, tstz } from './_helpers.js';
 import { productSearchExpr, trgmIndex } from './_search.js';
 import { users } from './system.js';
 
-/** Nhóm hàng dạng cây (hiện tối đa 2 cấp, hỗ trợ nhiều cấp). */
-export const categories = pgTable(
-  'categories',
-  {
-    id: pk(),
-    name: text().notNull(),
-    parentId: uuid().references((): AnyPgColumn => categories.id),
-    sortOrder: integer().notNull().default(0),
-    ...timestamps(),
-    ...softDelete(),
-  },
-  (t) => [
-    index('categories_parent_idx').on(t.parentId),
-    // Tên không trùng trong cùng nhóm cha (không phân biệt hoa thường và dấu); nhóm gốc dùng UUID rỗng thay NULL
-    uniqueIndex('categories_sibling_name_unique')
-      .on(
-        sql`coalesce(${t.parentId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
-        sql`f_search_text(${t.name})`,
-      )
-      .where(sql`${t.deletedAt} is null`),
-  ],
-);
-
 /**
  * Hàng hóa. Mỗi quy cách là một SKU riêng (đơn vị nằm trong tên), không có biến thể/lô.
  * `product_type`: `goods` (Hàng hóa) hoặc `combo` (gói các hàng thành phần ở `product_components`; KHÔNG có dòng tồn
@@ -51,7 +27,6 @@ export const products = pgTable(
     id: pk(),
     code: text().notNull().unique(),
     name: text().notNull(),
-    categoryId: uuid().references(() => categories.id),
     productType: productType().notNull().default('goods'),
     liquidationStatus: liquidationStatus().notNull().default('normal'),
     description: text(),
@@ -61,7 +36,6 @@ export const products = pgTable(
     ...softDelete(),
   },
   (t) => [
-    index('products_category_idx').on(t.categoryId),
     trgmIndex('products_search_trgm', productSearchExpr(t)),
     index('products_active_idx').on(t.isActive),
     index('products_type_idx').on(t.productType),

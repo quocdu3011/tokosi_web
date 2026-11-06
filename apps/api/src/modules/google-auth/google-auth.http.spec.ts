@@ -224,13 +224,7 @@ describe('Đăng nhập / đăng ký bằng Google (Supabase)', () => {
     const auth = { Authorization: `Bearer ${res.body.accessToken as string}` };
     await t.http().get('/api/v1/auth/me').set(auth).expect(200);
     // mọi endpoint nghiệp vụ bị chặn
-    for (const url of [
-      '/products',
-      '/categories',
-      '/users',
-      '/roles',
-      '/settings/auth',
-    ]) {
+    for (const url of ['/products', '/users', '/roles', '/settings/auth']) {
       const r = await t.http().get(`/api/v1${url}`).set(auth);
       expect(r.status, `${url} → ${r.status}`).toBe(403);
     }

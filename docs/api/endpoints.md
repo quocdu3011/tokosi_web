@@ -183,34 +183,9 @@ Luồng: web gọi `supabase.auth.signInWithOAuth({ provider: 'google' })` (PKCE
 > **Trạng thái: đã triển khai** mục 2.1–2.2 (Swagger `/api/docs`, `openapi.json`). **Không có giá bán trong hệ thống** (quyết định 05/11/2026): giá bán được quy ước chung ở phần mô tả sản phẩm; không có bảng giá, lưới giá hay báo giá.
 > **Quy ước chung của mục này:** mọi endpoint cần đăng nhập và quyền nêu ở cột "Quyền". Số lượng là chuỗi thập phân tối đa 3 chữ số (`"515.000"`); giá vốn là chuỗi 4 chữ số thập phân (`"21800.5000"`).
 
-### 2.1 Nhóm hàng
+### 2.1 Nhóm hàng đã được loại bỏ
 
-| Method | Đường dẫn         | Mô tả                                            | Quyền          |
-| ------ | ----------------- | ------------------------------------------------ | -------------- |
-| GET    | `/categories`     | Cây nhóm hàng (không phân trang)                 | `product.view` |
-| POST   | `/categories`     | Tạo nhóm `{ name, parentId? }`                   | `product.edit` |
-| PATCH  | `/categories/:id` | Đổi tên / chuyển nhóm cha `{ name?, parentId? }` | `product.edit` |
-| DELETE | `/categories/:id` | Xóa mềm → `204`                                  | `product.edit` |
-
-```json
-// GET /categories
-[
-  {
-    "id": "…",
-    "name": "NHÀ BẾP",
-    "parentId": null,
-    "productCount": 310,
-    "children": [
-      { "id": "…", "name": "Nồi chảo", "parentId": "…", "productCount": 54, "children": [] }
-    ]
-  }
-]
-```
-
-- `productCount` của nhóm cha **đã cộng dồn** hàng của mọi nhóm con (không đếm hàng đã xóa).
-- Tối đa **3 cấp**. Tên **không trùng trong cùng nhóm cha** (không phân biệt hoa thường và dấu) → `409 DUPLICATE_NAME`.
-- `PATCH` với `parentId: null` chuyển nhóm ra gốc. Không được chuyển nhóm vào chính nó hoặc nhóm con của nó (`400 INVALID_STATE`); vượt 3 cấp → `400 VALIDATION_ERROR` (`field = parentId`).
-- `DELETE` chỉ khi không còn nhóm con và không còn hàng hóa → ngược lại `400 INVALID_STATE` (`details.productCount` nếu còn hàng).
+Từ 06/11/2026, không có API `/categories`, bảng `categories` hay trường nhóm trên hàng hóa.
 
 ### 2.2 Danh sách hàng hóa
 
@@ -228,7 +203,7 @@ Luồng: web gọi `supabase.auth.signInWithOAuth({ provider: 'google' })` (PKCE
 | GET    | `/products/:id/stock-card?from&to` | **Thẻ kho**: lịch sử nhập–xuất tại chi nhánh làm việc                      | `product.view` (+ `X-Branch-Id`)           |
 | GET    | `/products/:id/branches`           | Chi tiết theo từng chi nhánh người dùng được phép: giá 7 bảng, tồn, vị trí | `product.view`                             |
 
-Bộ lọc `GET /products`: `q` (tìm không dấu theo mã và tên), `categoryId` (**gồm cả nhóm con**), `isActive`, `liquidationStatus`, `productType` (`goods` | `combo`), `inStock` (`true` = còn tồn **tại chi nhánh làm việc**; với combo là số combo ghép được), `sort` (`code`, `name`, `onHand`, `createdAt`; thêm `-` để giảm dần; cột lạ bị bỏ qua), `page`, `limit` (tối đa 100).
+Bộ lọc `GET /products`: `q` (tìm không dấu theo mã và tên), `isActive`, `liquidationStatus`, `productType` (`goods` | `combo`), `inStock` (`true` = còn tồn **tại chi nhánh làm việc**; với combo là số combo ghép được), `sort` (`code`, `name`, `onHand`, `createdAt`; thêm `-` để giảm dần; cột lạ bị bỏ qua), `page`, `limit` (tối đa 100).
 
 ```json
 // Đối tượng Product
@@ -236,8 +211,6 @@ Bộ lọc `GET /products`: `q` (tìm không dấu theo mã và tên), `category
   "id": "0192…",
   "code": "QKBSP",
   "name": "Quạt kẹp bàn Super MST-A1",
-  "categoryId": "…",
-  "categoryPath": "ĐIỆN GIA DỤNG > Quạt điện",
   "productType": "goods", // "goods" = Hàng hóa (mặc định) | "combo"
   "liquidationStatus": "normal", // normal=Thường (mặc định) | clearance=Thanh Lý | disabled=Tắt Mã | high_stock=Tồn Cao | priority_stock=Tồn Ưu Tiên
   "components": "", // combo: hàng thành phần dạng "MSP/SL,MSP/SL" (vd "DAO01/2,KEO03/1"); hàng hóa: ""
@@ -262,7 +235,6 @@ Bộ lọc `GET /products`: `q` (tìm không dấu theo mã và tên), `category
 {
   "code": "QKBSP",
   "name": "…",
-  "categoryId": "…",
   "productType": "goods", // mặc định "goods"; "combo" thì bắt buộc có components
   "liquidationStatus": "normal", // tùy chọn, mặc định "normal"
   "components": "DAO01/2,KEO03/1", // chỉ với combo
@@ -374,6 +346,8 @@ Màn hình chỉ cần một nút Lưu và gọi lần lượt hai API này. N�
 - `refType`: `opening`, `goods_receipt`, `invoice`, `sales_return`, `purchase_return`, `adjustment`, `transfer_out`, `transfer_in`, `transfer_cancel`.
 
 **Xuất Excel:** `GET /products?format=xlsx` (kèm các bộ lọc, bỏ qua `page/limit`, tối đa 10.000 dòng). Tiêu đề cột trùng file KiotViet nên nhập lại được; cột `Giá vốn`, `Giá nhập cuối` chỉ có khi có quyền xem giá vốn.
+
+Thêm `columns=code,name,onHand` để chỉ xuất các cột được chọn. Các mã hợp lệ (theo thứ tự trong file): `code`, `name`, `productType`, `components`, `liquidationStatus`, `costPrice`, `lastPurchasePrice`, `onHand`, `reserved`, `description`, `isActive`, `images`. Bỏ qua `columns` để xuất đủ cột như trước; chuỗi rỗng, mã lạ hoặc lựa chọn không có cột được phép xuất trả `400`. Cột giá vốn vẫn bị loại khi thiếu `product.cost.view`. Hộp thoại trên web có checkbox, “Chọn tất cả”, “Mặc định” và bộ đếm, không có ô tìm kiếm; “Mặc định” khôi phục toàn bộ cột được phép của file hiện tại. File tùy chọn chỉ nhập lại được khi vẫn giữ đủ các cột bắt buộc của chức năng nhập.
 
 ### 2.3 Giá bán
 
@@ -941,8 +915,8 @@ Tất cả nhận `?format=json` (mặc định) \| `xlsx` \| `pdf`. Quyền the
 
 | Method | Đường dẫn                | Mô tả                             | Tham số chính                                                                                       | Mốc |
 | ------ | ------------------------ | --------------------------------- | --------------------------------------------------------------------------------------------------- | --- |
-| GET    | `/reports/inventory`     | Tồn kho: SL, giá vốn, giá trị tồn | `asOf`, `categoryId`, `q`, `onlyInStock`, `noMovementDays`                                          | W4  |
-| GET    | `/reports/sales`         | Doanh số + lãi gộp                | `from`, `to`, `groupBy=day\|month\|customer\|product\|category\|seller`, `customerId`, `categoryId` | W5  |
+| GET    | `/reports/inventory`     | Tồn kho: SL, giá vốn, giá trị tồn | `asOf`, `q`, `onlyInStock`, `noMovementDays`                                          | W4  |
+| GET    | `/reports/sales`         | Doanh số + lãi gộp                | `from`, `to`, `groupBy=day\|month\|customer\|product\|seller`, `customerId` | W5  |
 | GET    | `/reports/customer-debt` | Công nợ khách theo tuổi nợ        | `asOf`, `salesOwnerId`, `overdueOnly`, `q`                                                          | W6  |
 | GET    | `/reports/cash-book`     | Sổ quỹ theo kỳ/loại               | `from`, `to`, `accountId`, `groupBy=category\|day`                                                  | W6  |
 | GET    | `/reports/supplier-debt` | Công nợ NCC                       | `asOf`, `q`                                                                                         | W7  |
@@ -1038,7 +1012,7 @@ Chi tiết `add`: bắt buộc `branchId` và cột `Tồn kho`. `Tồn kho` là
 | `Tồn nhỏ nhất`, `Tồn lớn nhất`, `Vị trí`, `Giá bán` | **Bị bỏ qua** (hệ thống không còn tồn tối thiểu/tối đa, vị trí kho nằm ở bảng riêng sau này, không có giá bán) |
 | `Loại hàng`                              | `Hàng hóa` (mặc định) hoặc `Combo` (KiotViet ghi `Combo - Đóng gói` cũng nhận). Trống mà có `Hàng thành phần` → coi là combo. Không đổi được loại của hàng đã có qua Excel |
 | `Hàng thành phần`                        | Của combo, dạng `MSP/SL,MSP/SL`. Thành phần là hàng hóa trong file (dù đứng sau) hoặc đã có trong hệ thống; chạy lại cùng file không đổi gì, đổi số lượng thì cập nhật |
-| `Nhóm hàng(3 Cấp)`                       | Dạng `NHÀ BẾP>>Dao kéo`, tối đa 3 cấp; **tự tạo nhóm còn thiếu**                                                                                    |
+| `Nhóm hàng(3 Cấp)` (file cũ) | Bỏ qua; không tạo hoặc lưu nhóm hàng |
 | `Tồn kho`, `Giá vốn` | **Chỉ dùng ở `mode=add`** (cộng/trừ tồn, giá nhập của lô cộng); ở `overwrite` bị bỏ qua (số dư đầu kỳ do công cụ chuyển dữ liệu riêng xử lý) |
 | `Giá bán` và cột khác | **Bị bỏ qua**: hệ thống không có giá bán |
 | `Đang kinh doanh`                        | `1`/`0`                                                                                                                                             |

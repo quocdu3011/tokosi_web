@@ -4,7 +4,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Database } from '../database.module.js';
 import {
   branches,
-  categories,
   debtLedger,
   products,
   stockMovements,
@@ -74,10 +73,9 @@ describe('runDemoSeed (CSDL thật trong bộ nhớ)', () => {
     }
   });
 
-  it('tạo 60 hàng, nhóm hàng 2 cấp, 3 combo và tồn đầu của 2 chi nhánh', async () => {
+  it('tạo 60 hàng, 3 combo và tồn đầu của 2 chi nhánh', async () => {
     const r = await runDemoSeed(db, { nodeEnv: 'test' });
     expect(r).toMatchObject({
-      categories: 12,
       products: 60,
       combos: 3,
       suppliers: 8,
@@ -89,7 +87,6 @@ describe('runDemoSeed (CSDL thật trong bộ nhớ)', () => {
       .filter((p) => p.productType === 'combo')
       .map((p) => p.id);
     expect(comboIds).toHaveLength(3);
-    expect(await db.select().from(categories)).toHaveLength(12);
 
     // nhà cung cấp mẫu: số lịch sử và nợ đầu kỳ RIÊNG từng chi nhánh; nợ chỉ nằm ở sổ cái (dòng opening)
     const sup = (await db.select().from(suppliers)).filter((x) =>
@@ -148,12 +145,10 @@ describe('runDemoSeed (CSDL thật trong bộ nhớ)', () => {
       moves: (await db.select().from(stockMovements)).length,
       debts: (await db.select().from(debtLedger)).length,
       hist: (await db.select().from(supplierBranchHistory)).length,
-      cats: (await db.select().from(categories)).length,
     });
     const before = await snapshot();
     const again = await runDemoSeed(db, { nodeEnv: 'test' });
     expect(again).toEqual({
-      categories: 0,
       products: 0,
       combos: 0,
       suppliers: 0,

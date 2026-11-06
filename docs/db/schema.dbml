@@ -236,23 +236,6 @@ Table cash_transactions {
 CHECK cash_transactions_amount_pos: amount > 0'''
 }
 
-Table categories {
-  id uuid [pk, default: `gen_random_uuid()`]
-  name text [not null]
-  parent_id uuid
-  sort_order integer [not null, default: 0]
-  created_at timestamptz [not null, default: `now()`]
-  updated_at timestamptz [not null, default: `now()`]
-  deleted_at timestamptz
-
-  indexes {
-    (parent_id) [name: 'categories_parent_idx']
-    (`coalesce(parentId, '00000000-0000-0000-0000-000000000000'::uuid)`, `f_search_text(name)`) [name: 'categories_sibling_name_unique', unique]
-  }
-
-  Note: '''Nhóm hàng dạng cây (parent_id).'''
-}
-
 Table code_sequences {
   prefix text [pk]
   next_value bigint [not null, default: 1]
@@ -628,7 +611,6 @@ Table products {
   id uuid [pk, default: `gen_random_uuid()`]
   code text [not null, unique]
   name text [not null]
-  category_id uuid
   product_type product_type [not null, default: 'goods', note: 'Loại hàng: goods = Hàng hóa (mặc định), combo = gói các hàng thành phần (không có tồn/giá vốn riêng)']
   liquidation_status liquidation_status [not null, default: 'normal', note: 'Trạng thái thanh lý: normal = Thường (mặc định), clearance = Thanh Lý, disabled = Tắt Mã, high_stock = Tồn Cao, priority_stock = Tồn Ưu Tiên']
   description text
@@ -639,7 +621,6 @@ Table products {
   deleted_at timestamptz
 
   indexes {
-    (category_id) [name: 'products_category_idx']
     (`f_search_text(code || ' ' || name) gin_trgm_ops`) [name: 'products_search_trgm']
     (is_active) [name: 'products_active_idx']
     (product_type) [name: 'products_type_idx']
@@ -1001,7 +982,6 @@ Ref: cash_transactions.branch_id > branches.id
 Ref: cash_transactions.category_id > cash_categories.id
 Ref: cash_transactions.account_id > cash_accounts.id
 Ref: cash_transactions.created_by > users.id
-Ref: categories.parent_id > categories.id
 Ref: customer_branch_terms.customer_id > customers.id [delete: cascade]
 Ref: customer_branch_terms.branch_id > branches.id
 Ref: customer_invoice_profiles.customer_id > customers.id [delete: cascade]
@@ -1042,7 +1022,6 @@ Ref: payment_allocations.invoice_id > invoices.id
 Ref: product_components.combo_id > products.id [delete: cascade]
 Ref: product_components.component_id > products.id
 Ref: product_images.product_id > products.id [delete: cascade]
-Ref: products.category_id > categories.id
 Ref: products.created_by > users.id
 Ref: purchase_order_items.order_id > purchase_orders.id [delete: cascade]
 Ref: purchase_order_items.product_id > products.id
@@ -1104,7 +1083,6 @@ TableGroup "Hệ thống" {
 }
 
 TableGroup "Hàng hóa & giá" {
-  categories
   products
   product_images
   product_components

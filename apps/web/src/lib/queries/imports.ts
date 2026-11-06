@@ -44,8 +44,7 @@ export function downloadImportTemplate(type: ImportType) {
 }
 
 /**
- * Nhập thật xong thì làm mới mọi thứ có thể đã đổi: danh sách hàng hóa, nhóm hàng (nhập tự tạo nhóm
- * còn thiếu). Chạy kiểm tra (`dryRun`) không ghi gì nên không làm mới.
+ * Nhập thật xong thì làm mới mọi thứ có thể đã đổi: danh sách hàng hóa. Chạy kiểm tra (`dryRun`) không ghi gì nên không làm mới.
  */
 export function useRunImport() {
   const qc = useQueryClient();
@@ -54,7 +53,6 @@ export function useRunImport() {
     onSuccess: (job) => {
       if (job.dryRun || job.status !== 'completed') return;
       void qc.invalidateQueries({ queryKey: productKeys.all });
-      void qc.invalidateQueries({ queryKey: productKeys.categories });
     },
   });
 }

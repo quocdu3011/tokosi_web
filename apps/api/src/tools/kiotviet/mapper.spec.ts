@@ -1,38 +1,19 @@
 import {
-  buildCategoryPaths,
   formatCost,
   formatQty,
   mapProducts,
   type KvProduct,
 } from './mapper.js';
 
-const cats = [
-  { categoryId: 1, categoryName: ' NHÀ BẾP ' },
-  { categoryId: 2, categoryName: 'Dao kéo', parentId: 1 },
-  { categoryId: 3, categoryName: 'Dao thái', parentId: 2 },
-  { categoryId: 4, categoryName: 'Quá sâu', parentId: 3 },
-  { categoryId: 9, categoryName: 'Vòng A', parentId: 10 },
-  { categoryId: 10, categoryName: 'Vòng B', parentId: 9 },
-];
-const ctx = { branchId: 7, categoryPaths: buildCategoryPaths(cats) };
+const ctx = { branchId: 7 };
 const goods = (over: Partial<KvProduct> = {}): KvProduct => ({
   code: 'SP001',
   name: 'Dao',
   fullName: 'Dao (T24)',
   type: 2,
-  categoryId: 2,
   isActive: true,
   inventories: [{ branchId: 7, onHand: 10, cost: 1500.5 }],
   ...over,
-});
-
-describe('đường dẫn nhóm hàng', () => {
-  it('ghép từ gốc, bỏ khoảng trắng thừa', () => {
-    expect(ctx.categoryPaths.get(3)).toEqual(['NHÀ BẾP', 'Dao kéo', 'Dao thái']);
-  });
-  it('không treo khi cha-con lặp vòng', () => {
-    expect(ctx.categoryPaths.get(9)!.length).toBeLessThanOrEqual(2);
-  });
 });
 
 describe('định dạng số', () => {
@@ -51,7 +32,7 @@ describe('định dạng số', () => {
 });
 
 describe('mapProducts', () => {
-  it('dùng tên có quy cách, nhóm đầy đủ, tồn và giá vốn của đúng chi nhánh', () => {
+  it('dùng tên có quy cách, tồn và giá vốn của đúng chi nhánh', () => {
     const r = mapProducts(
       [
         goods({
@@ -67,7 +48,6 @@ describe('mapProducts', () => {
     expect(r.rows[0]).toEqual([
       'SP001',
       'Dao (T24)',
-      'NHÀ BẾP>>Dao kéo',
       'Hàng hóa',
       '10',
       '1500.5',
@@ -80,13 +60,16 @@ describe('mapProducts', () => {
   it('tồn 0 hoặc không có chi nhánh: không nhập tồn, không giá vốn', () => {
     const r = mapProducts(
       [
-        goods({ code: 'A', inventories: [{ branchId: 7, onHand: 0, cost: 9 }] }),
+        goods({
+          code: 'A',
+          inventories: [{ branchId: 7, onHand: 0, cost: 9 }],
+        }),
         goods({ code: 'B', inventories: [] }),
         goods({ code: 'C', inventories: null }),
       ],
       ctx,
     );
-    for (const row of r.rows) expect([row[4], row[5]]).toEqual([null, null]);
+    for (const row of r.rows) expect([row[3], row[4]]).toEqual([null, null]);
   });
 
   it('tồn âm không được nhập và được đếm', () => {
@@ -94,7 +77,7 @@ describe('mapProducts', () => {
       [goods({ inventories: [{ branchId: 7, onHand: -3, cost: 5 }] })],
       ctx,
     );
-    expect(r.rows[0]![4]).toBeNull();
+    expect(r.rows[0]![3]).toBeNull();
     expect(r.negativeStock).toBe(1);
   });
 
@@ -103,7 +86,7 @@ describe('mapProducts', () => {
       [goods({ inventories: [{ branchId: 7, onHand: 4, cost: 0 }] })],
       ctx,
     );
-    expect([r.rows[0]![4], r.rows[0]![5]]).toEqual(['4', '0']);
+    expect([r.rows[0]![3], r.rows[0]![4]]).toEqual(['4', '0']);
   });
 
   it('bỏ qua và liệt kê, không sửa mã: mã sai quy tắc, không phải hàng hóa, trùng không phân biệt hoa thường', () => {
@@ -126,18 +109,12 @@ describe('mapProducts', () => {
     ]);
   });
 
-  it('bỏ qua tên quá dài và nhóm quá 3 cấp', () => {
+  it('bỏ qua tên quá dài', () => {
     const r = mapProducts(
-      [
-        goods({ code: 'L', fullName: 'x'.repeat(256) }),
-        goods({ code: 'D', categoryId: 4 }),
-      ],
+      [goods({ code: 'L', fullName: 'x'.repeat(256) })],
       ctx,
     );
-    expect(r.skipped.map((s) => s.reason)).toEqual([
-      'ten-qua-dai',
-      'nhom-qua-3-cap',
-    ]);
+    expect(r.skipped.map((s) => s.reason)).toEqual(['ten-qua-dai']);
   });
 
   it('ngừng kinh doanh → 0; ảnh trùng gộp, tối đa 10 ảnh', () => {
@@ -146,8 +123,8 @@ describe('mapProducts', () => {
       [goods({ isActive: false, images: [urls[0]!, urls[0]!, ...urls] })],
       ctx,
     );
-    expect(r.rows[0]![7]).toBe(0);
-    expect(String(r.rows[0]![8]).split(',')).toHaveLength(10);
+    expect(r.rows[0]![6]).toBe(0);
+    expect(String(r.rows[0]![7]).split(',')).toHaveLength(10);
     expect(r.imagesTrimmed).toBe(1);
   });
 });

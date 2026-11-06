@@ -667,51 +667,6 @@ export interface paths {
     patch: operations['AuthSettingsController_update'];
     trace?: never;
   };
-  '/api/v1/categories': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Cây nhóm hàng (không phân trang)
-     * @description productCount của nhóm cha đã gồm hàng của mọi nhóm con. Tối đa 3 cấp.
-     */
-    get: operations['CategoriesController_tree'];
-    put?: never;
-    /** Tạo nhóm hàng */
-    post: operations['CategoriesController_create'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/categories/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    /**
-     * Xóa nhóm hàng (xóa mềm)
-     * @description Chỉ khi không còn nhóm con và không còn hàng hóa.
-     */
-    delete: operations['CategoriesController_remove'];
-    options?: never;
-    head?: never;
-    /**
-     * Đổi tên / chuyển nhóm cha
-     * @description Không được chuyển nhóm vào chính nó hoặc nhóm con của nó (INVALID_STATE); tổng không quá 3 cấp.
-     */
-    patch: operations['CategoriesController_update'];
-    trace?: never;
-  };
   '/api/v1/products': {
     parameters: {
       query?: never;
@@ -1616,29 +1571,6 @@ export interface components {
       googleSignupEnabled?: boolean;
       googleSignupDomains?: string[];
     };
-    CategoryNodeDto: {
-      id: string;
-      /** @example NHÀ BẾP */
-      name: string;
-      parentId: string | null;
-      /** @description Số hàng hóa chưa xóa thuộc nhóm này VÀ mọi nhóm con (nhóm cha cộng dồn từ nhóm con) */
-      productCount: number;
-      children: components['schemas']['CategoryNodeDto'][];
-    };
-    CreateCategoryDto: {
-      /**
-       * @description Tên nhóm, 1-100 ký tự; không trùng trong cùng nhóm cha (không phân biệt hoa thường và dấu)
-       * @example Dao kéo
-       */
-      name: string;
-      /** @description Nhóm cha; bỏ trống = nhóm gốc. Tối đa 3 cấp */
-      parentId?: string;
-    };
-    UpdateCategoryDto: {
-      name?: string;
-      /** @description Nhóm cha mới; null = chuyển ra nhóm gốc */
-      parentId?: string | null;
-    };
     ProductComponentDto: {
       productId: string;
       /** @example DAO01 */
@@ -1661,9 +1593,6 @@ export interface components {
       /** @example QKBSP */
       code: string;
       name: string;
-      categoryId: string | null;
-      /** @example ĐIỆN GIA DỤNG > Quạt điện */
-      categoryPath: string | null;
       /**
        * @description `goods` = Hàng hóa, `combo` = gói nhiều hàng thành phần. Combo không có tồn/giá vốn riêng: onHand, available, costPrice, lastPurchasePrice luôn tính từ thành phần; reserved luôn "0"; minStock/maxStock/location luôn null
        * @enum {string}
@@ -1738,8 +1667,6 @@ export interface components {
       code: string;
       /** @example Quạt kẹp bàn Super MST-A1 */
       name: string;
-      /** @description Nhóm hàng (GET /categories) */
-      categoryId?: string;
       /**
        * @default goods
        * @enum {string}
@@ -1761,7 +1688,6 @@ export interface components {
       /** @description Chỉ đổi được khi hàng chưa có giao dịch nào */
       code?: string;
       name?: string;
-      categoryId?: string | null;
       /**
        * @description Chỉ đổi được khi hàng chưa có giao dịch và (khi đổi sang combo) chưa là thành phần của combo nào
        * @enum {string}
@@ -3178,120 +3104,6 @@ export interface operations {
       };
     };
   };
-  CategoriesController_tree: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CategoryNodeDto'][];
-        };
-      };
-    };
-  };
-  CategoriesController_create: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateCategoryDto'];
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CategoryNodeDto'];
-        };
-      };
-      /** @description DUPLICATE_NAME */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  CategoriesController_remove: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      204: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description Không tìm thấy nhóm hàng */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  CategoriesController_update: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateCategoryDto'];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CategoryNodeDto'];
-        };
-      };
-      /** @description Không tìm thấy nhóm hàng */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description DUPLICATE_NAME */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
   ProductsController_list: {
     parameters: {
       query?: {
@@ -3301,8 +3113,6 @@ export interface operations {
         sort?: string;
         /** @description Tìm không dấu theo mã và tên (mọi từ đều phải có mặt) */
         q?: string;
-        /** @description Lọc theo nhóm hàng, GỒM cả hàng của các nhóm con */
-        categoryId?: string;
         isActive?: boolean;
         /** @description Lọc theo loại hàng */
         productType?: 'goods' | 'combo';
@@ -3312,6 +3122,8 @@ export interface operations {
         inStock?: boolean;
         /** @description xlsx = tải file Excel theo đúng bộ lọc hiện tại (bỏ qua page/limit, tối đa 10.000 dòng) */
         format?: 'xlsx';
+        /** @description Các cột Excel, phân cách bằng dấu phẩy. Bỏ qua = tất cả cột được phép. Thứ tự theo file mặc định; cột giá vốn cần product.cost.view. */
+        columns?: string;
       };
       header?: never;
       path?: never;

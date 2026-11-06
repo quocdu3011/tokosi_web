@@ -3,7 +3,6 @@ import {
   IsIn,
   IsOptional,
   IsString,
-  IsUUID,
   Matches,
   MaxLength,
   MinLength,
@@ -12,6 +11,7 @@ import {
 import {
   LIQUIDATION_STATUSES,
   PRODUCT_TYPES,
+  PRODUCT_EXPORT_COLUMNS,
   type LiquidationStatus,
   type ProductType,
 } from '@kiot/shared';
@@ -49,13 +49,6 @@ export class ProductDto {
   @ApiProperty() id!: string;
   @ApiProperty({ example: 'QKBSP' }) code!: string;
   @ApiProperty() name!: string;
-  @ApiProperty({ nullable: true, type: String }) categoryId!: string | null;
-  @ApiProperty({
-    nullable: true,
-    type: String,
-    example: 'ĐIỆN GIA DỤNG > Quạt điện',
-  })
-  categoryPath!: string | null;
   @ApiProperty({
     enum: PRODUCT_TYPES,
     description:
@@ -135,13 +128,6 @@ export class ListProductsQueryDto extends PageQueryDto {
   @MaxLength(100)
   q?: string;
 
-  @ApiPropertyOptional({
-    description: 'Lọc theo nhóm hàng, GỒM cả hàng của các nhóm con',
-  })
-  @IsOptional()
-  @IsUUID()
-  categoryId?: string;
-
   @ApiPropertyOptional() @QueryBoolean() isActive?: boolean;
 
   @ApiPropertyOptional({
@@ -174,6 +160,22 @@ export class ListProductsQueryDto extends PageQueryDto {
   @IsOptional()
   @IsIn(['xlsx'])
   format?: 'xlsx';
+
+  @ApiPropertyOptional({
+    description:
+      'Các cột Excel, phân cách bằng dấu phẩy. Bỏ qua = tất cả cột được phép. Thứ tự theo file mặc định; cột giá vốn cần product.cost.view.',
+    example: 'code,name,onHand',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  @Matches(
+    new RegExp(
+      `^(${PRODUCT_EXPORT_COLUMNS.map((c) => c.id).join('|')})(,(${PRODUCT_EXPORT_COLUMNS.map((c) => c.id).join('|')}))*$`,
+    ),
+    { message: 'Chọn ít nhất một cột Excel hợp lệ' },
+  )
+  columns?: string;
 }
 
 export class LookupQueryDto {
@@ -219,11 +221,6 @@ export class CreateProductDto {
   @MaxLength(255)
   name!: string;
 
-  @ApiPropertyOptional({ description: 'Nhóm hàng (GET /categories)' })
-  @IsOptional()
-  @IsUUID()
-  categoryId?: string;
-
   @ApiPropertyOptional({ enum: PRODUCT_TYPES, default: 'goods' })
   @IsOptional()
   @IsIn(PRODUCT_TYPES)
@@ -268,11 +265,6 @@ export class UpdateProductDto {
   @MinLength(1)
   @MaxLength(255)
   name?: string;
-
-  @ApiPropertyOptional({ nullable: true, type: String })
-  @IsOptional()
-  @IsUUID()
-  categoryId?: string | null;
 
   @ApiPropertyOptional({
     enum: PRODUCT_TYPES,

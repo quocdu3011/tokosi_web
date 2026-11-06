@@ -47,7 +47,6 @@ const GROUPS: Record<string, string[]> = {
     'system_settings',
   ],
   'Hàng hóa & giá': [
-    'categories',
     'products',
     'product_images',
     'product_components',
@@ -118,7 +117,6 @@ const TABLE_NOTES: Record<string, string> = {
   idempotency_keys:
     'Chống tạo trùng khi gửi lại yêu cầu (header Idempotency-Key).',
   import_jobs: 'Công việc import Excel chạy nền.',
-  categories: 'Nhóm hàng dạng cây (parent_id).',
   products:
     'Hàng hóa — chỉ thông tin DÙNG CHUNG giữa các chi nhánh. Giá bán ở price_book_items, tồn kho/giá vốn/vị trí ở stocks (theo chi nhánh).',
   product_images: 'Ảnh sản phẩm.',

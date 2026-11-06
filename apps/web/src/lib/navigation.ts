@@ -49,12 +49,6 @@ export const NAV_SECTIONS: NavSection[] = [
         permissions: ['product.view'],
         ready: true,
       },
-      {
-        href: '/products/categories',
-        label: 'Nhóm hàng',
-        permissions: ['product.view'],
-        ready: true,
-      },
     ],
   },
   {
@@ -155,7 +149,7 @@ export const NAV_SECTIONS: NavSection[] = [
 
 /**
  * Mục menu có đang được chọn không: khớp đường dẫn hiện tại và là khớp DÀI NHẤT, để
- * `/products/categories` không làm sáng cả mục `/products`.
+ * `/settings/users` không làm sáng cả mục cha `/settings` nếu cùng có trong menu.
  */
 export function isNavActive(pathname: string, href: string): boolean {
   const matches = (h: string) =>

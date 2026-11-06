@@ -2225,159 +2225,6 @@
         ]
       }
     },
-    "/api/v1/categories": {
-      "get": {
-        "description": "productCount của nhóm cha đã gồm hàng của mọi nhóm con. Tối đa 3 cấp.",
-        "operationId": "CategoriesController_tree",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/CategoryNodeDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Cây nhóm hàng (không phân trang)",
-        "tags": [
-          "Nhóm hàng"
-        ]
-      },
-      "post": {
-        "operationId": "CategoriesController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateCategoryDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CategoryNodeDto"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "DUPLICATE_NAME"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Tạo nhóm hàng",
-        "tags": [
-          "Nhóm hàng"
-        ]
-      }
-    },
-    "/api/v1/categories/{id}": {
-      "patch": {
-        "description": "Không được chuyển nhóm vào chính nó hoặc nhóm con của nó (INVALID_STATE); tổng không quá 3 cấp.",
-        "operationId": "CategoriesController_update",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateCategoryDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CategoryNodeDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Không tìm thấy nhóm hàng"
-          },
-          "409": {
-            "description": "DUPLICATE_NAME"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Đổi tên / chuyển nhóm cha",
-        "tags": [
-          "Nhóm hàng"
-        ]
-      },
-      "delete": {
-        "description": "Chỉ khi không còn nhóm con và không còn hàng hóa.",
-        "operationId": "CategoriesController_remove",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          },
-          "404": {
-            "description": "Không tìm thấy nhóm hàng"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Xóa nhóm hàng (xóa mềm)",
-        "tags": [
-          "Nhóm hàng"
-        ]
-      }
-    },
     "/api/v1/products": {
       "get": {
         "description": "Các trường giá/tồn/vị trí tính cho chi nhánh làm việc (header X-Branch-Id). costPrice và lastPurchasePrice chỉ có khi người gọi có quyền product.cost.view.",
@@ -2419,15 +2266,6 @@
             "required": false,
             "in": "query",
             "description": "Tìm không dấu theo mã và tên (mọi từ đều phải có mặt)",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "categoryId",
-            "required": false,
-            "in": "query",
-            "description": "Lọc theo nhóm hàng, GỒM cả hàng của các nhóm con",
             "schema": {
               "type": "string"
             }
@@ -2488,6 +2326,16 @@
               "enum": [
                 "xlsx"
               ]
+            }
+          },
+          {
+            "name": "columns",
+            "required": false,
+            "in": "query",
+            "description": "Các cột Excel, phân cách bằng dấu phẩy. Bỏ qua = tất cả cột được phép. Thứ tự theo file mặc định; cột giá vốn cần product.cost.view.",
+            "schema": {
+              "example": "code,name,onHand",
+              "type": "string"
             }
           }
         ],
@@ -5070,69 +4918,6 @@
           }
         }
       },
-      "CategoryNodeDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string",
-            "example": "NHÀ BẾP"
-          },
-          "parentId": {
-            "type": "string",
-            "nullable": true
-          },
-          "productCount": {
-            "type": "number",
-            "description": "Số hàng hóa chưa xóa thuộc nhóm này VÀ mọi nhóm con (nhóm cha cộng dồn từ nhóm con)"
-          },
-          "children": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CategoryNodeDto"
-            }
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "parentId",
-          "productCount",
-          "children"
-        ]
-      },
-      "CreateCategoryDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "example": "Dao kéo",
-            "description": "Tên nhóm, 1-100 ký tự; không trùng trong cùng nhóm cha (không phân biệt hoa thường và dấu)"
-          },
-          "parentId": {
-            "type": "string",
-            "description": "Nhóm cha; bỏ trống = nhóm gốc. Tối đa 3 cấp"
-          }
-        },
-        "required": [
-          "name"
-        ]
-      },
-      "UpdateCategoryDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "parentId": {
-            "type": "string",
-            "nullable": true,
-            "description": "Nhóm cha mới; null = chuyển ra nhóm gốc"
-          }
-        }
-      },
       "ProductComponentDto": {
         "type": "object",
         "properties": {
@@ -5191,15 +4976,6 @@
           },
           "name": {
             "type": "string"
-          },
-          "categoryId": {
-            "type": "string",
-            "nullable": true
-          },
-          "categoryPath": {
-            "type": "string",
-            "nullable": true,
-            "example": "ĐIỆN GIA DỤNG > Quạt điện"
           },
           "productType": {
             "type": "string",
@@ -5288,8 +5064,6 @@
           "id",
           "code",
           "name",
-          "categoryId",
-          "categoryPath",
           "productType",
           "liquidationStatus",
           "components",
@@ -5401,10 +5175,6 @@
             "type": "string",
             "example": "Quạt kẹp bàn Super MST-A1"
           },
-          "categoryId": {
-            "type": "string",
-            "description": "Nhóm hàng (GET /categories)"
-          },
           "productType": {
             "type": "string",
             "enum": [
@@ -5447,10 +5217,6 @@
           },
           "name": {
             "type": "string"
-          },
-          "categoryId": {
-            "type": "string",
-            "nullable": true
           },
           "productType": {
             "type": "string",

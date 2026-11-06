@@ -2,7 +2,6 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   auditLogs,
-  categories,
   customers,
   orderItems,
   orders,
@@ -15,8 +14,6 @@ import { CatalogModule } from './catalog.module.js';
 describe('Hàng hóa qua HTTP', () => {
   let t: Awaited<ReturnType<typeof createHttpTestApp>>;
   let inv: InventoryService;
-  let catBep: string;
-  let catDao: string;
   const ids: Record<string, string> = {};
 
   beforeAll(async () => {
@@ -28,24 +25,12 @@ describe('Hàng hóa qua HTTP', () => {
     await t.makeUser('ketoan1', 'accountant', [t.sg, t.hn]);
     await t.makeUser('mkt1', 'marketing', [t.sg]);
 
-    const [bep] = await t.db
-      .insert(categories)
-      .values({ name: 'NHÀ BẾP' })
-      .returning();
-    catBep = bep!.id;
-    const [dao] = await t.db
-      .insert(categories)
-      .values({ name: 'Dao kéo', parentId: catBep })
-      .returning();
-    catDao = dao!.id;
-
-    // 4 hàng: A,B ở nhóm con; C ở nhóm cha; D chưa có nhóm
     const rows = await t.db
       .insert(products)
       .values([
-        { code: 'QKBSP', name: 'Quạt kẹp bàn Super', categoryId: catDao },
-        { code: 'DAO01', name: 'Dao thái rau', categoryId: catDao },
-        { code: 'NOI01', name: 'Nồi inox 24cm', categoryId: catBep },
+        { code: 'QKBSP', name: 'Quạt kẹp bàn Super' },
+        { code: 'DAO01', name: 'Dao thái rau' },
+        { code: 'NOI01', name: 'Nồi inox 24cm' },
         { code: 'LOA01', name: 'Loa mini', isActive: false },
       ])
       .returning();
@@ -124,9 +109,10 @@ describe('Hàng hóa qua HTTP', () => {
       available: '475.000',
       onOrder: '0.000',
       costPrice: '21800.5000',
-      categoryPath: 'NHÀ BẾP > Dao kéo',
       images: [],
     });
+    expect(a).not.toHaveProperty('categoryId');
+    expect(a).not.toHaveProperty('categoryPath');
     const b = (await hn.get(`/products/${ids.QKBSP}`).expect(200)).body;
     expect(b).toMatchObject({
       branchId: t.hn,
@@ -162,7 +148,7 @@ describe('Hàng hóa qua HTTP', () => {
     expect(own.body.onHand).toBe('40.000');
   });
 
-  it('lọc: tìm không dấu theo mã/tên, nhóm hàng gồm cả nhóm con, isActive, inStock', async () => {
+  it('lọc: tìm không dấu theo mã/tên, isActive, inStock', async () => {
     const api = await t.as('quanly', t.sg);
     const codes = (r: { body: { data: Array<{ code: string }> } }) =>
       r.body.data.map((p) => p.code).sort();
@@ -176,14 +162,6 @@ describe('Hàng hóa qua HTTP', () => {
     expect(codes(await api.get('/products?q=noi%20inox').expect(200))).toEqual([
       'NOI01',
     ]);
-
-    // nhóm cha gồm cả hàng của nhóm con
-    expect(
-      codes(await api.get(`/products?categoryId=${catBep}`).expect(200)),
-    ).toEqual(['DAO01', 'NOI01', 'QKBSP']);
-    expect(
-      codes(await api.get(`/products?categoryId=${catDao}`).expect(200)),
-    ).toEqual(['DAO01', 'QKBSP']);
 
     expect(
       codes(await api.get('/products?isActive=false').expect(200)),
@@ -289,6 +267,7 @@ describe('Hàng hóa qua HTTP', () => {
     expect(dup.body.code).toBe('DUPLICATE_CODE');
     expect(dup.body.details[0].field).toBe('code');
 
+    // Trường nhóm đã bị loại bỏ: không chấp nhận payload cũ.
     const noCat = await api
       .post('/products')
       .send({
@@ -297,27 +276,25 @@ describe('Hàng hóa qua HTTP', () => {
         categoryId: '00000000-0000-4000-8000-000000000001',
       })
       .expect(400);
-    expect(noCat.body.details[0].field).toBe('categoryId');
+    expect(noCat.body.code).toBe('VALIDATION_ERROR');
     expect(
       await t.db.select().from(products).where(eq(products.code, 'OK2')),
     ).toHaveLength(0);
   });
 
-  it('sửa tên/nhóm; ngưng bán; nhật ký ghi trước/sau và requestId', async () => {
+  it('sửa tên; ngưng bán; nhật ký ghi trước/sau và requestId', async () => {
     const api = await t.as('quanly', t.sg);
     const res = await api
       .patch(`/products/${ids.NEW01}`)
       .set('X-Request-Id', 'sua-hang-0001')
       .send({
         name: 'Hàng mới đổi tên',
-        categoryId: catBep,
         isActive: false,
       })
       .expect(200);
     expect(res.body).toMatchObject({
       name: 'Hàng mới đổi tên',
       isActive: false,
-      categoryPath: 'NHÀ BẾP',
     });
     const logs = await t.db
       .select()

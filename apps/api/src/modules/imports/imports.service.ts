@@ -227,7 +227,6 @@ export class ImportsService {
       [
         { header: 'Mã hàng', width: 16 },
         { header: 'Tên hàng', width: 36 },
-        { header: 'Nhóm hàng(3 Cấp)', width: 30 },
         { header: 'Loại hàng', width: 12 },
         { header: 'Hàng thành phần', width: 30 },
         { header: 'Tồn kho', width: 12 },
@@ -243,7 +242,6 @@ export class ImportsService {
         [
           'VD001',
           'Hàng ví dụ',
-          'NHÀ BẾP>>Dao kéo',
           'Hàng hóa',
           null,
           50,
@@ -258,7 +256,6 @@ export class ImportsService {
         [
           'VD-COMBO',
           'Combo ví dụ',
-          'NHÀ BẾP>>Dao kéo',
           'Combo',
           'VD001/2',
           null,

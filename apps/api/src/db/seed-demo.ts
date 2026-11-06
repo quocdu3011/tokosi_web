@@ -20,7 +20,6 @@ const db: Database = drizzle({ client: pool, schema, casing: 'snake_case' });
 
 try {
   const r = await runDemoSeed(db);
-  console.log(`Nhóm hàng mẫu    +${r.categories}`);
   console.log(
     `Hàng hóa mẫu     +${r.products}${r.products === 0 ? ' (đã có)' : ''}`,
   );

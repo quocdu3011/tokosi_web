@@ -88,7 +88,7 @@ Chi tiết endpoint và ví dụ: [`endpoints.md`](endpoints.md) mục 1. Quy t�
 Endpoint danh sách dùng phân trang theo trang:
 
 ```
-GET /products?page=1&limit=20&sort=-createdAt&q=quat&categoryId=...
+GET /products?page=1&limit=20&sort=-createdAt&q=quat
 ```
 
 | Tham số | Mặc định | Ghi chú                                                                                                                                                                             |
@@ -147,7 +147,6 @@ Mọi lỗi có cùng cấu trúc:
 | 429  | `SIGNUP_LIMIT`              | Quá nhiều tài khoản đang chờ cấp quyền                                                                                   |
 | 503  | `GOOGLE_NOT_CONFIGURED`     | Máy chủ chưa cấu hình đăng nhập Google                                                                                   |
 | 409  | `DUPLICATE_USERNAME`        | Trùng tên đăng nhập (không phân biệt hoa thường)                                                                         |
-| 409  | `DUPLICATE_NAME`            | Trùng tên (nhóm hàng cùng nhóm cha)                                                                            |
 | 400  | `IMPORT_TYPE_NOT_SUPPORTED` | Loại nhập Excel chưa hỗ trợ (khách hàng, nhà cung cấp)                                                                   |
 | 409  | `IMPORT_DUPLICATE_FILE`     | Import thêm (`mode=add`): file này đã nhập thật vào chi nhánh này rồi (gửi `allowDuplicate=true` nếu cố ý nhập lại) |
 | 413  | `PAYLOAD_TOO_LARGE`         | File tải lên quá lớn (ảnh > 5 MB, file Excel > 10 MB)                                                                    |
@@ -311,6 +310,8 @@ Dùng để khởi tạo lần đầu (`pnpm db:seed`) và cho nút "Khôi phụ
 - Backend xuất lại file: chạy `pnpm openapi:export` trong `apps/api`.
 
 ## Nhật ký thay đổi
+
+06/11/2026: Bỏ nhóm hàng trên BE, FE và DB (migration `0026_bo_nhom_hang`). Xóa `/categories`, `categoryId`/`categoryPath` khỏi hợp đồng hàng hóa; nhập Excel bỏ qua cột nhóm cũ, xuất/mẫu Excel không có nhóm. Giữ nguyên hàng hóa, tồn kho và chứng từ.
 
 | Ngày       | Thay đổi                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

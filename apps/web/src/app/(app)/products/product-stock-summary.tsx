@@ -1,6 +1,7 @@
 'use client';
 
 import type { Product } from '@/lib/api/types';
+import { Box, ShoppingCart, Tag, Wallet, Receipt } from 'lucide-react';
 import { formatDecimal, formatMoney } from '@/lib/format';
 
 /**
@@ -16,26 +17,41 @@ export function ProductStockSummary({ product: branch }: { product: Product }) {
       )}
       <dl className="stat-row">
         <div>
-          <dt>Tồn kho</dt>
+          <dt>
+            <Box aria-hidden="true" />
+            Tồn kho
+          </dt>
           <dd className="tabular">{formatDecimal(branch.onHand) || '0'}</dd>
         </div>
         <div>
-          <dt>Khách đặt</dt>
+          <dt>
+            <ShoppingCart aria-hidden="true" />
+            Khách đặt
+          </dt>
           <dd className="tabular">{formatDecimal(branch.reserved) || '0'}</dd>
         </div>
         <div>
-          <dt>Có thể bán</dt>
+          <dt>
+            <Tag aria-hidden="true" />
+            Có thể bán
+          </dt>
           <dd className="tabular">{formatDecimal(branch.available) || '0'}</dd>
         </div>
         {branch.costPrice !== undefined && (
           <div>
-            <dt>Giá vốn</dt>
+            <dt>
+              <Wallet aria-hidden="true" />
+              Giá vốn
+            </dt>
             <dd className="tabular">{formatMoney(branch.costPrice)}</dd>
           </div>
         )}
         {branch.lastPurchasePrice !== undefined && (
           <div>
-            <dt>Giá nhập cuối</dt>
+            <dt>
+              <Receipt aria-hidden="true" />
+              Giá nhập cuối
+            </dt>
             <dd className="tabular">
               {branch.lastPurchasePrice === null
                 ? 'Chưa có'

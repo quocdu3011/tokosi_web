@@ -16,6 +16,8 @@ import {
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import {
   LIQUIDATION_STATUS_LABELS,
+  PRODUCT_EXPORT_COLUMNS,
+  isProductCostColumn,
   formatComponents,
   parseComponents,
   type ProductType,
@@ -32,10 +34,8 @@ import { pageMeta, pageParams, parseSort } from '../../common/pagination.js';
 import { vnDayStart } from '../../common/vn-date.js';
 import { uniqueViolation } from '../../common/pg-errors.js';
 import { DB, type Database, type DbOrTx } from '../../db/database.module.js';
-import { categoryWithDescendants } from '../../db/category-tree.js';
 import { searchWhere } from '../../db/search.js';
 import {
-  categories,
   goodsReceiptItems,
   invoiceItems,
   orderItems,
@@ -112,9 +112,6 @@ export class ProductsService {
       user.role,
       'product.cost.view',
     );
-    const categoryIds = q.categoryId
-      ? await categoryWithDescendants(this.db, q.categoryId)
-      : undefined;
 
     const onHandExpr = effectiveOnHandSql(branchId);
     const conditions: Array<SQL | undefined> = [
@@ -125,7 +122,6 @@ export class ProductsService {
       q.liquidationStatus
         ? eq(products.liquidationStatus, q.liquidationStatus)
         : undefined,
-      categoryIds ? inArray(products.categoryId, categoryIds) : undefined,
       q.inStock === undefined
         ? undefined
         : q.inStock
@@ -181,13 +177,12 @@ export class ProductsService {
     q: ListProductsQueryDto,
   ): Promise<Buffer> {
     const { data } = await this.list(user, branchId, q, 'export');
-    const withCost = data.some((p) => p.costPrice !== undefined);
+    const withCost = await this.permissions.has(user.role, 'product.cost.view');
     const num = (v: string | null | undefined): CellValue =>
       v === null || v === undefined ? null : Number(v);
     const columns: SheetColumn[] = [
       { header: 'Mã hàng', width: 16 },
       { header: 'Tên hàng', width: 38 },
-      { header: 'Nhóm hàng(3 Cấp)', width: 30 },
       { header: 'Loại hàng', width: 12 },
       { header: 'Hàng thành phần', width: 30 },
       { header: 'Trạng thái thanh lý', width: 18 },
@@ -206,7 +201,6 @@ export class ProductsService {
     const rows = data.map((p): CellValue[] => [
       p.code,
       p.name,
-      p.categoryPath ? p.categoryPath.replaceAll(' > ', '>>') : null,
       p.productType === 'combo' ? 'Combo' : 'Hàng hóa',
       p.components || null,
       LIQUIDATION_STATUS_LABELS[p.liquidationStatus],
@@ -217,7 +211,26 @@ export class ProductsService {
       p.isActive ? 1 : 0,
       p.images.map((i) => i.url).join(',') || null,
     ]);
-    return writeSheet('Hàng hóa', columns, rows);
+    const requested =
+      q.columns === undefined ? undefined : new Set(q.columns.split(','));
+    const allowed = PRODUCT_EXPORT_COLUMNS.filter(
+      (c) => withCost || !isProductCostColumn(c.id),
+    );
+    const indexes = allowed.flatMap((c, index) =>
+      !requested || requested.has(c.id) ? [index] : [],
+    );
+    if (indexes.length === 0) {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Chọn ít nhất một cột được phép xuất',
+      );
+    }
+    return writeSheet(
+      'Hàng hóa',
+      indexes.map((index) => columns[index]!),
+      rows.map((row) => indexes.map((index) => row[index]!)),
+    );
   }
 
   async get(user: AuthUser, branchId: string, id: string): Promise<ProductDto> {
@@ -278,7 +291,6 @@ export class ProductsService {
     branchId: string,
     input: CreateProductDto,
   ): Promise<ProductDto> {
-    if (input.categoryId) await this.assertCategory(this.db, input.categoryId);
     const productType: ProductType = input.productType ?? 'goods';
     const entries = this.parseComponentInput(productType, input.components);
     const id = await this.db
@@ -288,7 +300,6 @@ export class ProductsService {
           .values({
             code: input.code,
             name: input.name.trim(),
-            categoryId: input.categoryId ?? null,
             productType,
             liquidationStatus: input.liquidationStatus ?? 'normal',
             description: input.description ?? null,
@@ -332,7 +343,6 @@ export class ProductsService {
         );
       }
     }
-    if (input.categoryId) await this.assertCategory(this.db, input.categoryId);
 
     await this.db
       .transaction(async (tx) => {
@@ -388,7 +398,6 @@ export class ProductsService {
           patch.liquidationStatus = input.liquidationStatus;
         if (input.code !== undefined) patch.code = input.code;
         if (input.name !== undefined) patch.name = input.name.trim();
-        if (input.categoryId !== undefined) patch.categoryId = input.categoryId;
         if (input.description !== undefined)
           patch.description = input.description;
         if (input.isActive !== undefined) patch.isActive = input.isActive;
@@ -624,9 +633,8 @@ export class ProductsService {
     const comboIds = rows
       .filter((r) => r.p.productType === 'combo')
       .map((r) => r.p.id);
-    const [images, paths, figures, comps, onOrder] = await Promise.all([
+    const [images, figures, comps, onOrder] = await Promise.all([
       this.imagesOf(rows.map((r) => r.p.id)),
-      this.categoryPaths(),
       comboFigures(this.db, branchId, comboIds),
       loadComponents(this.db, comboIds),
       onOrderByProduct(
@@ -645,10 +653,6 @@ export class ProductsService {
         id: r.p.id,
         code: r.p.code,
         name: r.p.name,
-        categoryId: r.p.categoryId,
-        categoryPath: r.p.categoryId
-          ? (paths.get(r.p.categoryId) ?? null)
-          : null,
         productType: r.p.productType,
         liquidationStatus: r.p.liquidationStatus,
         components: componentsText(items),
@@ -695,40 +699,6 @@ export class ProductsService {
       map.set(r.productId, list);
     }
     return map;
-  }
-
-  /** "ĐIỆN GIA DỤNG > Quạt điện" cho từng nhóm. */
-  private async categoryPaths(): Promise<Map<string, string>> {
-    const rows = await this.db
-      .select()
-      .from(categories)
-      .where(isNull(categories.deletedAt));
-    const byId = new Map(rows.map((r) => [r.id, r]));
-    const paths = new Map<string, string>();
-    for (const r of rows) {
-      const names: string[] = [];
-      for (
-        let cur: (typeof rows)[number] | undefined = r;
-        cur;
-        cur = cur.parentId ? byId.get(cur.parentId) : undefined
-      ) {
-        names.unshift(cur.name);
-      }
-      paths.set(r.id, names.join(' > '));
-    }
-    return paths;
-  }
-
-  private async assertCategory(db: DbOrTx, categoryId: string): Promise<void> {
-    const [row] = await db
-      .select({ id: categories.id })
-      .from(categories)
-      .where(and(eq(categories.id, categoryId), isNull(categories.deletedAt)));
-    if (!row) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'Nhóm hàng không tồn tại', [
-        { field: 'categoryId', message: 'Nhóm hàng không tồn tại' },
-      ]);
-    }
   }
 
   /**
@@ -893,7 +863,6 @@ function auditView(p: ProductRow, components: string) {
   return {
     code: p.code,
     name: p.name,
-    categoryId: p.categoryId,
     productType: p.productType,
     liquidationStatus: p.liquidationStatus,
     components,

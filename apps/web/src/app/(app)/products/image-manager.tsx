@@ -4,14 +4,14 @@ import { ImagePlus, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
-import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { errorMessage } from '@/lib/api';
-import type { Product, ProductImage } from '@/lib/api/types';
+import type { Product } from '@/lib/api/types';
 import { MAX_IMAGES_PER_PRODUCT, validateImageFiles } from '@/lib/product-images';
 import { useDeleteImage, useReorderImages, useUploadImages } from '@/lib/queries/product-images';
+import { ProductImageViewer } from './product-image-viewer';
 
-/** Tab "Ảnh": tải nhiều ảnh một lần, đổi thứ tự (ảnh đầu là ảnh đại diện) và xóa ảnh có xác nhận. */
+/** Quản lý ảnh và xem ảnh lớn; ảnh đầu là ảnh đại diện. */
 export function ImageManager({ product, canEdit }: { product: Product; canEdit: boolean }) {
   const images = [...product.images].sort((a, b) => a.sortOrder - b.sortOrder);
   const upload = useUploadImages();
@@ -20,13 +20,13 @@ export function ImageManager({ product, canEdit }: { product: Product; canEdit: 
   const input = useRef<HTMLInputElement>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropId, setDropId] = useState<string | null>(null);
-  const [toDelete, setToDelete] = useState<ProductImage | null>(null);
+  const [viewingId, setViewingId] = useState<string | null>(null);
   const busy = upload.isPending || reorder.isPending || remove.isPending;
 
   const onPick = async (list: FileList | File[] | null) => {
     const files = Array.from(list ?? []);
     if (input.current) input.current.value = '';
-    if (!canEdit || busy || toDelete || files.length === 0) return;
+    if (!canEdit || busy || viewingId || files.length === 0) return;
     const problem = validateImageFiles(images.length, files);
     if (problem) {
       toast.error(problem);
@@ -45,7 +45,7 @@ export function ImageManager({ product, canEdit }: { product: Product; canEdit: 
       const files = Array.from(event.clipboardData?.files ?? []).filter((file) =>
         file.type.startsWith('image/'),
       );
-      if (!canEdit || toDelete || files.length === 0) return;
+      if (!canEdit || viewingId || files.length === 0) return;
       event.preventDefault();
       if (busy) return;
       void onPick(files);
@@ -82,6 +82,7 @@ export function ImageManager({ product, canEdit }: { product: Product; canEdit: 
               onChange={(e) => void onPick(e.target.files)}
             />
             <Button
+              type="button"
               variant="outline"
               onClick={() => input.current?.click()}
               disabled={busy || images.length >= MAX_IMAGES_PER_PRODUCT}
@@ -109,7 +110,7 @@ export function ImageManager({ product, canEdit }: { product: Product; canEdit: 
             <li
               key={img.id}
               className={`image-card${dropId === img.id ? ' image-card-drop' : ''}`}
-              draggable={canEdit && !busy && !toDelete}
+              draggable={canEdit && !busy}
               tabIndex={canEdit ? 0 : undefined}
               aria-label={`Ảnh ${i + 1}${i === 0 ? ', ảnh đại diện' : ''}`}
               title={canEdit ? 'Kéo thả hoặc dùng Alt và phím mũi tên để đổi thứ tự' : undefined}
@@ -148,23 +149,41 @@ export function ImageManager({ product, canEdit }: { product: Product; canEdit: 
                 setDropId(null);
               }}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element -- URL ảnh từ kho file/Excel, không qua tối ưu hóa của Next */}
-              <img
-                src={img.url}
-                alt={`${product.name} - ảnh ${i + 1}`}
-                loading="lazy"
-                draggable={false}
-              />
+              <button
+                type="button"
+                className="image-preview"
+                aria-label={`Xem ảnh ${i + 1} của ${product.name}`}
+                onClick={() => {
+                  if (!draggedId) setViewingId(img.id);
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- URL ảnh từ kho file/Excel, không qua tối ưu hóa của Next */}
+                <img
+                  src={img.url}
+                  alt={`${product.name} - ảnh ${i + 1}`}
+                  loading="lazy"
+                  draggable={false}
+                />
+              </button>
               {i === 0 && <span className="image-badge">Ảnh đại diện</span>}
               {canEdit && (
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon"
                   className="image-remove"
                   aria-label={`Xóa ảnh ${i + 1}`}
                   title="Xóa ảnh"
                   onDragStart={(event) => event.preventDefault()}
-                  onClick={() => setToDelete(img)}
+                  onClick={async () => {
+                    if (!canEdit || busy) return;
+                    try {
+                      await remove.mutateAsync({ id: product.id, imageId: img.id });
+                      toast.success('Đã xóa ảnh');
+                    } catch (error) {
+                      toast.error(errorMessage(error));
+                    }
+                  }}
                   disabled={busy}
                 >
                   <X aria-hidden="true" />
@@ -175,14 +194,13 @@ export function ImageManager({ product, canEdit }: { product: Product; canEdit: 
         </ul>
       )}
 
-      {toDelete && (
-        <ConfirmDialog
-          title="Xóa ảnh này?"
-          description="Ảnh sẽ bị gỡ khỏi hàng hóa và không khôi phục được. Hàng hóa không bị ảnh hưởng."
-          confirmLabel="Xóa ảnh"
-          destructive
-          onConfirm={() => remove.mutateAsync({ id: product.id, imageId: toDelete.id })}
-          onClose={() => setToDelete(null)}
+      {viewingId && (
+        <ProductImageViewer
+          images={images}
+          imageId={viewingId}
+          name={product.name}
+          onChange={setViewingId}
+          onClose={() => setViewingId(null)}
         />
       )}
     </div>

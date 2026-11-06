@@ -29,14 +29,11 @@ export type RoleCode = Schemas['RoleSummaryDto']['role'];
 /** Phân hệ Hàng hóa (docs/api/endpoints.md mục 2). */
 export type Product = Schemas['ProductDto'];
 export type ProductList = Schemas['ProductListDto'];
-export type CategoryNode = Schemas['CategoryNodeDto'];
 export type CreateProductInput = Schemas['CreateProductDto'];
 export type UpdateProductInput = Schemas['UpdateProductDto'];
 export type ProductBranch = Schemas['ProductBranchDto'];
 export type ProductImage = Schemas['ProductImageDto'];
 export type ProductLookup = Schemas['ProductLookupDto'];
-export type CreateCategoryInput = Schemas['CreateCategoryDto'];
-export type UpdateCategoryInput = Schemas['UpdateCategoryDto'];
 export type StockCardMovement = Schemas['StockCardMovementDto'];
 export type StockCard = Schemas['StockCardDto'];
 

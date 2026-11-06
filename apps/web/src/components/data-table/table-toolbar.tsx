@@ -1,16 +1,6 @@
 'use client';
 
-import {
-  Download,
-  FileSpreadsheet,
-  FileText,
-  Search,
-  SlidersHorizontal,
-  Upload,
-  X,
-} from 'lucide-react';
-import { useState } from 'react';
-import { toast } from 'sonner';
+import { Search, SlidersHorizontal, Upload, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -23,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { errorMessage } from '@/lib/api';
+export { ExportMenu } from './export-menu';
 
 /** Ô tìm kiếm trên bảng: biểu tượng kính lúp, nút × xóa nhanh, Esc để xóa. */
 export function TableSearch({
@@ -84,52 +74,6 @@ export function ImportButton({
       <Upload aria-hidden="true" />
       Nhập Excel
     </Button>
-  );
-}
-
-export type ExportFormat = 'xlsx' | 'html';
-
-/** Nút "Xuất file" mở menu Excel / HTML; chống bấm trùng khi đang xuất và báo lỗi bằng toast. */
-export function ExportMenu({
-  onExport,
-  disabled,
-}: {
-  onExport: (format: ExportFormat) => Promise<void>;
-  disabled?: boolean;
-}) {
-  const [busy, setBusy] = useState(false);
-
-  const run = async (format: ExportFormat) => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      await onExport(format);
-    } catch (e) {
-      toast.error(errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" disabled={disabled || busy} aria-busy={busy}>
-          {busy ? <span className="spinner" aria-hidden="true" /> : <Download aria-hidden="true" />}
-          {busy ? 'Đang xuất…' : 'Xuất file'}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={() => void run('xlsx')}>
-          <FileSpreadsheet aria-hidden="true" />
-          Excel (.xlsx)
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => void run('html')}>
-          <FileText aria-hidden="true" />
-          Trang HTML (.html)
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 

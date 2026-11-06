@@ -2,12 +2,12 @@
 
 > **Sinh tự động** từ `apps/api/src/db/schema` bằng `pnpm db:docs` — không sửa tay. Tổng quan và cách xem sơ đồ: [`README.md`](README.md).
 
-**43 bảng · 20 kiểu liệt kê (enum)**
+**42 bảng · 20 kiểu liệt kê (enum)**
 
 ## Mục lục
 
 - **Hệ thống**: [`branches`](#branches), [`users`](#users), [`refresh_tokens`](#refresh_tokens), [`audit_logs`](#audit_logs), [`code_sequences`](#code_sequences), [`company_profile`](#company_profile), [`idempotency_keys`](#idempotency_keys), [`import_jobs`](#import_jobs), [`user_branches`](#user_branches), [`role_permissions`](#role_permissions), [`user_identities`](#user_identities), [`system_settings`](#system_settings)
-- **Hàng hóa & giá**: [`categories`](#categories), [`products`](#products), [`product_images`](#product_images), [`product_components`](#product_components), [`price_books`](#price_books), [`price_book_items`](#price_book_items)
+- **Hàng hóa & giá**: [`products`](#products), [`product_images`](#product_images), [`product_components`](#product_components), [`price_books`](#price_books), [`price_book_items`](#price_book_items)
 - **Tồn kho & chuyển kho**: [`stocks`](#stocks), [`stock_movements`](#stock_movements), [`stock_transfers`](#stock_transfers), [`stock_transfer_items`](#stock_transfer_items)
 - **Đối tác**: [`customers`](#customers), [`customer_branch_terms`](#customer_branch_terms), [`customer_invoice_profiles`](#customer_invoice_profiles), [`suppliers`](#suppliers), [`supplier_branch_history`](#supplier_branch_history)
 - **Đơn hàng**: [`orders`](#orders), [`order_items`](#order_items), [`invoices`](#invoices), [`invoice_items`](#invoice_items), [`invoice_payments`](#invoice_payments), [`sales_returns`](#sales_returns), [`sales_return_items`](#sales_return_items)
@@ -276,25 +276,6 @@ Cài đặt hệ thống dạng khóa → JSON do Quản lý chỉnh (vd mở/t�
 
 ## Hàng hóa & giá
 
-### categories
-
-Nhóm hàng dạng cây (parent_id).
-
-| Cột | Kiểu | Null | Mặc định | Ràng buộc / ghi chú |
-| --- | --- | :-: | --- | --- |
-| `id` | uuid |  | `gen_random_uuid()` | **PK** |
-| `name` | text |  |  |  |
-| `parent_id` | uuid | ✔ |  | → `categories.id` |
-| `sort_order` | integer |  | `0` |  |
-| `created_at` | timestamptz |  | `now()` |  |
-| `updated_at` | timestamptz |  | `now()` |  |
-| `deleted_at` | timestamptz | ✔ |  |  |
-
-**Chỉ mục:**
-
-- `categories_parent_idx`: `parent_id`
-- `categories_sibling_name_unique` (unique): `coalesce(parentId, '00000000-0000-0000-0000-000000000000'::uuid)`, `f_search_text(name)` WHERE deletedAt is null
-
 ### products
 
 Hàng hóa — chỉ thông tin DÙNG CHUNG giữa các chi nhánh. Giá bán ở price_book_items, tồn kho/giá vốn/vị trí ở stocks (theo chi nhánh).
@@ -304,7 +285,6 @@ Hàng hóa — chỉ thông tin DÙNG CHUNG giữa các chi nhánh. Giá bán �
 | `id` | uuid |  | `gen_random_uuid()` | **PK** |
 | `code` | text |  |  | unique |
 | `name` | text |  |  |  |
-| `category_id` | uuid | ✔ |  | → `categories.id` |
 | `product_type` | product_type |  | `'goods'` | Loại hàng: goods = Hàng hóa (mặc định), combo = gói các hàng thành phần (không có tồn/giá vốn riêng) |
 | `liquidation_status` | liquidation_status |  | `'normal'` | Trạng thái thanh lý: normal = Thường (mặc định), clearance = Thanh Lý, disabled = Tắt Mã, high_stock = Tồn Cao, priority_stock = Tồn Ưu Tiên |
 | `description` | text | ✔ |  |  |
@@ -316,7 +296,6 @@ Hàng hóa — chỉ thông tin DÙNG CHUNG giữa các chi nhánh. Giá bán �
 
 **Chỉ mục:**
 
-- `products_category_idx`: `category_id`
 - `products_search_trgm`: `f_search_text(code || ' ' || name) gin_trgm_ops`
 - `products_active_idx`: `is_active`
 - `products_type_idx`: `product_type`

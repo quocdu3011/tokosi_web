@@ -1,7 +1,13 @@
 'use client';
 
 import { Plus } from 'lucide-react';
-import { LIQUIDATION_STATUSES, LIQUIDATION_STATUS_LABELS } from '@kiot/shared';
+import {
+  LIQUIDATION_STATUSES,
+  LIQUIDATION_STATUS_LABELS,
+  PRODUCT_EXPORT_COLUMNS,
+  isProductCostColumn,
+  type ProductExportColumnId,
+} from '@kiot/shared';
 import { useMemo, useState } from 'react';
 
 import { PageHeader } from '@/components/common/coming-soon';
@@ -12,7 +18,6 @@ import {
   ExportMenu,
   ImportButton,
   TableSearch,
-  type ExportFormat,
 } from '@/components/data-table/table-toolbar';
 import { ImportDialog } from '@/components/import/import-dialog';
 import { Badge } from '@/components/ui/badge';
@@ -33,13 +38,10 @@ import { formatDateTime, formatDecimal, formatMoney } from '@/lib/format';
 import { can } from '@/lib/permissions';
 import {
   downloadProductsXlsx,
-  fetchAllProducts,
-  flattenCategories,
-  useCategories,
   useProductList,
   type ProductFilterParams,
 } from '@/lib/queries/products';
-import { buildHtmlDocument, exportFilename, saveBlob, type ExportColumn } from '@/lib/table-export';
+import { exportFilename, saveBlob } from '@/lib/table-export';
 import { decimalSortValue, sortRows, type SortValue } from '@/lib/table-sort';
 
 import { ProductDrawer, type DrawerTarget } from './product-drawer';
@@ -130,7 +132,6 @@ export function ProductsScreen() {
   const { hidden, setVisible, reset } = useColumnVisibility('cols:products', DEFAULT_HIDDEN);
 
   const [q, setQ] = useState('');
-  const [categoryId, setCategoryId] = useState<string>(ALL);
   const [status, setStatus] = useState<string>('active');
   const [stock, setStock] = useState<string>(ALL);
   const [productType, setProductType] = useState<string>(ALL);
@@ -139,10 +140,9 @@ export function ProductsScreen() {
   const [page, setPage] = useState(1);
   const debouncedQ = useDebouncedValue(q.trim());
 
-  // Bộ lọc + sắp xếp dùng chung cho danh sách, xuất Excel và xuất HTML (file luôn khớp màn hình).
+  // Bộ lọc + sắp xếp dùng chung cho danh sách, xuất Excel (file luôn khớp màn hình).
   const filters: ProductFilterParams = {
     q: debouncedQ || undefined,
-    categoryId: categoryId === ALL ? undefined : categoryId,
     isActive: status === ALL ? undefined : status === 'active',
     inStock: stock === 'in' ? true : undefined,
     productType: productType === ALL ? undefined : (productType as Product['productType']),
@@ -158,8 +158,6 @@ export function ProductsScreen() {
   });
   // Cột không có ở API: sắp xếp ngay trên các dòng của trang hiện tại.
   const rows = useMemo(() => sortRows(data?.data ?? EMPTY, sort, PAGE_SORT), [data, sort]);
-  const { data: categoryTree } = useCategories();
-  const categories = useMemo(() => flattenCategories(categoryTree ?? []), [categoryTree]);
 
   const columns = useMemo<AppColumnDef<Product>[]>(() => {
     const cols: AppColumnDef<Product>[] = [
@@ -183,9 +181,6 @@ export function ProductsScreen() {
         cell: ({ row }) => (
           <div className="cell-stack">
             <span className="cell-title">{row.original.name}</span>
-            {row.original.categoryPath && (
-              <span className="cell-sub">{row.original.categoryPath}</span>
-            )}
           </div>
         ),
       },
@@ -302,49 +297,13 @@ export function ProductsScreen() {
     setPage(1);
   };
 
-  /** Cột & định dạng của file HTML — giống cách hiển thị trên màn hình, nhưng là chữ thuần. */
-  const exportColumns = useMemo<ExportColumn<Product>[]>(() => {
-    const cols: ExportColumn<Product>[] = [
-      { header: 'Mã hàng', value: (p) => p.code },
-      { header: 'Tên hàng', value: (p) => p.name },
-      { header: 'Nhóm hàng', value: (p) => p.categoryPath ?? '' },
-    ];
-    if (canSeeCost) {
-      cols.push({
-        header: 'Giá vốn (₫)',
-        value: (p) => formatDecimal(p.costPrice),
-        numeric: true,
-      });
-    }
-    cols.push(
-      { header: 'Tồn kho', value: (p) => formatDecimal(p.onHand) || '0', numeric: true },
-      { header: 'Khách đặt', value: (p) => formatDecimal(p.reserved) || '0', numeric: true },
-      { header: 'Có thể bán', value: (p) => formatDecimal(p.available) || '0', numeric: true },
-      {
-        header: 'Trạng thái',
-        value: (p) => (p.isActive ? 'Đang kinh doanh' : 'Ngừng kinh doanh'),
-      },
-    );
-    return cols;
-  }, [canSeeCost]);
+  const exportOptions = PRODUCT_EXPORT_COLUMNS.filter(
+    (column) => canSeeCost || !isProductCostColumn(column.id),
+  );
 
-  const handleExport = async (format: ExportFormat) => {
-    if (format === 'xlsx') {
-      const { blob, filename } = await downloadProductsXlsx(filters);
-      saveBlob(blob, filename ?? exportFilename('hang-hoa', 'xlsx'));
-      return;
-    }
-    const all = await fetchAllProducts(filters);
-    const html = buildHtmlDocument({
-      title: 'Danh sách hàng hóa',
-      subtitle: debouncedQ ? `Tìm: "${debouncedQ}"` : undefined,
-      columns: exportColumns,
-      rows: sortRows(all, sort, PAGE_SORT),
-    });
-    saveBlob(
-      new Blob([html], { type: 'text/html;charset=utf-8' }),
-      exportFilename('hang-hoa', 'html'),
-    );
+  const handleExport = async (selectedColumns: ProductExportColumnId[]) => {
+    const { blob, filename } = await downloadProductsXlsx(filters, selectedColumns);
+    saveBlob(blob, filename ?? exportFilename('hang-hoa', 'xlsx'));
   };
 
   return (
@@ -368,20 +327,6 @@ export function ProductsScreen() {
           placeholder="Tìm mã hoặc tên hàng"
           label="Tìm hàng hóa"
         />
-        <Select value={categoryId} onValueChange={(v) => resetFilters(() => setCategoryId(v))}>
-          <SelectTrigger aria-label="Lọc theo nhóm hàng" className="toolbar-select">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Mọi nhóm hàng</SelectItem>
-            {categories.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {'  '.repeat(c.depth)}
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         <Select value={status} onValueChange={(v) => resetFilters(() => setStatus(v))}>
           <SelectTrigger aria-label="Lọc theo trạng thái" className="toolbar-select">
             <SelectValue />
@@ -440,7 +385,11 @@ export function ProductsScreen() {
             onReset={reset}
           />
           {canImport && <ImportButton onClick={() => setImportOpen(true)} />}
-          <ExportMenu onExport={handleExport} disabled={!data || data.meta.total === 0} />
+          <ExportMenu
+            options={exportOptions}
+            onExport={handleExport}
+            disabled={!data || data.meta.total === 0}
+          />
         </div>
       </div>
       {importOpen && <ImportDialog type="products" onClose={() => setImportOpen(false)} />}
