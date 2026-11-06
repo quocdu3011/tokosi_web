@@ -414,6 +414,9 @@
   gap: var(--space-md);
   padding-right: 40px;
 }
+.drawer-status-action {
+  justify-self: start;
+}
 .tabs-list {
   display: flex;
   gap: var(--space-xs);

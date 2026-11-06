@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import { toast } from 'sonner';
+
+import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,7 +14,7 @@ import { errorMessage } from '@/lib/api';
 import { useAuthStore } from '@/lib/auth/store';
 import { useBranchStore } from '@/lib/branch';
 import { can } from '@/lib/permissions';
-import { useCategories, useProduct } from '@/lib/queries/products';
+import { useCategories, useProduct, useUpdateProduct } from '@/lib/queries/products';
 
 import { ImageManager } from './image-manager';
 import { ProductBranchesTab } from './product-branches-tab';
@@ -32,6 +36,9 @@ export function ProductDrawer({ target, onClose }: { target: DrawerTarget; onClo
     target.kind === 'view' ? (target.tab ?? 'info') : 'info',
   );
   const id = current.kind === 'view' ? current.id : null;
+  const canEdit = can(me, 'product.edit');
+  const [confirmToggle, setConfirmToggle] = useState(false);
+  const updateProduct = useUpdateProduct();
 
   const { data: product, isLoading, isError, error } = useProduct(id);
   const { data: categories = [] } = useCategories();
@@ -59,6 +66,16 @@ export function ProductDrawer({ target, onClose }: { target: DrawerTarget; onClo
                 )}
                 {product.productType === 'combo' && <Badge variant="info">Combo</Badge>}
               </div>
+            )}
+            {product && canEdit && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="drawer-status-action"
+                onClick={() => setConfirmToggle(true)}
+              >
+                {product.isActive ? 'Ngừng kinh doanh' : 'Cho phép kinh doanh'}
+              </Button>
             )}
           </header>
 
@@ -111,6 +128,26 @@ export function ProductDrawer({ target, onClose }: { target: DrawerTarget; onClo
             </Tabs>
           )}
         </div>
+        {product && confirmToggle && (
+          <ConfirmDialog
+            title={product.isActive ? 'Ngừng kinh doanh hàng này?' : 'Cho phép kinh doanh lại?'}
+            description={
+              product.isActive
+                ? `${product.code} · ${product.name} sẽ không còn được chọn khi lập đơn. Dữ liệu và lịch sử giữ nguyên, có thể bật lại bất cứ lúc nào.`
+                : `${product.code} · ${product.name} sẽ được kinh doanh trở lại.`
+            }
+            confirmLabel={product.isActive ? 'Ngừng kinh doanh' : 'Cho phép kinh doanh'}
+            destructive={product.isActive}
+            onConfirm={async () => {
+              await updateProduct.mutateAsync({
+                id: product.id,
+                patch: { isActive: !product.isActive },
+              });
+              toast.success(product.isActive ? 'Đã ngừng kinh doanh' : 'Đã cho phép kinh doanh');
+            }}
+            onClose={() => setConfirmToggle(false)}
+          />
+        )}
       </SheetContent>
     </Sheet>
   );
