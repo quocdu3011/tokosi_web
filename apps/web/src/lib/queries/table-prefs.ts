@@ -36,13 +36,15 @@ export const tablePrefsKeys = {
   all: (userId: string | null) => ['me', 'table-prefs', userId ?? ''] as const,
 };
 
-interface TablePrefsData {
+export interface TablePrefsData {
   tables: Record<string, TablePrefs>;
   /** `true` khi dữ liệu đã đến từ server (chưa chỉ là bản lạc quan). */
   fromServer: boolean;
 }
 
 const EMPTY_TABLES: Record<string, TablePrefs> = {};
+
+type PrefsUpdate = TablePrefs | ((current: TablePrefs | undefined) => TablePrefs);
 
 // ---------------------------------------------------------------------------------------------
 // Bản sao nóng (localStorage) — đọc qua useSyncExternalStore: lần vẽ đầu (hydrate) luôn dùng mặc định,
@@ -189,7 +191,15 @@ function enqueue(
   const key = slotKey(userId, tableKey);
   let slot = slots.get(key);
   if (!slot) {
-    slot = { userId, tableKey, value, version: 0, dirty: true, timer: null, chain: Promise.resolve() };
+    slot = {
+      userId,
+      tableKey,
+      value,
+      version: 0,
+      dirty: true,
+      timer: null,
+      chain: Promise.resolve(),
+    };
     slots.set(key, slot);
   }
   slot.value = value;
@@ -239,6 +249,44 @@ function removeLegacyKeys(keys: readonly string[]) {
 // Hook công khai
 // ---------------------------------------------------------------------------------------------
 
+/** `GET /me/table-prefs`, phủ thay đổi chưa được xác nhận lên kết quả và cập nhật bản sao nóng. */
+export async function fetchTablePrefs(
+  userId: string,
+  signal?: AbortSignal,
+): Promise<TablePrefsData> {
+  const res = await api.get<{ data?: unknown }>('/me/table-prefs', { signal });
+  const tables = overlayDirty(userId, sanitizeTables(res?.data));
+  writeHot(userId, tables);
+  return { tables, fromServer: true };
+}
+
+/**
+ * Lưu tùy chỉnh một bảng: cập nhật lạc quan ngay, gửi `PUT` sau {@link TABLE_PREFS_DEBOUNCE_MS} ms kể từ lần đổi cuối.
+ * `update` là bản mới hoặc hàm nhận bản mới nhất (gồm cả thay đổi lạc quan chưa gửi).
+ */
+export function saveTablePrefs(
+  qc: QueryClient,
+  userId: string,
+  tableKey: string,
+  update: PrefsUpdate,
+): void {
+  const current: TablePrefs | undefined = currentTables(qc, userId)[tableKey];
+  const next = typeof update === 'function' ? update(current) : update;
+  void enqueue(qc, userId, tableKey, next, false);
+}
+
+/** Đặt một bảng về mặc định: xóa lạc quan ngay và gửi `DELETE` ngay (hủy `PUT` đang chờ). Trả `true` nếu server đã nhận. */
+export function resetTablePrefs(
+  qc: QueryClient,
+  userId: string,
+  tableKey: string,
+): Promise<boolean> {
+  // Khóa cũ còn đó thì lần sau sẽ bị nhập ngược lên server.
+  const legacy = LEGACY_STORAGE_KEYS[tableKey];
+  removeLegacyKeys([legacy?.hidden, legacy?.widths].filter((k): k is string => !!k));
+  return enqueue(qc, userId, tableKey, null, true);
+}
+
 export interface AllTablePrefs {
   /** Tùy chỉnh mọi bảng đã biết (server + thay đổi lạc quan; chưa có thì bản sao nóng; không có gì thì rỗng). */
   tables: Readonly<Record<string, TablePrefs>>;
@@ -267,13 +315,10 @@ export function useAllTablePrefs(): AllTablePrefs {
     enabled: userId !== null,
     staleTime: Infinity,
     gcTime: Infinity,
-    queryFn: async ({ signal }): Promise<TablePrefsData> => {
-      if (!userId) return { tables: EMPTY_TABLES, fromServer: false };
-      const res = await api.get<{ data?: unknown }>('/me/table-prefs', { signal });
-      const tables = overlayDirty(userId, sanitizeTables(res?.data));
-      writeHot(userId, tables);
-      return { tables, fromServer: true };
-    },
+    queryFn: ({ signal }) =>
+      userId
+        ? fetchTablePrefs(userId, signal)
+        : Promise.resolve({ tables: EMPTY_TABLES, fromServer: false }),
   });
 
   return {
@@ -283,8 +328,6 @@ export function useAllTablePrefs(): AllTablePrefs {
     isError: query.isError,
   };
 }
-
-type PrefsUpdate = TablePrefs | ((current: TablePrefs | undefined) => TablePrefs);
 
 /**
  * Lưu tùy chỉnh một bảng: cập nhật LẠC QUAN ngay (cache + bản sao nóng), gửi `PUT` sau
@@ -296,17 +339,11 @@ export function useSaveTablePrefs() {
   const userId = useAuthStore((s) => s.user?.id ?? null);
   const save = useCallback(
     (tableKey: string, update: PrefsUpdate) => {
-      if (!userId) return;
-      const current = currentTables(qc, userId)[tableKey];
-      const next = typeof update === 'function' ? update(current) : update;
-      void enqueue(qc, userId, tableKey, next, false);
+      if (userId) saveTablePrefs(qc, userId, tableKey, update);
     },
     [qc, userId],
   );
-  const flush = useCallback(
-    (tableKey?: string) => flushTablePrefs(userId, tableKey),
-    [userId],
-  );
+  const flush = useCallback((tableKey?: string) => flushTablePrefs(userId, tableKey), [userId]);
   return useMemo(() => ({ save, flush }), [save, flush]);
 }
 
@@ -316,11 +353,7 @@ export function useResetTablePrefs() {
   const userId = useAuthStore((s) => s.user?.id ?? null);
   return useCallback(
     (tableKey: string) => {
-      if (!userId) return;
-      // Khóa cũ còn đó thì lần sau sẽ bị nhập ngược lên server.
-      const legacy = LEGACY_STORAGE_KEYS[tableKey];
-      removeLegacyKeys([legacy?.hidden, legacy?.widths].filter((k): k is string => !!k));
-      void enqueue(qc, userId, tableKey, null, true);
+      if (userId) void resetTablePrefs(qc, userId, tableKey);
     },
     [qc, userId],
   );

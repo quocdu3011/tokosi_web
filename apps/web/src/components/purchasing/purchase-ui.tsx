@@ -1,13 +1,6 @@
 import { FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   TableSearch,
   ColumnPicker,
   type ColumnOption,
@@ -15,40 +8,8 @@ import {
 import type { PurchaseDocument } from '@/lib/api/types';
 import { PURCHASE_STATUS } from '@/lib/purchasing';
 
-export function FilterSelect({
-  label,
-  value,
-  onChange,
-  options,
-  id,
-  disabled,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: readonly { value: string; label: string }[];
-  id?: string;
-  disabled?: boolean;
-}) {
-  return (
-    <Select
-      disabled={disabled}
-      value={value || 'all'}
-      onValueChange={(next) => onChange(next === 'all' ? '' : next)}
-    >
-      <SelectTrigger id={id} aria-label={label} className="toolbar-select">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((o) => (
-          <SelectItem key={o.value || 'all'} value={o.value || 'all'}>
-            {o.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
+// FilterSelect đã chuyển về components/data-table/table-toolbar; re-export để màn mua hàng cũ không vỡ.
+export { FilterSelect } from '@/components/data-table/table-toolbar';
 export function PurchaseStatus({ status }: { status: PurchaseDocument['status'] }) {
   const variant =
     status === 'completed'

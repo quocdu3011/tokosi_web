@@ -86,7 +86,8 @@ export function mergePrefs(
   const widths: ColumnWidths = {};
   for (const spec of list) {
     const value = saved?.widths?.[spec.id];
-    widths[spec.id] = typeof value === 'number' && Number.isFinite(value) ? clampWidth(value) : spec.width;
+    widths[spec.id] =
+      typeof value === 'number' && Number.isFinite(value) ? clampWidth(value) : spec.width;
   }
 
   return {
@@ -147,7 +148,11 @@ export function withOrder(
 }
 
 /** Đặt độ rộng một cột (px), kẹp trong [MIN_COLUMN_WIDTH, 1000]. */
-export function withWidth(saved: TablePrefs | null | undefined, id: string, px: number): TablePrefs {
+export function withWidth(
+  saved: TablePrefs | null | undefined,
+  id: string,
+  px: number,
+): TablePrefs {
   const base = saved ?? {};
   if (!Number.isFinite(px)) return base;
   const width = Math.max(MIN_COLUMN_WIDTH, clampWidth(px));
@@ -158,9 +163,11 @@ export function withWidth(saved: TablePrefs | null | undefined, id: string, px: 
 export function withoutWidth(saved: TablePrefs | null | undefined, id: string): TablePrefs {
   const base = saved ?? {};
   if (!base.widths || !(id in base.widths)) return base;
-  const { [id]: _removed, ...rest } = base.widths;
-  const { widths: _widths, ...others } = base;
-  return Object.keys(rest).length > 0 ? { ...others, widths: rest } : others;
+  const widths = { ...base.widths };
+  delete widths[id];
+  const next: TablePrefs = { ...base, widths };
+  if (Object.keys(widths).length === 0) delete next.widths;
+  return next;
 }
 
 /** Đặt số dòng mỗi trang; giá trị ngoài `PAGE_SIZE_OPTIONS` bị bỏ qua. */
@@ -181,7 +188,9 @@ function cleanIds(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const { maxColumns, maxColumnIdLength } = TABLE_PREFS_LIMITS;
   return unique(
-    value.filter((x): x is string => typeof x === 'string' && x.length > 0 && x.length <= maxColumnIdLength),
+    value.filter(
+      (x): x is string => typeof x === 'string' && x.length > 0 && x.length <= maxColumnIdLength,
+    ),
   ).slice(0, maxColumns);
 }
 
@@ -224,7 +233,10 @@ export function sanitizeTables(value: unknown): Record<string, TablePrefs> {
 }
 
 /** Hai bản ghi có cùng nội dung không (so sánh theo giá trị)? */
-export function samePrefs(a: TablePrefs | null | undefined, b: TablePrefs | null | undefined): boolean {
+export function samePrefs(
+  a: TablePrefs | null | undefined,
+  b: TablePrefs | null | undefined,
+): boolean {
   return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 }
 
@@ -233,9 +245,7 @@ export function samePrefs(a: TablePrefs | null | undefined, b: TablePrefs | null
 // ---------------------------------------------------------------------------------------------
 
 /** Khóa localStorage cũ của từng bảng: `hidden` = mảng id cột ẩn; `widths` = `{ [id]: px }`. */
-export const LEGACY_STORAGE_KEYS: Readonly<
-  Record<string, { hidden?: string; widths?: string }>
-> = {
+export const LEGACY_STORAGE_KEYS: Readonly<Record<string, { hidden?: string; widths?: string }>> = {
   products: { hidden: 'cols:products', widths: 'table:products' },
   users: { hidden: 'cols:users' },
   suppliers: { hidden: 'table:suppliers:hidden', widths: 'table:suppliers' },
@@ -292,7 +302,10 @@ export function readLegacyPrefs(
  * Chỉ giữ phần thật sự là tùy chỉnh của người dùng: bỏ cột không còn, độ rộng bằng mặc định,
  * và `hidden` trùng tập ẩn mặc định. Không còn gì → `null` (không cần gửi lên server).
  */
-export function pruneLegacyPrefs(prefs: TablePrefs, specs: readonly ColumnSpec[]): TablePrefs | null {
+export function pruneLegacyPrefs(
+  prefs: TablePrefs,
+  specs: readonly ColumnSpec[],
+): TablePrefs | null {
   const byId = new Map(specs.map((spec) => [spec.id, spec]));
   const out: TablePrefs = {};
 
