@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import JSZip from 'jszip';
 
 export type CellValue = string | number | boolean | null;
 
@@ -51,7 +52,13 @@ const MAX_ROWS = 20000;
 /** Đọc sheet đầu tiên của file .xlsx. Dòng trống hoàn toàn bị bỏ qua. Ném lỗi nếu file không phải .xlsx hợp lệ. */
 export async function readSheet(buffer: Buffer): Promise<ParsedSheet> {
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
+  try {
+    await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
+  } catch (e) {
+    const fixed = await normalizeXlsxParts(buffer);
+    if (!fixed) throw e;
+    await workbook.xlsx.load(fixed as unknown as ArrayBuffer);
+  }
   const sheet = workbook.worksheets[0];
   if (!sheet) throw new Error('File không có sheet nào');
   const headerRow = sheet.getRow(1);
@@ -98,4 +105,45 @@ function cellText(v: ExcelJS.CellValue): string {
   if ('result' in v) return cellText(v.result as ExcelJS.CellValue);
   if ('text' in v) return String(v.text);
   return '';
+}
+
+/**
+ * Một số file xuất từ KiotViet (vd SoQuy) làm ExcelJS không đọc được vì: (1) XML dùng tiền tố namespace cho mọi phần tử
+ * (`<x:styleSheet xmlns:x="…/spreadsheetml/2006/main">`) mà ExcelJS chỉ nhận tên không tiền tố; (2) đường dẫn trong
+ * workbook.xml.rels là tuyệt đối (`/xl/worksheets/sheet2.xml`); (3) tham chiếu bảng dùng thuộc tính `p3:id`. Chuẩn hóa rồi đọc lại; trả null nếu file
+ * không phải zip hoặc không có gì để đổi.
+ */
+async function normalizeXlsxParts(buffer: Buffer): Promise<Buffer | null> {
+  try {
+    const zip = await JSZip.loadAsync(buffer);
+    let changed = false;
+    for (const [name, entry] of Object.entries(zip.files)) {
+      if (entry.dir || !/^xl\/(?!theme\/).*\.(xml|rels)$/.test(name)) continue;
+      const text = await entry.async('string');
+      // Đường dẫn tương đối: rels của sheet nằm trong xl/worksheets/_rels nên trỏ ngược lên bằng "../"
+      let next = text.replace(
+        /Target="\/xl\//g,
+        name.startsWith('xl/worksheets/_rels/') ? 'Target="../' : 'Target="',
+      );
+      const ns = /xmlns:([A-Za-z_][\w.-]*)="http:\/\/schemas\.openxmlformats\.org\/spreadsheetml\/2006\/main"/.exec(next);
+      if (ns) {
+        const prefix = ns[1]!;
+        next = next
+          .replace(new RegExp(`<(/?)${prefix}:`, 'g'), '<$1')
+          .replace(`xmlns:${prefix}="`, 'xmlns="');
+      }
+      // Bảng (table) của sheet không cần để đọc giá trị; file KiotViet ghi tham chiếu của nó bằng thuộc tính `p3:id`
+      // (không phải `r:id`) làm ExcelJS lỗi, nên bỏ hẳn.
+      if (/^xl\/worksheets\/[^/]+\.xml$/.test(name)) {
+        next = next.replace(/<(?:\w+:)?tableParts[\s\S]*?<\/(?:\w+:)?tableParts>/g, '');
+      }
+      if (next !== text) {
+        zip.file(name, next);
+        changed = true;
+      }
+    }
+    return changed ? await zip.generateAsync({ type: 'nodebuffer' }) : null;
+  } catch {
+    return null;
+  }
 }

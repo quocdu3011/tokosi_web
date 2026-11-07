@@ -692,7 +692,7 @@ Server từ chối trường lạ (`400`), ví dụ gửi công nợ hay tổng 
 // GET /customers/:id/visits → [{ "id": "…", "visitedOn": "2026-11-03", "note": "…", "createdByName": "…", "createdAt": "…" }]
 ```
 
-**Còn lại trong bản nháp (chưa triển khai):** `GET /customers/:id/orders|invoices|sales-returns|aging|statement` và `POST /customers/:id/receipts` (thu nợ nhanh, `Idempotency-Key`, cấn trừ hóa đơn cũ nhất; lỗi `422 ALLOCATION_EXCEEDS`) làm cùng Sổ quỹ và Đơn hàng.
+**Còn lại trong bản nháp (chưa triển khai):** `GET /customers/:id/orders|invoices|sales-returns|aging|statement` làm cùng Đơn hàng. **Thu nợ nhanh `POST /customers/:id/receipts` đã có** (mục 6).
 
 ---
 
@@ -815,7 +815,8 @@ Mọi endpoint cần `X-Branch-Id`; hóa đơn thuộc chi nhánh làm việc (c
   "seller": { "id": "…", "fullName": "…" },
   "invoicedAt": "2026-11-03T07:11:16.170Z",
   "subtotal": "33735000", "discount": "0", "total": "33735000",
-  "paid": "10000000", "debt": "23735000", // debt = total − paid (paid gồm cả khoản cấn trừ thu nợ về sau)
+  "paid": "10000000", "returned": "0", "debt": "23735000", // paid = thu lúc xuất + cấn trừ thu nợ về sau; debt = total − paid − returned (phiếu trả hoàn tất gắn hóa đơn), không âm
+  "allocations": [{ "cashCode": "TT019402", "occurredAt": "…", "amount": "5000000" }], // chỉ ở chi tiết: các lần thu nợ đã cấn vào hóa đơn
   "totalQty": "515.000", "itemCount": 1,
   "note": "…",
   "createdBy": { "id": "…", "fullName": "…" }, "createdAt": "…", "updatedAt": "…",
@@ -910,68 +911,101 @@ Mọi endpoint cần `X-Branch-Id`; phiếu về chi nhánh của hóa đơn g�
 
 ## 6. Sổ quỹ
 
-| Method     | Đường dẫn                                  | Mô tả                                      | Quyền         | Mốc |
-| ---------- | ------------------------------------------ | ------------------------------------------ | ------------- | --- |
-| GET        | `/cash-accounts`                           | Quỹ tiền mặt / tài khoản ngân hàng + số dư | `cash.view`   | W6  |
-| POST/PATCH | `/cash-accounts`, `/cash-accounts/:id`     | Tạo / sửa quỹ                              | `cash.manage` | W6  |
-| GET        | `/cash-categories`                         | Danh mục thu chi (`direction`)             | `cash.view`   | W6  |
-| POST/PATCH | `/cash-categories`, `/cash-categories/:id` | Tạo / sửa danh mục                         | `cash.manage` | W6  |
-| GET        | `/cash-transactions`                       | Danh sách phiếu thu/chi + tổng hợp kỳ      | `cash.view`   | W6  |
-| GET        | `/cash-transactions/:id`                   | Chi tiết                                   | `cash.view`   | W6  |
-| POST       | `/cash-transactions`                       | Tạo phiếu thu/chi (**Idempotency-Key**)    | `cash.create` | W6  |
-| POST       | `/cash-transactions/:id/cancel`            | Hủy phiếu `{ reason }`                     | `cash.cancel` | W6  |
+Đã triển khai (07/11/2026). Quỹ và phiếu thu/chi **riêng từng chi nhánh** (header `X-Branch-Id`); danh mục thu chi dùng chung. Số dư quỹ **không lưu**, tính từ quỹ đầu kỳ + phiếu hoàn tất.
 
-Bộ lọc `GET /cash-transactions`: `from`, `to`, `direction`, `categoryId`, `accountId`, `partyType`, `partyId`, `q`.
+| Method | Đường dẫn                           | Mô tả                                                                     | Quyền         |
+| ------ | ----------------------------------- | ------------------------------------------------------------------------- | ------------- |
+| GET    | `/cash-accounts`                    | Quỹ của chi nhánh làm việc + `balance` (`?includeInactive=true`)          | `cash.view`   |
+| POST   | `/cash-accounts`                    | Tạo quỹ `{ name, type: cash\|bank, openingBalance? }`                     | `cash.manage` |
+| PATCH  | `/cash-accounts/:id`                | Sửa `name`, `isActive`, `openingBalance` (**chỉ khi quỹ chưa có phiếu**)  | `cash.manage` |
+| GET    | `/cash-categories`                  | Danh mục thu chi (`?direction=in\|out`, `?includeInactive=true`)          | `cash.view`   |
+| POST   | `/cash-categories`                  | Tạo danh mục `{ name, direction }` (không ghi công nợ)                    | `cash.manage` |
+| PATCH  | `/cash-categories/:id`              | Đổi `name`, `isActive` (danh mục hệ thống không ngưng được)               | `cash.manage` |
+| GET    | `/cash-transactions`                | Danh sách phiếu + `summary` kỳ (`?format=xlsx`)                           | `cash.view`   |
+| GET    | `/cash-transactions/:id`            | Chi tiết (kèm `allocations[]` nếu là phiếu thu nợ khách)                  | `cash.view`   |
+| POST   | `/cash-transactions`                | Lập phiếu thu/chi (**Idempotency-Key**)                                   | `cash.create` |
+| PATCH  | `/cash-transactions/:id`            | Chỉ sửa ghi chú `{ note }`                                                | `cash.create` |
+| POST   | `/cash-transactions/:id/cancel`     | Hủy phiếu `{ reason }` (bắt buộc)                                         | `cash.cancel` |
+| POST   | `/customers/:id/receipts`           | Thu nợ nhanh theo khách (**Idempotency-Key**)                             | `cash.create` |
+
+Lỗi thường gặp: `404` quỹ / phiếu thuộc chi nhánh khác; `409 DUPLICATE_NAME` (trùng tên quỹ trong chi nhánh, trùng tên danh mục cùng hướng); `422 INVALID_STATE`; `422 ALLOCATION_EXCEEDS`.
+
+**Quỹ** (`CashAccount`): `{ id, name, type, openingBalance, balance, isActive, hasTransactions }`. `balance = openingBalance + Σ thu − Σ chi` của phiếu `completed`. `openingBalance` (số nguyên đồng ≥ 0) chỉ đổi được khi `hasTransactions = false`, ngược lại `422 INVALID_STATE`.
+
+**Danh mục hệ thống quyết định phiếu có ghi công nợ** (theo `category.code`, không theo tên). Chỉ bốn danh mục này ghi `debt_ledger` (cùng chi nhánh, cùng transaction):
+
+| `code`              | Hướng | Đối tượng (`party`) bắt buộc | Công nợ                                 |
+| ------------------- | ----- | ---------------------------- | --------------------------------------- |
+| `customer_payment`  | thu   | khách hàng                   | khách **giảm** (và cấn trừ hóa đơn)     |
+| `customer_refund`   | chi   | khách hàng                   | khách **tăng** (hoàn tiền cho khách)    |
+| `supplier_payment`  | chi   | nhà cung cấp                 | NCC **giảm** (trả nợ NCC)               |
+| `supplier_refund`   | thu   | nhà cung cấp                 | NCC **tăng** (NCC hoàn tiền)            |
+
+Danh mục khác (cước vận chuyển, xăng xe, thu khác…): `party` tùy chọn (khách / NCC / nhân viên) hoặc `partyName` chữ, `vehicleRef` cho biển số xe; **không ghi công nợ** (nhân viên chỉ là người nộp/nhận để tra cứu). Thiếu hoặc sai loại đối tượng với danh mục ghi nợ → `400`; đối tác nội bộ (chuyển kho) → `404`.
 
 ```json
-// GET /cash-transactions?from=2026-11-01&to=2026-11-03
+// GET /cash-transactions?from=2026-11-01&to=2026-11-03&accountId=…
 {
   "summary": {
-    "openingBalance": "300000000",
-    "totalIn": "100000000",
+    "openingBalance": "300000000", // quỹ đầu kỳ của các quỹ đang xét + thu − chi các phiếu hoàn tất trước `from`
+    "totalIn": "100000000", // theo TOÀN BỘ bộ lọc (không chỉ trang hiện tại), chỉ phiếu hoàn tất
     "totalOut": "150000000",
-    "closingBalance": "250000000"
+    "closingBalance": "250000000" // đến hết `to`; theo quỹ đang xét, không theo lọc loại/đối tượng/từ khóa
   },
   "data": [
     {
       "id": "…",
-      "code": "CTM002305",
+      "code": "CTM002305", // TT… phiếu thu, CTM… phiếu chi
+      "branchId": "…",
       "direction": "out",
-      "amount": "2800000",
-      "category": { "id": "…", "name": "SỬA CHỮA KHO" },
-      "account": { "id": "…", "name": "Tiền mặt", "type": "cash" },
-      "party": null,
-      "partyName": null,
+      "amount": "2800000", // luôn dương; chiều thu/chi do direction
+      "category": { "id": "…", "code": "warehouse_repair", "name": "Sửa chữa kho" },
+      "account": { "id": "…", "name": "Tiền mặt - Sài Gòn", "type": "cash" },
+      "party": null, // { type: customer|supplier|employee, id, code, name } khi chọn đối tượng trong hệ thống
+      "partyName": "Thợ sửa kho", // tên dạng chữ khi không có party
       "vehicleRef": null,
       "occurredAt": "…",
+      "refType": null, // "invoice" = tiền thu lúc xuất hóa đơn; "import" = nhập từ file KiotViet
       "note": null,
-      "status": "completed"
+      "status": "completed",
+      "createdBy": { "id": "…", "fullName": "…" },
+      "createdAt": "…",
+      "cancelledAt": null,
+      "cancelReason": null
     }
   ],
   "meta": { "page": 1, "limit": 20, "total": 32, "totalPages": 2 }
 }
 ```
 
-`amount` luôn **dương**; chiều thu/chi do `direction`. `summary` tính cho toàn bộ bộ lọc (không chỉ trang hiện tại).
+Bộ lọc: `from`, `to` (giờ Việt Nam, gồm cả ngày), `direction`, `categoryId`, `accountId`, `partyType`, `partyId`, `status`, `q` (tìm không dấu theo mã phiếu, tên người nộp/nhận, ghi chú), `sort` (`occurredAt` mặc định giảm dần, `code`, `amount`). `?format=xlsx` tải Excel theo đúng bộ lọc với tiêu đề như file Sổ quỹ KiotViet: `Mã phiếu`, `Thời gian`, `Loại thu chi`, `Người nộp/nhận`, `Giá trị` (thu dương, chi âm), thêm `Quỹ`, `Ghi chú`, `Trạng thái`.
 
 ```json
-// POST /cash-transactions
+// POST /cash-transactions   (Idempotency-Key bắt buộc)
 {
   "direction": "out",
-  "amount": "4300000",
-  "categoryId": "…",
-  "accountId": "…",
-  "occurredAt": "…?",
-  "party": { "type": "supplier", "id": "…" }, // tùy chọn; hoặc dùng partyName (chữ) khi không có trong hệ thống
-  "partyName": null,
-  "vehicleRef": null, // biển số/xe cho chi phí vận chuyển, xăng xe
-  "allocations": [{ "invoiceId": "…", "amount": "4300000" }], // chỉ khi thu nợ khách (direction=in, party.type=customer)
+  "amount": "4300000", // số nguyên đồng > 0
+  "categoryId": "…", // phải đang dùng và cùng hướng
+  "accountId": "…", // quỹ thuộc chi nhánh làm việc, đang hoạt động
+  "occurredAt": "…?", // mặc định bây giờ, không ở tương lai
+  "party": { "type": "supplier", "id": "…" }, // bắt buộc với 4 danh mục ghi công nợ
+  "partyName": null, // tên chữ khi không có trong hệ thống (bỏ qua nếu có party)
+  "vehicleRef": null,
+  "allocations": [{ "invoiceId": "…", "amount": "4300000" }], // chỉ phiếu thu nợ khách
   "note": null
 }
 ```
 
-- **Thu nợ khách** nên dùng `POST /customers/:id/receipts` (tiện hơn); `cash-transactions` dùng cho thu/chi khác và trả nợ NCC (`party.type = "supplier"`, danh mục "Công nợ").
-- Phiếu đã tạo **không sửa**, chỉ hủy.
+**Thu nợ khách và cấn trừ hóa đơn** (`customer_payment`, hoặc `POST /customers/:id/receipts` với body `{ accountId, amount, occurredAt?, allocations?, note? }`):
+- `allocations` **bỏ trống** → tự cấn vào các hóa đơn còn nợ **cũ nhất** của khách tại chi nhánh (theo `invoicedAt`, `code`) cho tới khi hết tiền.
+- `allocations: []` → không cấn (khách trả trước).
+- Có danh sách → cấn đúng theo đó: hóa đơn phải `completed`, cùng khách và chi nhánh; mỗi khoản ≤ **còn nợ** của hóa đơn, tổng ≤ `amount`; vi phạm → `422 ALLOCATION_EXCEEDS` (`details[].field = allocations.N.amount | allocations.N.invoiceId | allocations`), không ghi gì.
+- Phần tiền không cấn vẫn ghi giảm công nợ khách (số dư công nợ **được phép âm** khi khách trả dư).
+- **Còn nợ của hóa đơn** (`debt` ở `/invoices`) = khách cần trả − thu lúc xuất − đã cấn trừ − phiếu trả hàng hoàn tất gắn hóa đơn, không âm. `GET /invoices?customerId=…&hasDebt=true` là danh sách hóa đơn còn nợ để chọn cấn trừ.
+
+**Cảnh báo mềm** (`warnings[]`, chỉ trong phản hồi tạo phiếu, không chặn): `CASH_NEGATIVE` — phiếu chi làm số dư quỹ xuống dưới 0 (vẫn ghi phiếu).
+
+**Phiếu đã lập không sửa** (trừ ghi chú); sai thì hủy rồi lập lại. **Hủy** (`reason` bắt buộc): phiếu → `cancelled`, **đảo bút toán công nợ** của phiếu (nếu có); các dòng cấn trừ giữ nguyên nhưng không còn được tính nên hóa đơn quay lại còn nợ. Đã hủy → `422 INVALID_STATE`. Phiếu thu sinh khi **xuất hóa đơn** (`refType = invoice`) không hủy riêng được (`409 INVALID_STATE`): hủy hóa đơn gốc. Hóa đơn đã được cấn trừ bởi phiếu thu còn hiệu lực không hủy được (`409`): hủy phiếu thu trước.
 
 ---
 
@@ -1046,7 +1080,7 @@ Dùng cho import hàng loạt (chuyển dữ liệu từ KiotViet và nhập tay
 
 | Method | Đường dẫn                 | Mô tả                                                                                          | Quyền        |
 | ------ | ------------------------- | ---------------------------------------------------------------------------------------------- | ------------ |
-| POST   | `/imports/:type`          | Tải file lên (`multipart/form-data`, field `file`, ≤ 10 MB). `type`: `products`, `customers` | `import.run` |
+| POST   | `/imports/:type`          | Tải file lên (`multipart/form-data`, field `file`, ≤ 10 MB). `type`: `products`, `customers`, `cash-transactions` | `import.run` |
 | GET    | `/imports/:id`            | Kết quả và lỗi từng dòng của một lần nhập                                                      | `import.run` |
 | GET    | `/imports/:type/template` | Tải file Excel mẫu                                                                             | `import.run` |
 
@@ -1137,6 +1171,13 @@ Nhập thật có thể chạy bằng dòng lệnh: `pnpm --filter @kiot/api kio
 
 - Nên cho người dùng chạy `dryRun=true` trước, xem lỗi rồi mới chạy thật (`dryRun=false`).
 - Import số dư đầu kỳ (tồn, nợ, quỹ) **không** mở cho giao diện; backend chạy bằng công cụ riêng khi chuyển đổi.
+
+**`cash-transactions`** — nhập Sổ quỹ theo file `SoQuy_…` của KiotViet (`GET /imports/cash-transactions/template`). Cần `import.run` **và** `cash.manage`; bắt buộc `branchId` (file không ghi chi nhánh), tùy chọn `accountId` (quỹ nhận phiếu; mặc định quỹ tiền mặt đang hoạt động của chi nhánh). Chỉ có chế độ mặc định (`mode=add` → `400`).
+- Cột: `Mã phiếu`, `Thời gian` (giờ Việt Nam: ô ngày giờ Excel hoặc chữ `dd/MM/yyyy HH:mm`), `Loại thu chi`, `Người nộp/nhận`, `Giá trị` (**dương = thu, âm = chi**, số nguyên đồng khác 0).
+- Giữ nguyên mã phiếu của file (trùng mã đã có hoặc trùng trong file → lỗi dòng); bộ đếm `TT`/`CTM` được nâng lên số lớn nhất + 1.
+- `Loại thu chi` map sang danh mục hệ thống theo từ khóa (Tiền khách trả, Công nợ, Cước hàng hoàn, Phí thu hộ, Palet/Bến, Thuê xe ngoài, Xăng xe, Sửa chữa kho, Xử lý hàng lỗi, Chuyển/Rút…); không nhận ra → "Thu khác"/"Chi khác" kèm **cảnh báo**; chuỗi gốc giữ ở `note`; "Xăng xe <biển số> (…)" tách biển số vào `vehicleRef`. `Người nộp/nhận` chỉ lưu thành `partyName` (chữ).
+- **Chỉ ghi lịch sử quỹ** (`refType = import`): **không ghi công nợ, không cấn trừ hóa đơn** (công nợ lấy từ số dư đầu kỳ của khách / NCC).
+- Bốn dòng tổng kết cuối file (không có mã; nhãn `Quỹ đầu kỳ`, `Tổng thu`, `Tổng chi`, `Tồn quỹ` ở cột Người nộp/nhận) **không được nhập**: dùng để đặt quỹ đầu kỳ (chỉ khi quỹ đích **chưa có phiếu nào**; quỹ đã có phiếu → giữ nguyên + cảnh báo) và **đối chiếu** tổng thu, tổng chi, tồn quỹ cuối — lệch → lỗi, không ghi gì.
 
 ---
 

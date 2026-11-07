@@ -10,6 +10,9 @@
  * `--type customers`: nhập khách hàng theo file TKS (cập nhật theo mã/tên, không cần --branch; công nợ đầu kỳ nằm trong
  * các cột "Công nợ <chi nhánh>"), vd: kiotviet:import -- --type customers --file <file.xlsx> [--apply]
  *
+ * `--type cash-transactions`: nhập file Sổ quỹ (SoQuy_…) vào quỹ tiền mặt của chi nhánh `--branch` (hoặc quỹ chỉ định bằng
+ * `--account <id>`); không ghi công nợ. Vd: kiotviet:import -- --type cash-transactions --branch HN --file <file.xlsx> [--apply]
+ *
  * Chế độ "thêm" (cộng tồn): chạy lại cùng file bị từ chối (409). Nhật ký ghi theo người dùng `--user` (mặc định quanly).
  */
 import 'dotenv/config';
@@ -39,9 +42,9 @@ const branchCode = arg('branch');
 const type = arg('type') ?? 'products';
 const username = arg('user') ?? 'quanly';
 const apply = process.argv.includes('--apply');
-if (!fileArg || (type === 'products' && !branchCode)) {
+if (!fileArg || ((type === 'products' || type === 'cash-transactions') && !branchCode)) {
   console.error(
-    'Cần --file <đường dẫn .xlsx>; với hàng hóa cần thêm --branch <mã chi nhánh, vd HN>',
+    'Cần --file <đường dẫn .xlsx>; với hàng hóa và sổ quỹ cần thêm --branch <mã chi nhánh, vd HN>',
   );
   process.exit(2);
 }
@@ -90,7 +93,9 @@ try {
         { originalname: basename(path), size: buffer.length, buffer },
         type === 'products'
           ? { dryRun: !apply, branchId: branch!.id, mode: 'add' }
-          : { dryRun: !apply, mode: 'overwrite' },
+          : type === 'cash-transactions'
+            ? { dryRun: !apply, branchId: branch!.id, accountId: arg('account'), mode: 'overwrite' }
+            : { dryRun: !apply, mode: 'overwrite' },
       ),
   );
 

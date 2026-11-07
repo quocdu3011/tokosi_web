@@ -225,6 +225,13 @@
       "when": 1793985156706,
       "tag": "0031_cap_quyen_huy_tra_hang_ban",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794040386285,
+      "tag": "0032_nhap_so_quy_tu_excel",
+      "breakpoints": true
     }
   ]
 }

@@ -24,7 +24,7 @@
 | `doc_status` | `completed`, `cancelled` |
 | `import_mode` | `overwrite`, `add` |
 | `import_status` | `queued`, `running`, `completed`, `failed` |
-| `import_type` | `products`, `customers`, `suppliers`, `price-books` |
+| `import_type` | `products`, `customers`, `suppliers`, `price-books`, `cash-transactions` |
 | `ledger_entry_type` | `opening`, `invoice`, `payment`, `return`, `adjustment`, `transfer` |
 | `liquidation_status` | `normal`, `clearance`, `disabled`, `high_stock`, `priority_stock` |
 | `order_status` | `draft`, `completed`, `cancelled` |

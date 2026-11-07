@@ -326,6 +326,12 @@ export class UpdateSaleNoteDto {
   note!: string | null;
 }
 
+export class InvoiceAllocationDto {
+  @ApiProperty({ example: 'TT000123' }) cashCode!: string;
+  @ApiProperty({ type: String, format: 'date-time' }) occurredAt!: string;
+  @ApiProperty() amount!: string;
+}
+
 export class InvoiceItemDto {
   @ApiProperty() lineNo!: number;
   @ApiProperty() productId!: string;
@@ -368,7 +374,12 @@ export class InvoiceDto {
   @ApiProperty({ description: 'Giảm giá hóa đơn' }) discount!: string;
   @ApiProperty({ description: 'Khách cần trả' }) total!: string;
   @ApiProperty({ description: 'Khách đã trả (thu lúc xuất + cấn trừ thu nợ về sau)' }) paid!: string;
-  @ApiProperty({ description: 'Còn nợ = khách cần trả − đã trả' }) debt!: string;
+  @ApiProperty({ description: 'Tổng phiếu trả hàng hoàn tất gắn hóa đơn này' }) returned!: string;
+  @ApiProperty({
+    description:
+      'Còn nợ = khách cần trả − đã trả − phiếu trả hàng gắn hóa đơn, không âm (khách trả dư thì phần dư nằm ở công nợ khách)',
+  })
+  debt!: string;
   @ApiProperty() totalQty!: string;
   @ApiProperty() itemCount!: number;
   @ApiProperty({ nullable: true, type: String }) note!: string | null;
@@ -381,6 +392,11 @@ export class InvoiceDto {
   items?: InvoiceItemDto[];
   @ApiPropertyOptional({ type: [InvoicePaymentDto], description: 'Chỉ ở chi tiết' })
   payments?: InvoicePaymentDto[];
+  @ApiPropertyOptional({
+    type: [InvoiceAllocationDto],
+    description: 'Các khoản thu nợ về sau đã cấn trừ vào hóa đơn (phiếu thu còn hiệu lực); chỉ ở chi tiết',
+  })
+  allocations?: InvoiceAllocationDto[];
   @ApiPropertyOptional({
     description:
       'Lãi gộp = tổng tiền hàng − giảm giá − Σ(SL × giá vốn). Chỉ ở chi tiết và chỉ khi có product.cost.view',

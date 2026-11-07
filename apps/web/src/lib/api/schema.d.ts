@@ -653,6 +653,167 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/cash-accounts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Quỹ (tiền mặt / ngân hàng) của chi nhánh làm việc kèm số dư
+     * @description Số dư = quỹ đầu kỳ + tổng thu − tổng chi của các phiếu hoàn tất, tính khi đọc.
+     */
+    get: operations['CashAccountsController_list'];
+    put?: never;
+    /** Tạo quỹ cho chi nhánh làm việc */
+    post: operations['CashAccountsController_create'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/cash-accounts/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Sửa tên / ngưng hoạt động / quỹ đầu kỳ
+     * @description Quỹ đầu kỳ chỉ đổi được khi quỹ chưa có phiếu nào.
+     */
+    patch: operations['CashAccountsController_update'];
+    trace?: never;
+  };
+  '/api/v1/cash-categories': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Danh mục thu chi (dùng chung hai chi nhánh) */
+    get: operations['CashCategoriesController_list'];
+    put?: never;
+    /** Tạo danh mục thu chi (không ghi công nợ) */
+    post: operations['CashCategoriesController_create'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/cash-categories/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Đổi tên / ngưng danh mục
+     * @description Danh mục hệ thống (`isSystem`) đổi tên được nhưng không ngưng hoạt động và không đổi hướng (hướng không đổi được với mọi danh mục).
+     */
+    patch: operations['CashCategoriesController_update'];
+    trace?: never;
+  };
+  '/api/v1/cash-transactions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Sổ quỹ: danh sách phiếu thu/chi của chi nhánh làm việc kèm tổng hợp kỳ
+     * @description `summary` (tồn đầu kỳ, tổng thu, tổng chi, tồn cuối kỳ) tính cho toàn bộ bộ lọc, không chỉ trang hiện tại. `?format=xlsx` tải Excel theo đúng bộ lọc (tiêu đề như file Sổ quỹ KiotViet: giá trị thu dương, chi âm).
+     */
+    get: operations['CashTransactionsController_list'];
+    put?: never;
+    /**
+     * Lập phiếu thu/chi
+     * @description Danh mục hệ thống quyết định phiếu có ghi công nợ: "Tiền khách trả" (khách −), "Hoàn tiền khách" (khách +), "Công nợ nhà cung cấp" (NCC −), "Hoàn tiền từ nhà cung cấp" (NCC +) — bắt buộc `party` đúng loại. Danh mục khác không ghi công nợ. Thu nợ khách tự cấn trừ vào hóa đơn còn nợ cũ nhất (xem `allocations`). Phiếu chi làm quỹ âm chỉ cảnh báo (`warnings[].code = CASH_NEGATIVE`).
+     */
+    post: operations['CashTransactionsController_create'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/cash-transactions/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Chi tiết phiếu (kèm các hóa đơn đã cấn trừ nếu là phiếu thu nợ) */
+    get: operations['CashTransactionsController_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Sửa ghi chú phiếu (không sửa gì khác; muốn đổi tiền thì hủy rồi lập lại) */
+    patch: operations['CashTransactionsController_updateNote'];
+    trace?: never;
+  };
+  '/api/v1/cash-transactions/{id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Hủy phiếu thu/chi
+     * @description Đảo bút toán công nợ của phiếu (nếu có). Phiếu thu lúc xuất hóa đơn (`refType = invoice`) không hủy riêng được (409): hủy hóa đơn gốc. Đã hủy → 422 INVALID_STATE.
+     */
+    post: operations['CashTransactionsController_cancel'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/customers/{id}/receipts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Thu nợ nhanh theo khách
+     * @description Phiếu thu danh mục "Tiền khách trả" của khách tại chi nhánh làm việc; mặc định cấn trừ vào hóa đơn còn nợ cũ nhất, chọn tay được bằng `allocations`. Giảm công nợ khách cùng chi nhánh (nợ có thể âm khi khách trả dư).
+     */
+    post: operations['CustomerReceiptsController_createReceipt'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/purchase-orders': {
     parameters: {
       query?: never;
@@ -1954,6 +2115,13 @@ export interface components {
       /** @description Mã phiếu thu (TT…) ở Sổ quỹ */
       cashCode: string | null;
     };
+    InvoiceAllocationDto: {
+      /** @example TT000123 */
+      cashCode: string;
+      /** Format: date-time */
+      occurredAt: string;
+      amount: string;
+    };
     InvoiceDto: {
       id: string;
       /** @example HD016890 */
@@ -1975,7 +2143,9 @@ export interface components {
       total: string;
       /** @description Khách đã trả (thu lúc xuất + cấn trừ thu nợ về sau) */
       paid: string;
-      /** @description Còn nợ = khách cần trả − đã trả */
+      /** @description Tổng phiếu trả hàng hoàn tất gắn hóa đơn này */
+      returned: string;
+      /** @description Còn nợ = khách cần trả − đã trả − phiếu trả hàng gắn hóa đơn, không âm (khách trả dư thì phần dư nằm ở công nợ khách) */
       debt: string;
       totalQty: string;
       itemCount: number;
@@ -1992,6 +2162,8 @@ export interface components {
       items?: components['schemas']['InvoiceItemDto'][];
       /** @description Chỉ ở chi tiết */
       payments?: components['schemas']['InvoicePaymentDto'][];
+      /** @description Các khoản thu nợ về sau đã cấn trừ vào hóa đơn (phiếu thu còn hiệu lực); chỉ ở chi tiết */
+      allocations?: components['schemas']['InvoiceAllocationDto'][];
       /** @description Lãi gộp = tổng tiền hàng − giảm giá − Σ(SL × giá vốn). Chỉ ở chi tiết và chỉ khi có product.cost.view */
       grossProfit?: string;
       /** @description Cảnh báo mềm lúc xuất (vượt có thể bán, vượt hạn mức); chỉ trong phản hồi tạo hóa đơn */
@@ -2129,6 +2301,214 @@ export interface components {
       note?: string | null;
       /** @description 1–500 dòng hàng hóa */
       items: components['schemas']['SalesReturnLineDto'][];
+    };
+    CashAccountDto: {
+      id: string;
+      /** @example Tiền mặt - Sài Gòn */
+      name: string;
+      /** @enum {string} */
+      type: 'cash' | 'bank';
+      /** @description Số dư quỹ đầu kỳ (số nguyên đồng) */
+      openingBalance: string;
+      /** @description Số dư hiện tại = quỹ đầu kỳ + tổng thu − tổng chi của các phiếu hoàn tất (tính khi đọc, không lưu) */
+      balance: string;
+      isActive: boolean;
+      /** @description Đã có phiếu thu/chi (hoàn tất hoặc đã hủy): khi đó không sửa được quỹ đầu kỳ */
+      hasTransactions: boolean;
+    };
+    CashAccountListDto: {
+      data: components['schemas']['CashAccountDto'][];
+    };
+    CreateCashAccountDto: {
+      name: string;
+      /** @enum {string} */
+      type: 'cash' | 'bank';
+      /**
+       * @description Quỹ đầu kỳ, số nguyên đồng ≥ 0 (mặc định 0)
+       * @example 369310338
+       */
+      openingBalance?: string;
+    };
+    UpdateCashAccountDto: {
+      name?: string;
+      /** @description Chỉ đổi được khi quỹ CHƯA có phiếu nào (đổi số đầu kỳ làm sai mọi số dư lịch sử), ngược lại 422 INVALID_STATE */
+      openingBalance?: string;
+      /** @description Ngưng hoạt động: không nhận phiếu mới */
+      isActive?: boolean;
+    };
+    CashCategoryDto: {
+      id: string;
+      /** @description Khóa ổn định của danh mục hệ thống (customer_payment, customer_refund, supplier_payment, supplier_refund, other_in…); danh mục tự tạo là null */
+      code: string | null;
+      name: string;
+      /** @enum {string} */
+      direction: 'in' | 'out';
+      /** @description Danh mục hệ thống: không đổi hướng, không ngưng hoạt động */
+      isSystem: boolean;
+      isActive: boolean;
+      sortOrder: number;
+    };
+    CashCategoryListDto: {
+      data: components['schemas']['CashCategoryDto'][];
+    };
+    CreateCashCategoryDto: {
+      name: string;
+      /** @enum {string} */
+      direction: 'in' | 'out';
+    };
+    UpdateCashCategoryDto: {
+      name?: string;
+      /** @description Danh mục hệ thống không ngưng được */
+      isActive?: boolean;
+    };
+    CashSummaryDto: {
+      /** @description Tồn quỹ đầu kỳ = quỹ đầu kỳ của các quỹ + thu − chi các phiếu hoàn tất trước `from` */
+      openingBalance: string;
+      /** @description Tổng thu của phiếu hoàn tất khớp bộ lọc (toàn bộ, không chỉ trang hiện tại) */
+      totalIn: string;
+      /** @description Tổng chi của phiếu hoàn tất khớp bộ lọc */
+      totalOut: string;
+      /** @description Tồn quỹ cuối kỳ (đến hết `to`); tính theo quỹ đang xét, không theo các bộ lọc loại/đối tượng */
+      closingBalance: string;
+    };
+    CashCategoryRefDto: {
+      id: string;
+      code: string | null;
+      name: string;
+    };
+    CashAccountRefDto: {
+      id: string;
+      name: string;
+      /** @enum {string} */
+      type: 'cash' | 'bank';
+    };
+    CashPartyDto: {
+      /** @enum {string} */
+      type: 'customer' | 'supplier' | 'employee';
+      id: string;
+      /** @description Mã khách / nhà cung cấp / nhân viên */
+      code: string | null;
+      name: string;
+    };
+    CashAllocationDto: {
+      invoiceId: string;
+      /** @example HD016890 */
+      invoiceCode: string;
+      amount: string;
+    };
+    CashWarningDto: {
+      /** @enum {string} */
+      code: 'CASH_NEGATIVE';
+      message: string;
+    };
+    CashTransactionDto: {
+      id: string;
+      /**
+       * @description TT… phiếu thu, CTM… phiếu chi
+       * @example TT000123
+       */
+      code: string;
+      branchId: string;
+      /** @enum {string} */
+      direction: 'in' | 'out';
+      /** @description Luôn dương */
+      amount: string;
+      category: components['schemas']['CashCategoryRefDto'];
+      account: components['schemas']['CashAccountRefDto'];
+      party: components['schemas']['CashPartyDto'] | null;
+      /** @description Tên người nộp/nhận dạng chữ (khi không có `party`) */
+      partyName: string | null;
+      vehicleRef: string | null;
+      /** Format: date-time */
+      occurredAt: string;
+      /** @description Nguồn phát sinh: invoice (thu lúc xuất hóa đơn), import… */
+      refType: string | null;
+      note: string | null;
+      /** @enum {string} */
+      status: 'completed' | 'cancelled';
+      createdBy: components['schemas']['DocPersonDto'] | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      cancelledAt: string | null;
+      cancelReason: string | null;
+      /** @description Các hóa đơn đã cấn trừ (chỉ phiếu thu nợ khách, chỉ ở chi tiết) */
+      allocations?: components['schemas']['CashAllocationDto'][];
+      /** @description Cảnh báo mềm, chỉ trong phản hồi tạo phiếu */
+      warnings?: components['schemas']['CashWarningDto'][];
+    };
+    CashTransactionListDto: {
+      summary: components['schemas']['CashSummaryDto'];
+      data: components['schemas']['CashTransactionDto'][];
+      meta: components['schemas']['DocMetaDto'];
+    };
+    CashAllocationInputDto: {
+      /** @description Hóa đơn hoàn tất của khách, cùng chi nhánh */
+      invoiceId: string;
+      /**
+       * @description Số nguyên đồng > 0, không vượt còn nợ của hóa đơn
+       * @example 4300000
+       */
+      amount: string;
+    };
+    CashPartyInputDto: {
+      /** @enum {string} */
+      type: 'customer' | 'supplier' | 'employee';
+      id: string;
+    };
+    CreateCashTransactionDto: {
+      /**
+       * Format: date-time
+       * @description Mặc định bây giờ; không ở tương lai
+       */
+      occurredAt?: string;
+      /** @description Chỉ khi thu nợ khách (danh mục "Tiền khách trả"). Bỏ trống = tự cấn vào hóa đơn còn nợ cũ nhất; `[]` = không cấn (khách trả trước); có danh sách = cấn đúng theo đó. Phần không cấn ghi vào công nợ khách (nợ có thể âm) */
+      allocations?: components['schemas']['CashAllocationInputDto'][];
+      note?: string | null;
+      /**
+       * @description Phải khớp hướng của danh mục
+       * @enum {string}
+       */
+      direction: 'in' | 'out';
+      /**
+       * @description Số nguyên đồng > 0 (luôn dương; chiều thu/chi do `direction`)
+       * @example 4300000
+       */
+      amount: string;
+      categoryId: string;
+      /** @description Quỹ thuộc chi nhánh làm việc và đang hoạt động */
+      accountId: string;
+      /** @description Đối tượng trong hệ thống. BẮT BUỘC (đúng loại) với danh mục ghi công nợ: "Tiền khách trả" và "Hoàn tiền khách" cần khách, "Công nợ nhà cung cấp" và "Hoàn tiền từ nhà cung cấp" cần nhà cung cấp. Danh mục khác: tùy chọn, không ghi công nợ */
+      party?: components['schemas']['CashPartyInputDto'];
+      /** @description Tên người nộp/nhận dạng chữ khi không có trong hệ thống (bỏ qua nếu có `party`) */
+      partyName?: string | null;
+      /** @description Biển số / xe cho chi phí vận chuyển, xăng xe */
+      vehicleRef?: string | null;
+    };
+    UpdateCashTransactionNoteDto: {
+      /** @description Chỉ sửa được ghi chú */
+      note: string | null;
+    };
+    CancelCashTransactionDto: {
+      /** @description Lý do hủy (bắt buộc) */
+      reason: string;
+    };
+    CreateCustomerReceiptDto: {
+      /**
+       * Format: date-time
+       * @description Mặc định bây giờ; không ở tương lai
+       */
+      occurredAt?: string;
+      /** @description Chỉ khi thu nợ khách (danh mục "Tiền khách trả"). Bỏ trống = tự cấn vào hóa đơn còn nợ cũ nhất; `[]` = không cấn (khách trả trước); có danh sách = cấn đúng theo đó. Phần không cấn ghi vào công nợ khách (nợ có thể âm) */
+      allocations?: components['schemas']['CashAllocationInputDto'][];
+      note?: string | null;
+      /** @description Quỹ nhận tiền, thuộc chi nhánh làm việc */
+      accountId: string;
+      /**
+       * @description Số nguyên đồng > 0
+       * @example 4300000
+       */
+      amount: string;
     };
     DocPartyDto: {
       id: string;
@@ -2793,7 +3173,7 @@ export interface components {
     ImportJobDto: {
       id: string;
       /** @enum {string} */
-      type: 'products' | 'customers' | 'suppliers';
+      type: 'products' | 'customers' | 'suppliers' | 'cash-transactions';
       /**
        * @description `overwrite` = đè theo mã; `add` = cộng thêm tồn kho (cột Tồn kho), giữ nguyên thông tin cũ
        * @enum {string}
@@ -4179,6 +4559,371 @@ export interface operations {
       };
     };
   };
+  CashAccountsController_list: {
+    parameters: {
+      query?: {
+        /** @description Lấy cả quỹ đã ngưng hoạt động (mặc định chỉ quỹ đang hoạt động) */
+        includeInactive?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CashAccountListDto'];
+        };
+      };
+    };
+  };
+  CashAccountsController_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateCashAccountDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CashAccountDto'];
+        };
+      };
+      /** @description DUPLICATE_NAME: trùng tên quỹ trong chi nhánh */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  CashAccountsController_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateCashAccountDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CashAccountDto'];
+        };
+      };
+      /** @description Quỹ không có hoặc thuộc chi nhánh khác */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description INVALID_STATE: đổi quỹ đầu kỳ khi đã có phiếu */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  CashCategoriesController_list: {
+    parameters: {
+      query?: {
+        direction?: 'in' | 'out';
+        /** @description Lấy cả danh mục đã ngưng (mặc định chỉ danh mục đang dùng) */
+        includeInactive?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CashCategoryListDto'];
+        };
+      };
+    };
+  };
+  CashCategoriesController_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateCashCategoryDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CashCategoryDto'];
+        };
+      };
+      /** @description DUPLICATE_NAME */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  CashCategoriesController_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateCashCategoryDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CashCategoryDto'];
+        };
+      };
+      /** @description Không có danh mục */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description INVALID_STATE: ngưng danh mục hệ thống */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  CashTransactionsController_list: {
+    parameters: {
+      query?: {
+        page?: number;
+        limit?: number;
+        /** @description Tên cột cần sắp xếp; thêm `-` phía trước để giảm dần. Chỉ nhận các cột endpoint cho phép */
+        sort?: string;
+        /** @description Tìm không dấu theo mã phiếu, tên người nộp/nhận, ghi chú */
+        q?: string;
+        direction?: 'in' | 'out';
+        categoryId?: string;
+        accountId?: string;
+        partyType?: 'customer' | 'supplier' | 'employee';
+        partyId?: string;
+        status?: 'completed' | 'cancelled';
+        /** @description Từ ngày (giờ Việt Nam, gồm cả ngày) */
+        from?: string;
+        /** @description Đến ngày (gồm cả ngày) */
+        to?: string;
+        /** @description xlsx = tải Excel theo đúng bộ lọc (bỏ qua page/limit, tối đa 10.000 phiếu) */
+        format?: 'xlsx';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CashTransactionListDto'];
+        };
+      };
+    };
+  };
+  CashTransactionsController_create: {
+    parameters: {
+      query?: never;
+      header: {
+        'Idempotency-Key': string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateCashTransactionDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CashTransactionDto'];
+        };
+      };
+      /** @description ALLOCATION_EXCEEDS: cấn trừ vượt tiền thu hoặc vượt còn nợ của hóa đơn */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  CashTransactionsController_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CashTransactionDto'];
+        };
+      };
+      /** @description Không có phiếu (hoặc thuộc chi nhánh khác) */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  CashTransactionsController_updateNote: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateCashTransactionNoteDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CashTransactionDto'];
+        };
+      };
+    };
+  };
+  CashTransactionsController_cancel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CancelCashTransactionDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CashTransactionDto'];
+        };
+      };
+    };
+  };
+  CustomerReceiptsController_createReceipt: {
+    parameters: {
+      query?: never;
+      header: {
+        'Idempotency-Key': string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateCustomerReceiptDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CashTransactionDto'];
+        };
+      };
+      /** @description ALLOCATION_EXCEEDS */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   PurchaseOrdersController_list: {
     parameters: {
       query?: {
@@ -5451,6 +6196,8 @@ export interface operations {
         dryRun?: boolean;
         /** @description Chi nhánh làm việc. Bắt buộc khi mode=add (cộng/trừ tồn kho của chi nhánh đó); ở chế độ đè có thể bỏ trống vì không có cột nào của hàng hóa phụ thuộc chi nhánh */
         branchId?: string;
+        /** @description Chỉ với type=cash-transactions: quỹ nhận các phiếu (thuộc chi nhánh branchId, bắt buộc có branchId). Bỏ trống = quỹ tiền mặt đang hoạt động của chi nhánh */
+        accountId?: string;
       };
       header?: never;
       path: {

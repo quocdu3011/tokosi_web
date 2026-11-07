@@ -76,6 +76,7 @@ export const importType = pgEnum('import_type', [
   'customers',
   'suppliers',
   'price-books',
+  'cash-transactions',
 ]);
 export const importStatus = pgEnum('import_status', [
   'queued',

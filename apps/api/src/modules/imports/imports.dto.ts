@@ -2,9 +2,18 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsUUID } from 'class-validator';
 import { QueryBoolean } from '../../common/query.js';
 
-export const IMPORT_TYPES = ['products', 'customers', 'suppliers'] as const;
+export const IMPORT_TYPES = [
+  'products',
+  'customers',
+  'suppliers',
+  'cash-transactions',
+] as const;
 /** Loại đã hỗ trợ; nhà cung cấp sẽ làm cùng đợt chuyển dữ liệu NCC. */
-export const SUPPORTED_IMPORT_TYPES = ['products', 'customers'] as const;
+export const SUPPORTED_IMPORT_TYPES = [
+  'products',
+  'customers',
+  'cash-transactions',
+] as const;
 export type SupportedImportType = (typeof SUPPORTED_IMPORT_TYPES)[number];
 
 /** `overwrite` (mặc định): đè thông tin theo mã. `add`: cộng thêm số lượng, giữ nguyên thông tin cũ. */
@@ -100,4 +109,12 @@ export class ImportQueryDto {
   @IsOptional()
   @IsUUID()
   branchId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Chỉ với type=cash-transactions: quỹ nhận các phiếu (thuộc chi nhánh branchId, bắt buộc có branchId). Bỏ trống = quỹ tiền mặt đang hoạt động của chi nhánh',
+  })
+  @IsOptional()
+  @IsUUID()
+  accountId?: string;
 }

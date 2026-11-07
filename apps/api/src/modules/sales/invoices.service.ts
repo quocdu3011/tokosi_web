@@ -49,6 +49,7 @@ import {
   resolveTime,
   summarizeLines,
 } from '../purchasing/purchase-lines.js';
+import { balancesOf, outstandingExpr, type InvoiceBalance } from './invoice-balance.js';
 import { OrdersService, saleSearch } from './orders.service.js';
 import {
   canSeeDebt,
@@ -67,6 +68,7 @@ import {
   type InvoiceDto,
   type InvoiceFromOrderDto,
   type InvoiceItemDto,
+  type InvoiceAllocationDto,
   type InvoicePaymentDto,
   type ListInvoicesQueryDto,
   type PaymentInputDto,
@@ -119,7 +121,6 @@ export class InvoicesService {
   ) {
     const own = (await scopeOf(this.permissions, user, 'invoice.view')) === 'own';
     const { start, endExclusive } = dayRange(q.from, q.to);
-    const debtLeft = sql`${invoices.total} - ${invoices.paidTotal}`;
     const where = and(
       eq(invoices.branchId, branchId),
       own ? eq(invoices.sellerId, user.id) : undefined,
@@ -132,7 +133,7 @@ export class InvoicesService {
         ? undefined
         : and(
             eq(invoices.status, 'completed'),
-            q.hasDebt ? sql`${debtLeft} > 0` : sql`${debtLeft} <= 0`,
+            q.hasDebt ? sql`${outstandingExpr} > 0` : sql`${outstandingExpr} <= 0`,
           ),
       start ? gte(invoices.invoicedAt, start) : undefined,
       endExclusive ? lt(invoices.invoicedAt, endExclusive) : undefined,
@@ -161,8 +162,9 @@ export class InvoicesService {
     const ids = rows.map((r) => r.r.id);
     const canCost = await this.permissions.has(user.role, 'product.cost.view');
     const items = await this.itemsOf(this.db, ids, canCost);
+    const bal = await balancesOf(this.db, ids);
     return {
-      data: rows.map((r) => this.toDto(r, items.get(r.r.id) ?? [], false)),
+      data: rows.map((r) => this.toDto(r, items.get(r.r.id) ?? [], false, bal.get(r.r.id))),
       meta: pageMeta(page, limit, total),
       itemsById: items,
       customerAddress: new Map(rows.map((r) => [r.r.id, r.cAddress])),
@@ -182,8 +184,9 @@ export class InvoicesService {
     if (!row) throw notFound('hóa đơn');
     const canCost = await this.permissions.has(user.role, 'product.cost.view');
     const items = (await this.itemsOf(this.db, [id], canCost)).get(id) ?? [];
-    const dto = this.toDto(row, items, true);
+    const dto = this.toDto(row, items, true, (await balancesOf(this.db, [id])).get(id));
     dto.payments = await this.paymentsOf(this.db, id);
+    dto.allocations = await this.allocationsOf(this.db, id);
     if (canCost) {
       const cost = items.reduce(
         (s, i) => s.plus(dec(i.qty).times(dec(i.unitCost ?? '0'))),
@@ -385,10 +388,20 @@ export class InvoicesService {
           `Hóa đơn đã có phiếu trả hàng ${ret.code}, hãy hủy phiếu trả trước`,
         );
       }
+      // Chỉ cấn trừ của phiếu thu còn hiệu lực mới chặn (phiếu đã hủy thì dòng cấn trừ không còn tính)
       const [alloc] = await tx
         .select({ id: paymentAllocations.id })
         .from(paymentAllocations)
-        .where(eq(paymentAllocations.invoiceId, id));
+        .innerJoin(
+          cashTransactions,
+          eq(cashTransactions.id, paymentAllocations.cashTransactionId),
+        )
+        .where(
+          and(
+            eq(paymentAllocations.invoiceId, id),
+            eq(cashTransactions.status, 'completed'),
+          ),
+        );
       if (alloc) {
         throw new AppError(
           409,
@@ -837,6 +850,35 @@ export class InvoicesService {
     return out;
   }
 
+  private async allocationsOf(
+    db: DbOrTx,
+    id: string,
+  ): Promise<InvoiceAllocationDto[]> {
+    const rows = await db
+      .select({
+        cashCode: cashTransactions.code,
+        occurredAt: cashTransactions.occurredAt,
+        amount: paymentAllocations.amount,
+      })
+      .from(paymentAllocations)
+      .innerJoin(
+        cashTransactions,
+        eq(cashTransactions.id, paymentAllocations.cashTransactionId),
+      )
+      .where(
+        and(
+          eq(paymentAllocations.invoiceId, id),
+          eq(cashTransactions.status, 'completed'),
+        ),
+      )
+      .orderBy(asc(cashTransactions.occurredAt), asc(cashTransactions.code));
+    return rows.map((r) => ({
+      cashCode: r.cashCode,
+      occurredAt: r.occurredAt.toISOString(),
+      amount: dec(r.amount).toFixed(0),
+    }));
+  }
+
   private async paymentsOf(db: DbOrTx, id: string): Promise<InvoicePaymentDto[]> {
     const rows = await db
       .select({
@@ -878,6 +920,7 @@ export class InvoicesService {
     },
     items: InvoiceItemDto[],
     withItems: boolean,
+    bal?: InvoiceBalance,
   ): InvoiceDto {
     const r = row.r;
     const person = (id: string | null, name: string | null) =>
@@ -894,8 +937,11 @@ export class InvoicesService {
       subtotal: dec(r.subtotal).toFixed(0),
       discount: dec(r.discount).toFixed(0),
       total: dec(r.total).toFixed(0),
-      paid: dec(r.paidTotal).toFixed(0),
-      debt: dec(r.total).minus(dec(r.paidTotal)).toFixed(0),
+      paid: dec(r.paidTotal).plus(dec(bal?.allocated ?? '0')).toFixed(0),
+      returned: dec(bal?.returned ?? '0').toFixed(0),
+      debt:
+        bal?.outstanding ??
+        dec(r.total).minus(dec(r.paidTotal)).toFixed(0),
       ...summarizeLines(items),
       note: r.note,
       createdBy: person(r.createdBy, row.creatorName),

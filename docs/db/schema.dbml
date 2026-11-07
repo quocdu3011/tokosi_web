@@ -48,6 +48,7 @@ enum import_type {
   "customers"
   "suppliers"
   "price-books"
+  "cash-transactions"
 }
 
 enum ledger_entry_type {

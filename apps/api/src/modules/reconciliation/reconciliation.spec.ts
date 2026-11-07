@@ -51,6 +51,8 @@ describe('ReconciliationService (CSDL thật trong bộ nhớ)', () => {
       'debt_orphan_party',
       'cash_account_branch',
       'debt_internal_symmetry',
+      'cash_debt_vs_ledger',
+      'invoice_allocation_exceeds',
     ]);
   });
 
@@ -73,6 +75,8 @@ describe('ReconciliationService (CSDL thật trong bộ nhớ)', () => {
       debt_orphan_party: 0,
       cash_account_branch: 0,
       debt_internal_symmetry: 0,
+      cash_debt_vs_ledger: 0,
+      invoice_allocation_exceeds: 0,
     });
   });
 
@@ -160,6 +164,27 @@ describe('ReconciliationService (CSDL thật trong bộ nhớ)', () => {
       occurredAt: new Date(),
     });
     expect((await issues()).debt_internal_symmetry).toBeGreaterThanOrEqual(1);
+  });
+
+  it('bắt được phiếu thu nợ khách hoàn tất mà không có bút toán công nợ tương ứng', async () => {
+    const [cat] = await db
+      .select()
+      .from(cashCategories)
+      .where(eq(cashCategories.code, 'customer_payment'));
+    const sgAccount = (await db.select().from(cashAccounts)).find((a) => a.branchId === sg)!;
+    const [customer] = await db.select().from(customers).where(eq(customers.code, 'KH000001'));
+    await db.insert(cashTransactions).values({
+      code: 'LECH-NO-1',
+      branchId: sg,
+      direction: 'in',
+      amount: '1000',
+      categoryId: cat!.id,
+      accountId: sgAccount.id,
+      occurredAt: new Date(),
+      partyType: 'customer',
+      partyId: customer?.id ?? sgAccount.id,
+    });
+    expect((await issues()).cash_debt_vs_ledger).toBeGreaterThanOrEqual(1);
   });
 });
 

@@ -746,3 +746,6 @@ ALTER TABLE "invoices" DROP CONSTRAINT "invoices_orderId_unique";CREATE UNIQUE I
 INSERT INTO "role_permissions" ("role", "permission_code", "scope")
 SELECT "role", 'return.cancel', "scope" FROM "role_permissions" WHERE "permission_code" = 'invoice.cancel'
 ON CONFLICT ("role", "permission_code") DO NOTHING;
+
+-- ===== 0032_nhap_so_quy_tu_excel.sql =====
+ALTER TYPE "public"."import_type" ADD VALUE 'cash-transactions';

@@ -10,6 +10,7 @@ import { IdempotencyModule } from './modules/idempotency/idempotency.module.js';
 import { ImportsModule } from './modules/imports/imports.module.js';
 import { FilesModule } from './modules/files/files.module.js';
 import { PreferencesModule } from './modules/preferences/preferences.module.js';
+import { CashModule } from './modules/cash/cash.module.js';
 import { PurchasingModule } from './modules/purchasing/purchasing.module.js';
 import { SalesModule } from './modules/sales/sales.module.js';
 import { CustomersModule } from './modules/customers/customers.module.js';
@@ -28,6 +29,7 @@ import { GoogleAuthModule } from './modules/google-auth/google-auth.module.js';
     SuppliersModule,
     CustomersModule,
     SalesModule,
+    CashModule,
     PurchasingModule,
     UsersModule,
     PreferencesModule,

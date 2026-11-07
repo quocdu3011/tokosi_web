@@ -21,6 +21,7 @@ import {
   type ImportMode,
   type SupportedImportType,
 } from './imports.dto.js';
+import { importCashTransactions } from './cash.importer.js';
 import { importCustomers } from './customers.importer.js';
 import { importProducts } from './products.importer.js';
 
@@ -57,6 +58,7 @@ export class ImportsService {
     opts: {
       dryRun: boolean;
       branchId?: string;
+      accountId?: string;
       mode: ImportMode;
       allowDuplicate?: boolean;
     },
@@ -93,6 +95,31 @@ export class ImportsService {
       if (await this.permissions.has(user.role, 'customer.debt.opening')) {
         debtBranchIds = (await this.branchAccess.listAllowed(user)).map(
           (b) => b.id,
+        );
+      }
+    }
+
+    if (kind === 'cash-transactions') {
+      if (opts.mode === 'add') {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Nhập Sổ quỹ chỉ có chế độ mặc định (mode=overwrite)',
+          [{ field: 'mode', message: 'Sổ quỹ không có chế độ "thêm"' }],
+        );
+      }
+      if (!opts.branchId) {
+        throw new AppError(400, 'VALIDATION_ERROR', 'Nhập Sổ quỹ cần chọn chi nhánh', [
+          { field: 'branchId', message: 'Bắt buộc: file không ghi chi nhánh' },
+        ]);
+      }
+      // Ghi lịch sử quỹ và đặt quỹ đầu kỳ: cần quyền quản lý quỹ
+      if (!(await this.permissions.has(user.role, 'cash.manage'))) {
+        throw new AppError(
+          403,
+          'FORBIDDEN',
+          'Nhập Sổ quỹ cần quyền quản lý quỹ',
+          { permission: 'cash.manage' },
         );
       }
     }
@@ -147,19 +174,26 @@ export class ImportsService {
     try {
       outcome = await this.db.transaction(async (tx) => {
         const result =
-          kind === 'customers'
-            ? await importCustomers(tx, sheet, {
+          kind === 'cash-transactions'
+            ? await importCashTransactions(tx, sheet, {
                 userId: user.id,
+                branchId: opts.branchId!,
+                accountId: opts.accountId,
                 ref,
-                debtBranchIds,
               })
-            : await importProducts(tx, sheet, {
-                branchId: opts.branchId,
-                userId: user.id,
-                mode: opts.mode,
-                inventory: this.inventory,
-                ref,
-              });
+            : kind === 'customers'
+              ? await importCustomers(tx, sheet, {
+                  userId: user.id,
+                  ref,
+                  debtBranchIds,
+                })
+              : await importProducts(tx, sheet, {
+                  branchId: opts.branchId,
+                  userId: user.id,
+                  mode: opts.mode,
+                  inventory: this.inventory,
+                  ref,
+                });
         if (opts.dryRun || result.errors.length > 0) throw new Rollback(result);
         await this.auditLog.record(tx, {
           action: 'import.run',
@@ -260,7 +294,9 @@ export class ImportsService {
 
   /** File Excel mẫu: tiêu đề giống file KiotViet kèm một dòng ví dụ (dữ liệu giả). */
   async template(type: string): Promise<Buffer> {
-    if (this.parseType(type) === 'customers') return customersTemplate();
+    const kind = this.parseType(type);
+    if (kind === 'customers') return customersTemplate();
+    if (kind === 'cash-transactions') return cashTemplate();
     return writeSheet(
       'Hàng hóa',
       [
@@ -414,6 +450,28 @@ function customersTemplate(): Promise<Buffer> {
         1500000,
         null,
       ],
+    ],
+  );
+}
+
+/** Mẫu nhập Sổ quỹ: đúng tiêu đề file SoQuy của KiotViet kèm vài dòng ví dụ (dữ liệu giả) và bốn dòng tổng kết. */
+function cashTemplate(): Promise<Buffer> {
+  return writeSheet(
+    'Sổ quỹ',
+    [
+      { header: 'Mã phiếu', width: 14 },
+      { header: 'Thời gian', width: 20 },
+      { header: 'Loại thu chi', width: 40 },
+      { header: 'Người nộp/nhận', width: 24 },
+      { header: 'Giá trị', width: 16 },
+    ],
+    [
+      ['TT000001', '03/11/2026 09:15', 'Phiếu thu Tiền khách trả', 'Khách ví dụ', 5000000],
+      ['CTM000001', '03/11/2026 10:30', 'Phiếu chi Cước hàng hoàn', 'Nhà xe ví dụ', -300000],
+      [null, null, null, 'Quỹ đầu kỳ', 1000000],
+      [null, null, null, 'Tổng thu', 5000000],
+      [null, null, null, 'Tổng chi', -300000],
+      [null, null, null, 'Tồn quỹ', 5700000],
     ],
   );
 }

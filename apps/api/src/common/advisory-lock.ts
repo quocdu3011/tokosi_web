@@ -35,3 +35,13 @@ export async function lockCustomerImport(tx: DbOrTx): Promise<void> {
     sql`select pg_advisory_xact_lock(hashtextextended('import:customers', 0))`,
   );
 }
+
+/**
+ * Khóa cho nhập Sổ quỹ từ Excel: bộ nhập đọc mã phiếu hiện có và số phiếu của quỹ rồi mới ghi (và đặt quỹ đầu kỳ nếu
+ * quỹ còn trống). Hai lần nhập song song cùng thấy "quỹ còn trống" hoặc "chưa có mã" nên cùng ghi. Gọi ĐẦU TIÊN.
+ */
+export async function lockCashImport(tx: DbOrTx): Promise<void> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended('import:cash', 0))`,
+  );
+}

@@ -95,6 +95,45 @@ export class ReconciliationService {
           full join payable p on r.me = p.other and r.other = p.me
           where coalesce(r.amt, 0) <> coalesce(p.amt, 0)`,
       ),
+      this.check(
+        db,
+        'cash_debt_vs_ledger',
+        'Phiếu quỹ thu/chi công nợ (danh mục hệ thống) có tổng bút toán công nợ khác số phải ghi (hoàn tất = ±số tiền, đã hủy = 0); bỏ qua phiếu thu lúc xuất hóa đơn và phiếu nhập từ file',
+        sql`
+          select t.id, t.code, t.status::text as status,
+                 (case when t.status = 'completed'
+                       then (case when c.code in ('customer_payment', 'supplier_payment') then -t.amount else t.amount end)
+                       else 0 end)::text as expected,
+                 coalesce((select sum(d.amount) from debt_ledger d
+                           where d.ref_type = 'cash_transaction' and d.ref_id = t.id), 0)::text as booked
+          from cash_transactions t
+          join cash_categories c on c.id = t.category_id
+          where c.code in ('customer_payment', 'supplier_payment', 'customer_refund', 'supplier_refund')
+            and coalesce(t.ref_type, '') not in ('invoice', 'import')
+            and (case when t.status = 'completed'
+                      then (case when c.code in ('customer_payment', 'supplier_payment') then -t.amount else t.amount end)
+                      else 0 end)
+                <> coalesce((select sum(d.amount) from debt_ledger d
+                             where d.ref_type = 'cash_transaction' and d.ref_id = t.id), 0)
+          order by t.created_at`,
+      ),
+      this.check(
+        db,
+        'invoice_allocation_exceeds',
+        'Hóa đơn hoàn tất có tổng cấn trừ thu nợ (phiếu quỹ còn hiệu lực) vượt phần còn phải thu sau khi thu lúc xuất',
+        sql`
+          select i.id, i.code, i.total::text as total, i.paid_total::text as paid_total, a.amt::text as allocated
+          from invoices i
+          join (
+            select pa.invoice_id, sum(pa.amount) as amt
+            from payment_allocations pa
+            join cash_transactions ct on ct.id = pa.cash_transaction_id
+            where ct.status = 'completed'
+            group by pa.invoice_id
+          ) a on a.invoice_id = i.id
+          where i.status = 'completed' and a.amt > i.total - i.paid_total
+          order by i.code`,
+      ),
     ]);
     return { ok: checks.every((c) => c.issues === 0), checks };
   }

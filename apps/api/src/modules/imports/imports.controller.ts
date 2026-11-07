@@ -82,6 +82,7 @@ export class ImportsController {
     return this.imports.run(user, type, file, {
       dryRun: query.dryRun ?? true,
       branchId: query.branchId,
+      accountId: query.accountId,
       mode: query.mode ?? 'overwrite',
       allowDuplicate: query.allowDuplicate ?? false,
     });
