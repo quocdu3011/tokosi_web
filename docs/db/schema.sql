@@ -741,3 +741,8 @@ UPDATE "role_permissions" SET "scope" = 'all' WHERE "permission_code" = 'custome
 
 -- ===== 0030_hoa_don_don_hang_duy_nhat_khi_hieu_luc.sql =====
 ALTER TABLE "invoices" DROP CONSTRAINT "invoices_orderId_unique";CREATE UNIQUE INDEX "invoices_order_completed_uq" ON "invoices" USING btree ("order_id") WHERE "invoices"."status" = 'completed';
+-- ===== 0031_cap_quyen_huy_tra_hang_ban.sql =====
+-- Quyền mới return.cancel (hủy phiếu trả hàng bán): cấp cho mọi vai trò đang có invoice.cancel, cùng phạm vi.
+INSERT INTO "role_permissions" ("role", "permission_code", "scope")
+SELECT "role", 'return.cancel', "scope" FROM "role_permissions" WHERE "permission_code" = 'invoice.cancel'
+ON CONFLICT ("role", "permission_code") DO NOTHING;

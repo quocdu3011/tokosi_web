@@ -149,6 +149,32 @@ describe('Đặt hàng qua HTTP', () => {
     expect((await t.db.select().from(debtLedger)).length).toBe(0);
   });
 
+  it('cảnh báo vượt hạn mức chỉ kèm số tiền khi người xem được công nợ khách: Kho và Sale xem khách của người khác chỉ thấy "vượt", không thấy số', async () => {
+    const made = await create('tro1', { customerId: cid.K1, items: [line('A', '10', '13000')] });
+    expect(made.status).toBe(201);
+    const pick = (b: { warnings: Array<{ code: string }> }) =>
+      b.warnings.find((w) => w.code === 'CREDIT_LIMIT_EXCEEDED') as Record<string, unknown>;
+    // Trợ lý có debt.view (tất cả) → có số
+    expect(pick(made.body)).toMatchObject({ creditLimit: '100000' });
+    expect(pick(made.body).balanceAfter).toBeDefined();
+    // Kho không có debt.view
+    const w0 = pick((await (await as('kho1')).get(`/orders/${made.body.id}`)).body);
+    expect(w0).toBeDefined();
+    expect(w0).not.toHaveProperty('creditLimit');
+    expect(w0).not.toHaveProperty('balanceAfter');
+    expect(String(w0.message)).not.toMatch(/\d/);
+    // Sale có debt.view "chỉ của mình" nhưng K1 không do sale1 phụ trách
+    const mine = await create('sale1', { customerId: cid.K1, items: [line('A', '10', '13000')] });
+    const w = pick(mine.body);
+    expect(w).toBeDefined();
+    expect(w).not.toHaveProperty('balanceAfter');
+    expect(String(w.message)).not.toMatch(/\d/);
+    // nhả hàng giữ để không ảnh hưởng ca sau
+    for (const id of [made.body.id, mine.body.id]) {
+      await (await as('quanly')).post(`/orders/${id}/cancel`).send({}).expect(200);
+    }
+  });
+
   it('phiếu tạm khác giữ hàng: có thể bán = tồn − hàng giữ cho phiếu tạm khác; hủy thì nhả', async () => {
     const first = (await create('tro1', { customerId: cid.K2, items: [line('A', '60', '13000')] })).body;
     const second = (await create('tro1', { customerId: cid.K2, items: [line('A', '30', '13000')] })).body;

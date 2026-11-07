@@ -51,6 +51,7 @@ import {
 } from '../purchasing/purchase-lines.js';
 import { OrdersService, saleSearch } from './orders.service.js';
 import {
+  canSeeDebt,
   creditWarning,
   loadCustomer,
   priceSaleLines,
@@ -599,7 +600,13 @@ export class InvoicesService {
 
     // Cảnh báo mềm (tính TRƯỚC khi ghi sổ): vượt có thể bán, vượt hạn mức
     const warnings = await stockWarnings(tx, p.branchId, p.lines, prods, p.orderId ?? undefined);
-    const credit = await creditWarning(tx, p.customerId, p.branchId, debtAdded);
+    const credit = await creditWarning(
+      tx,
+      p.customerId,
+      p.branchId,
+      debtAdded,
+      await canSeeDebt(tx, this.permissions, p.user, p.customerId),
+    );
     if (credit) warnings.push(credit);
 
     const code = await nextFreeDocumentCode(tx, DOCUMENT_PREFIX.invoice, async (c) => {

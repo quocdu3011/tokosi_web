@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsISO8601,
   IsOptional,
@@ -19,7 +20,7 @@ import {
   DocPersonDto,
   DocRefDto,
 } from '../purchasing/purchasing.dto.js';
-import { Lines } from '../purchasing/purchase-lines.js';
+import { Lines, QTY_PATTERN } from '../purchasing/purchase-lines.js';
 import { MONEY_PATTERN, SaleLineDto } from './sale-lines.js';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -409,4 +410,125 @@ export class ListInvoicesQueryDto extends ListSalesDocsQueryDto {
   @IsOptional()
   @IsUUID()
   orderId?: string;
+}
+
+// ------------------------------------------------------------------ trả hàng bán
+
+export const RETURN_STATUSES = ['completed', 'cancelled'] as const;
+export type SalesReturnStatus = (typeof RETURN_STATUSES)[number];
+export const RETURN_SORT_FIELDS = ['returnedAt', 'code', 'total'] as const;
+
+export class SalesReturnLineDto {
+  @ApiProperty() @IsUUID() productId!: string;
+  @ApiProperty({ example: '36', description: 'Số lượng trả > 0, tối đa 3 chữ số thập phân' })
+  @IsString()
+  @Matches(QTY_PATTERN, { message: 'Số lượng không hợp lệ' })
+  qty!: string;
+  @ApiProperty({ example: '130000', description: 'Giá trả (Giá bán) trên 1 đơn vị, số nguyên đồng; tiền trả khách = SL × giá trả, ghi giảm công nợ' })
+  @IsString()
+  @Matches(MONEY_PATTERN, { message: 'Giá trả phải là số nguyên đồng ≥ 0' })
+  returnPrice!: string;
+  @ApiPropertyOptional({
+    example: '120000',
+    description: 'Giá nhập lại (có thể khác giá trả); mặc định = giá trả. Không đổi giá vốn bình quân; chênh lệch (giá trả − giá nhập lại) × SL tính vào lợi nhuận',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(MONEY_PATTERN, { message: 'Giá nhập lại phải là số nguyên đồng ≥ 0' })
+  restockPrice?: string;
+  @ApiPropertyOptional({ default: true, description: 'true = nhập lại kho (cộng tồn, không đổi giá vốn); false = không nhập kho' })
+  @IsOptional()
+  @IsBoolean()
+  restock?: boolean;
+  @ApiPropertyOptional({ nullable: true, type: String })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string | null;
+}
+
+export class CreateSalesReturnDto {
+  @ApiProperty() @IsUUID() customerId!: string;
+  @ApiPropertyOptional({
+    description: 'Hóa đơn gốc (cùng chi nhánh và khách). Bỏ trống = trả không tham chiếu hóa đơn; quyền "chỉ của mình" bắt buộc có hóa đơn của mình',
+  })
+  @IsOptional()
+  @IsUUID()
+  invoiceId?: string;
+  @ApiPropertyOptional({ type: String, format: 'date-time' })
+  @IsOptional()
+  @IsISO8601()
+  returnedAt?: string;
+  @ApiPropertyOptional({ description: 'Người nhận trả hàng; mặc định = người đang đăng nhập' })
+  @IsOptional()
+  @IsUUID()
+  receivedById?: string;
+  @ApiPropertyOptional({ nullable: true, type: String })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  note?: string | null;
+  @ApiProperty({ type: [SalesReturnLineDto], description: '1–500 dòng hàng hóa' })
+  @Lines(SalesReturnLineDto)
+  items!: SalesReturnLineDto[];
+}
+
+export class SalesReturnItemDto {
+  @ApiProperty() productId!: string;
+  @ApiProperty() code!: string;
+  @ApiProperty() name!: string;
+  @ApiProperty({ example: '36.000' }) qty!: string;
+  @ApiProperty({ description: 'Giá trả (Giá bán)' }) returnPrice!: string;
+  @ApiProperty({ nullable: true, type: String, description: 'Giá nhập lại; null nếu không nhập kho' })
+  restockPrice!: string | null;
+  @ApiProperty() restock!: boolean;
+  @ApiProperty() lineTotal!: string;
+  @ApiProperty({ nullable: true, type: String }) note!: string | null;
+}
+
+export class SalesReturnDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ example: 'TH001076' }) code!: string;
+  @ApiProperty({ enum: RETURN_STATUSES }) status!: SalesReturnStatus;
+  @ApiProperty() branchId!: string;
+  @ApiProperty({ type: SaleCustomerDto }) customer!: SaleCustomerDto;
+  @ApiProperty({ nullable: true, type: DocRefDto, description: 'Hóa đơn gốc' })
+  invoice!: DocRefDto | null;
+  @ApiProperty({ nullable: true, type: DocPersonDto, description: 'Người bán của hóa đơn gốc' })
+  seller!: DocPersonDto | null;
+  @ApiProperty({ type: String, format: 'date-time' }) returnedAt!: string;
+  @ApiProperty({ nullable: true, type: DocPersonDto, description: 'Người nhận trả' })
+  receivedBy!: DocPersonDto | null;
+  @ApiProperty({ description: 'Tổng tiền trả khách = Σ thành tiền; luôn GHI GIẢM công nợ khách (không hoàn tiền trên phiếu)' })
+  total!: string;
+  @ApiProperty() totalQty!: string;
+  @ApiProperty() itemCount!: number;
+  @ApiProperty({ nullable: true, type: String }) note!: string | null;
+  @ApiProperty({ nullable: true, type: DocPersonDto }) createdBy!: DocPersonDto | null;
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
+  @ApiProperty({ nullable: true, type: String, format: 'date-time' }) cancelledAt!: string | null;
+  @ApiProperty({ nullable: true, type: String }) cancelReason!: string | null;
+  @ApiPropertyOptional({ type: [SalesReturnItemDto], description: 'Chỉ ở chi tiết' })
+  items?: SalesReturnItemDto[];
+  @ApiPropertyOptional({
+    description: 'Chênh lệch giá nhập lại tính vào lợi nhuận = Σ (giá trả − giá nhập lại) × SL các dòng nhập kho. Chỉ ở chi tiết và khi có product.cost.view',
+  })
+  priceDifference?: string;
+}
+
+export class SalesReturnListDto {
+  @ApiProperty({ type: [SalesReturnDto] }) data!: SalesReturnDto[];
+  @ApiProperty({ type: DocMetaDto }) meta!: DocMetaDto;
+}
+
+export class ListSalesReturnsQueryDto extends ListSalesDocsQueryDto {
+  @ApiPropertyOptional({ enum: RETURN_STATUSES })
+  @IsOptional()
+  @IsIn(RETURN_STATUSES)
+  status?: SalesReturnStatus;
+  @ApiPropertyOptional({ description: 'Chỉ phiếu trả của hóa đơn này' })
+  @IsOptional()
+  @IsUUID()
+  invoiceId?: string;
 }

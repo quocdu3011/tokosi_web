@@ -588,6 +588,71 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/sales-returns': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Danh sách phiếu trả hàng bán của chi nhánh làm việc
+     * @description Quyền xem "chỉ của mình": chỉ phiếu trả của hóa đơn do mình bán. `?format=xlsx` tải Excel theo đúng bộ lọc (tiêu đề như file chi tiết trả hàng của KiotViet).
+     */
+    get: operations['SalesReturnsController_list'];
+    put?: never;
+    /**
+     * Tạo phiếu trả hàng bán
+     * @description Tiền trả khách LUÔN ghi giảm công nợ khách tại chi nhánh (không hoàn tiền trên phiếu). Dòng `restock` cộng lại tồn nhưng không đổi giá vốn bình quân. Có `invoiceId` thì tổng trả mỗi mặt hàng không vượt số đã bán (422 RETURN_QTY_EXCEEDED) và giá trả không vượt giá bán thực của dòng sau giảm giá phiếu (422 RETURN_PRICE_EXCEEDED). Quyền "chỉ của mình": bắt buộc hóa đơn do mình bán.
+     */
+    post: operations['SalesReturnsController_create'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/sales-returns/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Chi tiết phiếu trả hàng bán
+     * @description `priceDifference` (chênh lệch giá nhập lại tính vào lợi nhuận) chỉ có khi người gọi có quyền product.cost.view.
+     */
+    get: operations['SalesReturnsController_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Sửa ghi chú phiếu trả hàng (không sửa gì khác) */
+    patch: operations['SalesReturnsController_updateNote'];
+    trace?: never;
+  };
+  '/api/v1/sales-returns/{id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Hủy phiếu trả hàng (bút toán đảo)
+     * @description Trừ lại tồn của các dòng đã nhập lại kho (không đủ tồn → 422 STOCK_NOT_ENOUGH) và cộng lại công nợ khách.
+     */
+    post: operations['SalesReturnsController_cancel'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/purchase-orders': {
     parameters: {
       query?: never;
@@ -1976,6 +2041,94 @@ export interface components {
     UpdateSaleNoteDto: {
       /** @description Chỉ sửa được ghi chú */
       note: string | null;
+    };
+    SalesReturnItemDto: {
+      productId: string;
+      code: string;
+      name: string;
+      /** @example 36.000 */
+      qty: string;
+      /** @description Giá trả (Giá bán) */
+      returnPrice: string;
+      /** @description Giá nhập lại; null nếu không nhập kho */
+      restockPrice: string | null;
+      restock: boolean;
+      lineTotal: string;
+      note: string | null;
+    };
+    SalesReturnDto: {
+      id: string;
+      /** @example TH001076 */
+      code: string;
+      /** @enum {string} */
+      status: 'completed' | 'cancelled';
+      branchId: string;
+      customer: components['schemas']['SaleCustomerDto'];
+      /** @description Hóa đơn gốc */
+      invoice: components['schemas']['DocRefDto'] | null;
+      /** @description Người bán của hóa đơn gốc */
+      seller: components['schemas']['DocPersonDto'] | null;
+      /** Format: date-time */
+      returnedAt: string;
+      /** @description Người nhận trả */
+      receivedBy: components['schemas']['DocPersonDto'] | null;
+      /** @description Tổng tiền trả khách = Σ thành tiền; luôn GHI GIẢM công nợ khách (không hoàn tiền trên phiếu) */
+      total: string;
+      totalQty: string;
+      itemCount: number;
+      note: string | null;
+      createdBy: components['schemas']['DocPersonDto'] | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      /** Format: date-time */
+      cancelledAt: string | null;
+      cancelReason: string | null;
+      /** @description Chỉ ở chi tiết */
+      items?: components['schemas']['SalesReturnItemDto'][];
+      /** @description Chênh lệch giá nhập lại tính vào lợi nhuận = Σ (giá trả − giá nhập lại) × SL các dòng nhập kho. Chỉ ở chi tiết và khi có product.cost.view */
+      priceDifference?: string;
+    };
+    SalesReturnListDto: {
+      data: components['schemas']['SalesReturnDto'][];
+      meta: components['schemas']['DocMetaDto'];
+    };
+    SalesReturnLineDto: {
+      productId: string;
+      /**
+       * @description Số lượng trả > 0, tối đa 3 chữ số thập phân
+       * @example 36
+       */
+      qty: string;
+      /**
+       * @description Giá trả (Giá bán) trên 1 đơn vị, số nguyên đồng; tiền trả khách = SL × giá trả, ghi giảm công nợ
+       * @example 130000
+       */
+      returnPrice: string;
+      /**
+       * @description Giá nhập lại (có thể khác giá trả); mặc định = giá trả. Không đổi giá vốn bình quân; chênh lệch (giá trả − giá nhập lại) × SL tính vào lợi nhuận
+       * @example 120000
+       */
+      restockPrice?: string;
+      /**
+       * @description true = nhập lại kho (cộng tồn, không đổi giá vốn); false = không nhập kho
+       * @default true
+       */
+      restock: boolean;
+      note?: string | null;
+    };
+    CreateSalesReturnDto: {
+      customerId: string;
+      /** @description Hóa đơn gốc (cùng chi nhánh và khách). Bỏ trống = trả không tham chiếu hóa đơn; quyền "chỉ của mình" bắt buộc có hóa đơn của mình */
+      invoiceId?: string;
+      /** Format: date-time */
+      returnedAt?: string;
+      /** @description Người nhận trả hàng; mặc định = người đang đăng nhập */
+      receivedById?: string;
+      note?: string | null;
+      /** @description 1–500 dòng hàng hóa */
+      items: components['schemas']['SalesReturnLineDto'][];
     };
     DocPartyDto: {
       id: string;
@@ -3858,6 +4011,167 @@ export interface operations {
       };
       /** @description INVALID_STATE: còn phiếu trả hàng / đã cấn trừ thu nợ */
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  SalesReturnsController_list: {
+    parameters: {
+      query?: {
+        page?: number;
+        limit?: number;
+        /** @description Tên cột cần sắp xếp; thêm `-` phía trước để giảm dần. Chỉ nhận các cột endpoint cho phép */
+        sort?: string;
+        /** @description Tìm không dấu theo mã phiếu, mã/tên/SĐT khách */
+        q?: string;
+        customerId?: string;
+        /** @description Người bán (id người dùng) */
+        sellerId?: string;
+        /** @description YYYY-MM-DD giờ Việt Nam, gồm cả ngày */
+        from?: string;
+        to?: string;
+        /** @description xlsx = tải Excel theo đúng bộ lọc, mỗi dòng hàng một dòng, tiêu đề như file chi tiết của KiotViet (bỏ qua page/limit, tối đa 10.000 phiếu) */
+        format?: 'xlsx';
+        status?: 'completed' | 'cancelled';
+        /** @description Chỉ phiếu trả của hóa đơn này */
+        invoiceId?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SalesReturnListDto'];
+        };
+      };
+    };
+  };
+  SalesReturnsController_create: {
+    parameters: {
+      query?: never;
+      header: {
+        'Idempotency-Key': string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateSalesReturnDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SalesReturnDto'];
+        };
+      };
+      /** @description Hóa đơn do người khác bán (quyền "chỉ của mình") */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description RETURN_QTY_EXCEEDED hoặc hóa đơn gốc đã hủy */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  SalesReturnsController_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SalesReturnDto'];
+        };
+      };
+      /** @description Không có phiếu (hoặc thuộc chi nhánh khác / không phải của mình) */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  SalesReturnsController_updateNote: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateSaleNoteDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SalesReturnDto'];
+        };
+      };
+    };
+  };
+  SalesReturnsController_cancel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CancelSaleDocDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SalesReturnDto'];
+        };
+      };
+      /** @description INVALID_STATE (đã hủy) hoặc STOCK_NOT_ENOUGH */
+      422: {
         headers: {
           [name: string]: unknown;
         };

@@ -162,6 +162,23 @@ export async function scopeOf(
   return g ? g.scope : null;
 }
 
+/** Có được thấy công nợ của khách này không (`debt.view`: tất cả, hoặc "chỉ của mình" = khách do mình phụ trách). */
+export async function canSeeDebt(
+  db: DbOrTx,
+  permissions: PermissionsService,
+  user: AuthUser,
+  customerId: string,
+): Promise<boolean> {
+  const scope = await scopeOf(permissions, user, 'debt.view');
+  if (scope === 'all') return true;
+  if (scope !== 'own') return false;
+  const [c] = await db
+    .select({ owner: customers.salesOwnerId })
+    .from(customers)
+    .where(eq(customers.id, customerId));
+  return c?.owner === user.id;
+}
+
 /** Quyền tạo/sửa "chỉ của mình": người bán luôn là chính mình (gửi người khác → 403). */
 export function sellerFor(
   scope: PermissionScope | null,
@@ -272,6 +289,7 @@ export async function creditWarning(
   customerId: string,
   branchId: string,
   addDebt: string,
+  showAmounts: boolean,
 ): Promise<SaleWarning | null> {
   const [terms] = await db
     .select({ creditLimit: customerBranchTerms.creditLimit })
@@ -295,6 +313,13 @@ export async function creditWarning(
     );
   const after = dec(row!.v).plus(dec(addDebt));
   if (after.lte(dec(terms.creditLimit))) return null;
+  // Không có quyền xem nợ khách này thì chỉ báo "vượt", không lộ số tiền
+  if (!showAmounts) {
+    return {
+      code: 'CREDIT_LIMIT_EXCEEDED',
+      message: 'Vượt hạn mức công nợ của khách tại chi nhánh',
+    };
+  }
   return {
     code: 'CREDIT_LIMIT_EXCEEDED',
     message: `Vượt hạn mức công nợ ${dec(after).minus(dec(terms.creditLimit)).toFixed(0)} ₫ (hạn mức ${dec(terms.creditLimit).toFixed(0)} ₫, nợ sau chứng từ ${after.toFixed(0)} ₫)`,

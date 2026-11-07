@@ -12,6 +12,7 @@ import { InventoryService } from '../inventory/inventory.service.js';
 import { ReconciliationService } from '../reconciliation/reconciliation.service.js';
 import { InvoicesService } from './invoices.service.js';
 import { OrdersService } from './orders.service.js';
+import { SalesReturnsService } from './sales-returns.service.js';
 
 /**
  * Chạy trên PostgreSQL THẬT với nhiều kết nối (PGlite chỉ có một kết nối nên không tái hiện được bế tắc/đua).
@@ -27,6 +28,7 @@ describe.skipIf(!URL)('Bán hàng: đồng thời trên PostgreSQL thật', () =
   let db: Database;
   let invoices: InvoicesService;
   let orders: OrdersService;
+  let returns: SalesReturnsService;
   let manager: AuthUser;
   let sg: string;
   let customerId: string;
@@ -109,6 +111,7 @@ describe.skipIf(!URL)('Bán hàng: đồng thời trên PostgreSQL thật', () =
     const inv = new InventoryService(db);
     orders = new OrdersService(db, audit, perms);
     invoices = new InvoicesService(db, audit, perms, inv, orders);
+    returns = new SalesReturnsService(db, audit, perms, inv);
     const rows = await db
       .insert(schema.products)
       .values(['A', 'B'].map((c) => ({ code: `SC-${c}`, name: c })))
@@ -218,6 +221,57 @@ describe.skipIf(!URL)('Bán hàng: đồng thời trên PostgreSQL thật', () =
     expect(attempts.filter((a) => a.status === 'fulfilled')).toHaveLength(1);
     expect(await stock('B')).toBe(stockBefore + 9);
     expect(await debt()).toBe(debtBefore - 18000);
+    expect((await new ReconciliationService().run(db)).ok).toBe(true);
+  }, 120_000);
+
+  it('trả hàng song song cùng một hóa đơn vượt số đã bán: chỉ phần hợp lệ thành công, tồn và nợ khớp', async () => {
+    const inv = await invoices.create(manager, sg, {
+      customerId,
+      items: [line('A', '10', '1000')],
+    });
+    const stockBefore = await stock('A');
+    const debtBefore = await debt();
+    const attempts = await Promise.allSettled(
+      Array.from({ length: 8 }, () =>
+        returns.create(manager, sg, {
+          customerId,
+          invoiceId: inv.id,
+          items: [{ productId: pid.A!, qty: '4', returnPrice: '1000' }],
+        }),
+      ),
+    );
+    const ok = attempts.filter((a) => a.status === 'fulfilled');
+    expect(ok).toHaveLength(2); // 2 × 4 = 8 ≤ 10, lần thứ ba sẽ vượt
+    for (const r of attempts.filter(
+      (a): a is PromiseRejectedResult => a.status === 'rejected',
+    )) {
+      expect((r.reason as { code?: string }).code).toBe('RETURN_QTY_EXCEEDED');
+    }
+    expect(await stock('A')).toBe(stockBefore + 8);
+    expect(await debt()).toBe(debtBefore - 8000);
+    expect((await new ReconciliationService().run(db)).ok).toBe(true);
+  }, 120_000);
+
+  it('hủy cùng một phiếu trả song song: đúng một lần thành công, kho và nợ chỉ đảo một lần', async () => {
+    const inv = await invoices.create(manager, sg, {
+      customerId,
+      items: [line('B', '6', '2000')],
+    });
+    const r = await returns.create(manager, sg, {
+      customerId,
+      invoiceId: inv.id,
+      items: [{ productId: pid.B!, qty: '5', returnPrice: '2000' }],
+    });
+    const stockBefore = await stock('B');
+    const debtBefore = await debt();
+    const attempts = await Promise.allSettled(
+      Array.from({ length: 6 }, () =>
+        returns.cancel(manager, sg, r.id, 'đua'),
+      ),
+    );
+    expect(attempts.filter((a) => a.status === 'fulfilled')).toHaveLength(1);
+    expect(await stock('B')).toBe(stockBefore - 5);
+    expect(await debt()).toBe(debtBefore + 10000);
     expect((await new ReconciliationService().run(db)).ok).toBe(true);
   }, 120_000);
 });

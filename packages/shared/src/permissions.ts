@@ -206,6 +206,12 @@ export const PERMISSIONS = [
     requires: ['invoice.view'],
   },
   {
+    code: 'return.cancel',
+    module: 'sales',
+    label: 'Hủy phiếu trả hàng bán',
+    requires: ['invoice.view'],
+  },
+  {
     code: 'delivery.view',
     module: 'sales',
     label: 'Xem/in phiếu giao hàng',
@@ -312,6 +318,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Exclude<Role, 'manager'>, RoleDefa
     'order.view',
     'invoice.view',
     'invoice.cancel',
+    'return.cancel',
     'delivery.view',
     'cash.view',
     'cash.create',

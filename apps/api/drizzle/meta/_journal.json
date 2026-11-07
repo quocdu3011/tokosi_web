@@ -218,6 +218,13 @@
       "when": 1793983911093,
       "tag": "0030_hoa_don_don_hang_duy_nhat_khi_hieu_luc",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1793985156706,
+      "tag": "0031_cap_quyen_huy_tra_hang_ban",
+      "breakpoints": true
     }
   ]
 }

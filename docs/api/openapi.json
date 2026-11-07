@@ -2056,6 +2056,329 @@
         ]
       }
     },
+    "/api/v1/sales-returns": {
+      "get": {
+        "description": "Quyền xem \"chỉ của mình\": chỉ phiếu trả của hóa đơn do mình bán. `?format=xlsx` tải Excel theo đúng bộ lọc (tiêu đề như file chi tiết trả hàng của KiotViet).",
+        "operationId": "SalesReturnsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Tên cột cần sắp xếp; thêm `-` phía trước để giảm dần. Chỉ nhận các cột endpoint cho phép",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Tìm không dấu theo mã phiếu, mã/tên/SĐT khách",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sellerId",
+            "required": false,
+            "in": "query",
+            "description": "Người bán (id người dùng)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "YYYY-MM-DD giờ Việt Nam, gồm cả ngày",
+            "schema": {
+              "example": "2026-11-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "description": "xlsx = tải Excel theo đúng bộ lọc, mỗi dòng hàng một dòng, tiêu đề như file chi tiết của KiotViet (bỏ qua page/limit, tối đa 10.000 phiếu)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "xlsx"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "cancelled"
+              ]
+            }
+          },
+          {
+            "name": "invoiceId",
+            "required": false,
+            "in": "query",
+            "description": "Chỉ phiếu trả của hóa đơn này",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesReturnListDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách phiếu trả hàng bán của chi nhánh làm việc",
+        "tags": [
+          "Trả hàng bán"
+        ]
+      },
+      "post": {
+        "description": "Tiền trả khách LUÔN ghi giảm công nợ khách tại chi nhánh (không hoàn tiền trên phiếu). Dòng `restock` cộng lại tồn nhưng không đổi giá vốn bình quân. Có `invoiceId` thì tổng trả mỗi mặt hàng không vượt số đã bán (422 RETURN_QTY_EXCEEDED) và giá trả không vượt giá bán thực của dòng sau giảm giá phiếu (422 RETURN_PRICE_EXCEEDED). Quyền \"chỉ của mình\": bắt buộc hóa đơn do mình bán.",
+        "operationId": "SalesReturnsController_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSalesReturnDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesReturnDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Hóa đơn do người khác bán (quyền \"chỉ của mình\")"
+          },
+          "422": {
+            "description": "RETURN_QTY_EXCEEDED hoặc hóa đơn gốc đã hủy"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tạo phiếu trả hàng bán",
+        "tags": [
+          "Trả hàng bán"
+        ]
+      }
+    },
+    "/api/v1/sales-returns/{id}": {
+      "get": {
+        "description": "`priceDifference` (chênh lệch giá nhập lại tính vào lợi nhuận) chỉ có khi người gọi có quyền product.cost.view.",
+        "operationId": "SalesReturnsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesReturnDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không có phiếu (hoặc thuộc chi nhánh khác / không phải của mình)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Chi tiết phiếu trả hàng bán",
+        "tags": [
+          "Trả hàng bán"
+        ]
+      },
+      "patch": {
+        "operationId": "SalesReturnsController_updateNote",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSaleNoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesReturnDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sửa ghi chú phiếu trả hàng (không sửa gì khác)",
+        "tags": [
+          "Trả hàng bán"
+        ]
+      }
+    },
+    "/api/v1/sales-returns/{id}/cancel": {
+      "post": {
+        "description": "Trừ lại tồn của các dòng đã nhập lại kho (không đủ tồn → 422 STOCK_NOT_ENOUGH) và cộng lại công nợ khách.",
+        "operationId": "SalesReturnsController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelSaleDocDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesReturnDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "INVALID_STATE (đã hủy) hoặc STOCK_NOT_ENOUGH"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hủy phiếu trả hàng (bút toán đảo)",
+        "tags": [
+          "Trả hàng bán"
+        ]
+      }
+    },
     "/api/v1/purchase-orders": {
       "get": {
         "description": "`receiveState` (chưa nhập / nhập một phần / đã nhập đủ) tính từ các phiếu nhập hoàn tất. `?format=xlsx` tải Excel theo đúng bộ lọc.",
@@ -6571,6 +6894,274 @@
         },
         "required": [
           "note"
+        ]
+      },
+      "SalesReturnItemDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "string",
+            "example": "36.000"
+          },
+          "returnPrice": {
+            "type": "string",
+            "description": "Giá trả (Giá bán)"
+          },
+          "restockPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "Giá nhập lại; null nếu không nhập kho"
+          },
+          "restock": {
+            "type": "boolean"
+          },
+          "lineTotal": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "productId",
+          "code",
+          "name",
+          "qty",
+          "returnPrice",
+          "restockPrice",
+          "restock",
+          "lineTotal",
+          "note"
+        ]
+      },
+      "SalesReturnDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "TH001076"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "cancelled"
+            ]
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/SaleCustomerDto"
+          },
+          "invoice": {
+            "nullable": true,
+            "description": "Hóa đơn gốc",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DocRefDto"
+              }
+            ]
+          },
+          "seller": {
+            "nullable": true,
+            "description": "Người bán của hóa đơn gốc",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DocPersonDto"
+              }
+            ]
+          },
+          "returnedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "receivedBy": {
+            "nullable": true,
+            "description": "Người nhận trả",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DocPersonDto"
+              }
+            ]
+          },
+          "total": {
+            "type": "string",
+            "description": "Tổng tiền trả khách = Σ thành tiền; luôn GHI GIẢM công nợ khách (không hoàn tiền trên phiếu)"
+          },
+          "totalQty": {
+            "type": "string"
+          },
+          "itemCount": {
+            "type": "number"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdBy": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DocPersonDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cancelledAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "items": {
+            "description": "Chỉ ở chi tiết",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesReturnItemDto"
+            }
+          },
+          "priceDifference": {
+            "type": "string",
+            "description": "Chênh lệch giá nhập lại tính vào lợi nhuận = Σ (giá trả − giá nhập lại) × SL các dòng nhập kho. Chỉ ở chi tiết và khi có product.cost.view"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "status",
+          "branchId",
+          "customer",
+          "invoice",
+          "seller",
+          "returnedAt",
+          "receivedBy",
+          "total",
+          "totalQty",
+          "itemCount",
+          "note",
+          "createdBy",
+          "createdAt",
+          "updatedAt",
+          "cancelledAt",
+          "cancelReason"
+        ]
+      },
+      "SalesReturnListDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesReturnDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DocMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "SalesReturnLineDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "string",
+            "example": "36",
+            "description": "Số lượng trả > 0, tối đa 3 chữ số thập phân"
+          },
+          "returnPrice": {
+            "type": "string",
+            "example": "130000",
+            "description": "Giá trả (Giá bán) trên 1 đơn vị, số nguyên đồng; tiền trả khách = SL × giá trả, ghi giảm công nợ"
+          },
+          "restockPrice": {
+            "type": "string",
+            "example": "120000",
+            "description": "Giá nhập lại (có thể khác giá trả); mặc định = giá trả. Không đổi giá vốn bình quân; chênh lệch (giá trả − giá nhập lại) × SL tính vào lợi nhuận"
+          },
+          "restock": {
+            "type": "boolean",
+            "default": true,
+            "description": "true = nhập lại kho (cộng tồn, không đổi giá vốn); false = không nhập kho"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "productId",
+          "qty",
+          "returnPrice"
+        ]
+      },
+      "CreateSalesReturnDto": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string"
+          },
+          "invoiceId": {
+            "type": "string",
+            "description": "Hóa đơn gốc (cùng chi nhánh và khách). Bỏ trống = trả không tham chiếu hóa đơn; quyền \"chỉ của mình\" bắt buộc có hóa đơn của mình"
+          },
+          "returnedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "receivedById": {
+            "type": "string",
+            "description": "Người nhận trả hàng; mặc định = người đang đăng nhập"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "items": {
+            "description": "1–500 dòng hàng hóa",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesReturnLineDto"
+            }
+          }
+        },
+        "required": [
+          "customerId",
+          "items"
         ]
       },
       "DocPartyDto": {

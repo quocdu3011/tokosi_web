@@ -43,6 +43,7 @@ import {
 } from '../purchasing/purchase-lines.js';
 import {
   availableByProduct,
+  canSeeDebt,
   creditWarning,
   loadCustomer,
   priceSaleLines,
@@ -148,7 +149,7 @@ export class OrdersService {
     const invoice = (await this.invoicesOf(this.db, [id])).get(id) ?? null;
     const dto = this.toDto(row, items, invoice, true);
     if (row.r.status === 'draft') {
-      dto.warnings = await this.warningsFor(this.db, row.r, items);
+      dto.warnings = await this.warningsFor(this.db, user, row.r, items);
       const avail = await availableByProduct(
         this.db,
         branchId,
@@ -459,12 +460,19 @@ export class OrdersService {
 
   private async warningsFor(
     db: DbOrTx,
+    user: AuthUser,
     order: OrderRow,
     items: OrderItemDto[],
   ): Promise<SaleWarning[]> {
     const codes = new Map(items.map((i) => [i.productId, { code: i.code }]));
     const out = await stockWarnings(db, order.branchId, items, codes, order.id);
-    const credit = await creditWarning(db, order.customerId, order.branchId, order.total);
+    const credit = await creditWarning(
+      db,
+      order.customerId,
+      order.branchId,
+      order.total,
+      await canSeeDebt(db, this.permissions, user, order.customerId),
+    );
     if (credit) out.push(credit);
     return out;
   }

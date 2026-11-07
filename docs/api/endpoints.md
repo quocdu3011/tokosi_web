@@ -760,7 +760,7 @@ Mọi endpoint cần `X-Branch-Id`; phiếu thuộc chi nhánh làm việc (phi�
 }
 ```
 
-- `STOCK_RESERVED`: tổng số lượng một mặt hàng (cộng các dòng trùng) vượt số có thể bán. `CREDIT_LIMIT_EXCEEDED`: nợ hiện tại của khách **tại chi nhánh** + `total` vượt hạn mức (khách không có hạn mức thì không cảnh báo). Thiếu tồn thực tế chỉ bị chặn khi **xuất hóa đơn** (`422 STOCK_NOT_ENOUGH`).
+- `STOCK_RESERVED`: tổng số lượng một mặt hàng (cộng các dòng trùng) vượt số có thể bán. `CREDIT_LIMIT_EXCEEDED`: nợ hiện tại của khách **tại chi nhánh** + `total` vượt hạn mức (khách không có hạn mức thì không cảnh báo). Chỉ khi người gọi được xem nợ khách đó (`debt.view`; "chỉ của mình" = khách do mình phụ trách) cảnh báo mới kèm `creditLimit`, `balanceAfter` và số tiền trong `message`; còn lại chỉ có `code` và câu "Vượt hạn mức công nợ…" không số. Thiếu tồn thực tế chỉ bị chặn khi **xuất hóa đơn** (`422 STOCK_NOT_ENOUGH`).
 - Sửa/hủy phiếu không còn là phiếu tạm → `422 INVALID_STATE`.
 - `?format=xlsx`: mỗi dòng hàng một dòng, tiêu đề như file `DanhSachChiTietDatHang` của KiotViet.
 
@@ -844,32 +844,67 @@ Mọi endpoint cần `X-Branch-Id`; hóa đơn thuộc chi nhánh làm việc (c
 
 ### 5.3 Trả hàng bán
 
-| Method | Đường dẫn            | Mô tả                                                    | Quyền           | Mốc |
-| ------ | -------------------- | -------------------------------------------------------- | --------------- | --- |
-| GET    | `/sales-returns`     | Danh sách (`q`, `customerId`, `invoiceId`, `from`, `to`) | `invoice.view`  | W6  |
-| GET    | `/sales-returns/:id` | Chi tiết                                                 | `invoice.view`  | W6  |
-| POST   | `/sales-returns`     | Tạo phiếu trả (**Idempotency-Key**)                      | `return.create` | W6  |
+> **Trạng thái:** đã triển khai.
+
+| Method | Đường dẫn                   | Mô tả                                                                                          | Quyền           |
+| ------ | --------------------------- | ---------------------------------------------------------------------------------------------- | --------------- |
+| GET    | `/sales-returns`            | Danh sách (`q`, `status`, `customerId`, `sellerId`, `invoiceId`, `from`, `to`, `sort`; `?format=xlsx`) | `invoice.view`  |
+| GET    | `/sales-returns/:id`        | Chi tiết                                                                                        | `invoice.view`  |
+| POST   | `/sales-returns`            | Tạo phiếu trả (**Idempotency-Key**)                                                              | `return.create` |
+| PATCH  | `/sales-returns/:id`        | Chỉ sửa ghi chú `{ note }`                                                                       | `return.create` |
+| POST   | `/sales-returns/:id/cancel` | Hủy phiếu trả `{ reason? }` (bút toán đảo)                                                       | `return.cancel` |
+
+Mọi endpoint cần `X-Branch-Id`; phiếu về chi nhánh của hóa đơn gốc (chi nhánh khác → `404`). Quyền "chỉ của mình": `return.create` chỉ trả cho **hóa đơn do mình bán** (bắt buộc có `invoiceId`; trả không hóa đơn hoặc hóa đơn người khác → `403`); `invoice.view` chỉ thấy phiếu trả của hóa đơn mình bán.
 
 ```json
 // POST /sales-returns
 {
   "customerId": "…",
-  "invoiceId": "…?", // có thể trả không tham chiếu hóa đơn
-  "items": [
+  "invoiceId": "…?", // hóa đơn gốc (hoàn tất, cùng chi nhánh và khách); bỏ trống = trả không tham chiếu hóa đơn
+  "returnedAt": "…?", // mặc định bây giờ; không ở tương lai
+  "receivedById": "…?", // người nhận trả; mặc định = người đang đăng nhập
+  "note": null,
+  "items": [ // 1–500 dòng hàng hóa; trả hàng vẫn cho phép với hàng đã ngưng kinh doanh
     {
       "productId": "…",
       "qty": "36",
-      "returnPrice": "130000",
-      "restockPrice": "120000", // Giá nhập lại; có thể khác returnPrice
-      "restock": true, // true = nhập lại kho (không đổi giá vốn bình quân)
+      "returnPrice": "130000", // giá trả (Giá bán) trên 1 đơn vị, số nguyên đồng
+      "restockPrice": "120000", // Giá nhập lại, tùy chọn (mặc định = returnPrice)
+      "restock": true, // true (mặc định) = nhập lại kho; false = không nhập kho
       "note": "lô mới nhỏ hơn khách ko lấy"
     }
-  ],
-  "note": null
+  ]
 }
 ```
 
-Phiếu trả **luôn ghi giảm công nợ khách** (không có `settlement`/hoàn tiền trên phiếu; trả tiền mặt cho khách làm bằng phiếu chi ở Sổ quỹ). Hàng nhập lại kho không đổi giá vốn bình quân; chênh lệch `(returnPrice − restockPrice) × qty` tính vào lợi nhuận. Response có `code` (`TH001076`), `total`, `items[]`.
+- **Tiền:** `lineTotal = qty × returnPrice` (làm tròn đồng), `total = Σ lineTotal`. Gửi `lineTotal`/`total` → `400`.
+- **Công nợ:** tiền trả khách **luôn ghi giảm công nợ khách** tại chi nhánh (`−total`). Phiếu không có hoàn tiền/`settlement`; trả tiền mặt lại cho khách làm bằng phiếu chi ở Sổ quỹ.
+- **Kho:** dòng `restock` cộng lại tồn **nhưng KHÔNG đổi giá vốn bình quân** (cộng theo giá vốn hiện tại). Chênh lệch `(returnPrice − restockPrice) × qty` của các dòng nhập kho được tính vào lợi nhuận; chi tiết trả `priceDifference` (chỉ khi có `product.cost.view`). Dòng `restock = false` không đổi tồn (`restockPrice` = `null`).
+- **Có `invoiceId`:** mỗi mặt hàng, tổng trả (các phiếu trả hoàn tất + phiếu này) không vượt tổng đã bán trên hóa đơn (cộng các dòng cùng mặt hàng); vượt hoặc hàng không có trong hóa đơn → `422 RETURN_QTY_EXCEEDED` (`details[].field = items.N.qty`). **Giá trả (`returnPrice`) không được vượt giá bán thực của dòng trong hóa đơn** = (thành tiền dòng − phần giảm giá phiếu chia theo tỷ lệ tiền dòng) ÷ số lượng, làm tròn lên đồng (mặt hàng lặp nhiều dòng lấy giá cao nhất); vượt → `422 RETURN_PRICE_EXCEEDED` (`details[].field = items.N.returnPrice`), để trả hàng không làm nợ khách giảm nhiều hơn số khách thực phải trả. Hóa đơn đã hủy → `422 INVALID_STATE`; khác khách → `400`.
+- Phiếu đã hủy thì phần đã trả không còn được tính (trả lại được).
+
+**Hủy phiếu trả** (`return.cancel`, mặc định Kế toán): trừ lại tồn của các dòng đã nhập lại kho (không đủ tồn vì đã bán đi → `422 STOCK_NOT_ENOUGH`, không hủy được) và cộng lại công nợ khách; hủy hai lần → `422 INVALID_STATE`. Hóa đơn gốc chỉ hủy được sau khi các phiếu trả của nó đã hủy (mục 5.2).
+
+```json
+// SalesReturn (response)
+{
+  "id": "…", "code": "TH001076", "status": "completed", // completed | cancelled
+  "branchId": "…",
+  "customer": { "id": "…", "code": "KH000002", "name": "…", "phone": "…" },
+  "invoice": { "id": "…", "code": "HD016890" }, // null nếu trả không hóa đơn
+  "seller": { "id": "…", "fullName": "…" }, // người bán của hóa đơn gốc
+  "returnedAt": "…", "receivedBy": { "id": "…", "fullName": "…" },
+  "total": "82000", "totalQty": "8.000", "itemCount": 2,
+  "note": null,
+  "createdBy": { … }, "createdAt": "…", "updatedAt": "…", "cancelledAt": null, "cancelReason": null,
+  "items": [ // chỉ ở chi tiết
+    { "productId": "…", "code": "A", "name": "…", "qty": "6.000", "returnPrice": "13000", "restockPrice": "12000", "restock": true, "lineTotal": "78000", "note": null }
+  ],
+  "priceDifference": "6000" // chỉ ở chi tiết và khi có product.cost.view
+}
+```
+
+`?format=xlsx`: mỗi dòng hàng một dòng, tiêu đề như file `DanhSachChiTietTraHang` của KiotViet (`Tiền mặt`/`Chuyển khoản` luôn 0, `Giá nhập lại` là giá nhập lại của dòng).
 
 ---
 
