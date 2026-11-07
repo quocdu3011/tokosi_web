@@ -37,6 +37,7 @@ import { nextFreeDocumentCode } from '../../db/code-sequence.js';
 import { DB, type Database, type DbOrTx } from '../../db/database.module.js';
 import { partySearchExpr } from '../../db/schema/_search.js';
 import {
+  branches,
   customerBranchTerms,
   customerProfiles,
   customerVisits,
@@ -50,10 +51,16 @@ import { searchWhere } from '../../db/search.js';
 import { AuditService } from '../audit/audit.service.js';
 import { PermissionsService } from '../authorization/permissions.service.js';
 import { BranchAccessService } from '../branches/branch-access.service.js';
+import { dayRange } from '../purchasing/purchase-lines.js';
 import type {
   LedgerDto,
   LedgerQueryDto,
 } from '../suppliers/suppliers.dto.js';
+import { buildAging, buildStatementLines } from './customer-statement.js';
+import type {
+  CustomerAgingDto,
+  CustomerStatementDto,
+} from './customers-statement.dto.js';
 import {
   CUSTOMER_SORT_FIELDS,
   type CreateCustomerDto,
@@ -383,6 +390,52 @@ export class CustomersService {
       openingBalance: opening.toFixed(0),
       entries: lines,
       closingBalance: balance.toFixed(0),
+    };
+  }
+
+  /**
+   * Tuổi nợ của khách tại chi nhánh làm việc: các hóa đơn còn nợ (tính theo ngày hóa đơn, kèm hạn đến hạn nếu khách có
+   * kỳ hạn công nợ), tổng theo nhóm 0–30 / 31–60 / 61–90 / >90 ngày và phần nợ không gắn hóa đơn.
+   */
+  async aging(
+    user: AuthUser,
+    branchId: string,
+    id: string,
+  ): Promise<CustomerAgingDto> {
+    const [row] = await this.rowsQuery(this.db).where(this.byIds([id]));
+    if (!row) throw notFound();
+    await this.assertDebtVisible(user, row.c);
+    return buildAging(this.db, id, branchId);
+  }
+
+  /** Biên bản đối chiếu công nợ theo kỳ tại chi nhánh làm việc (dựng từ sổ công nợ). */
+  async statement(
+    user: AuthUser,
+    branchId: string,
+    id: string,
+    q: LedgerQueryDto,
+  ): Promise<CustomerStatementDto> {
+    const [row] = await this.rowsQuery(this.db).where(this.byIds([id]));
+    if (!row) throw notFound();
+    await this.assertDebtVisible(user, row.c);
+    const range = dayRange(q.from, q.to);
+    const [branch] = await this.db
+      .select({ id: branches.id, name: branches.name })
+      .from(branches)
+      .where(eq(branches.id, branchId));
+    const body = await buildStatementLines(this.db, id, branchId, range);
+    return {
+      customer: {
+        id: row.c.id,
+        code: row.c.code,
+        name: row.c.name,
+        phone: row.c.phone,
+        address: row.c.address,
+      },
+      branch: { id: branchId, name: branch?.name ?? '' },
+      from: q.from ?? null,
+      to: q.to ?? null,
+      ...body,
     };
   }
 

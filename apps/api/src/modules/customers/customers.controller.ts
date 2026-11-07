@@ -30,7 +30,14 @@ import {
 import { ParseIdPipe } from '../../common/parse-id.pipe.js';
 import { RequirePermission } from '../authorization/require-permission.decorator.js';
 import { RequireBranch } from '../branches/require-branch.decorator.js';
+import { xlsxFile } from '../purchasing/purchase-lines.js';
 import { LedgerDto, LedgerQueryDto } from '../suppliers/suppliers.dto.js';
+import { statementXlsx } from './customer-statement.js';
+import {
+  CustomerAgingDto,
+  CustomerStatementDto,
+  CustomerStatementQueryDto,
+} from './customers-statement.dto.js';
 import {
   CreateCustomerDto,
   CreateCustomerVisitDto,
@@ -139,6 +146,49 @@ export class CustomersController {
     @Query() query: LedgerQueryDto,
   ) {
     return this.customers.ledger(user, branchId, id, query);
+  }
+
+  @Get(':id/aging')
+  @RequirePermission('customer.view', 'debt.view')
+  @RequireBranch()
+  @ApiOperation({
+    summary: 'Tuổi nợ của khách tại chi nhánh làm việc',
+    description:
+      'Các hóa đơn còn nợ (cũ nhất trước) tính tuổi theo ngày hóa đơn kèm ngày đến hạn / quá hạn nếu khách có kỳ hạn công nợ; tổng theo nhóm 0–30, 31–60, 61–90, trên 90 ngày. `invoiceTotal + notAllocated = balance` (công nợ theo sổ): `notAllocated` là nợ không gắn hóa đơn (nợ đầu kỳ chuyển từ KiotViet, điều chỉnh, tiền khách trả trước chưa cấn). Cần customer.view và debt.view (chỉ "của mình" thì chỉ khách mình phụ trách).',
+  })
+  @ApiOkResponse({ type: CustomerAgingDto })
+  @ApiNotFoundResponse({ description: 'Không tìm thấy khách hàng' })
+  @ApiForbiddenResponse({ description: 'Không được xem công nợ của khách này' })
+  aging(
+    @CurrentUser() user: AuthUser,
+    @WorkingBranchId() branchId: string,
+    @Param('id', ParseIdPipe) id: string,
+  ) {
+    return this.customers.aging(user, branchId, id);
+  }
+
+  @Get(':id/statement')
+  @RequirePermission('customer.view', 'debt.view')
+  @RequireBranch()
+  @ApiOperation({
+    summary: 'Biên bản đối chiếu công nợ theo kỳ',
+    description:
+      'Nợ đầu kỳ, các chứng từ phát sinh trong kỳ (hóa đơn gộp tổng và phần thu ngay lúc xuất thành một dòng, trả hàng, thu nợ, hoàn tiền, hủy chứng từ), cộng phát sinh và nợ cuối kỳ của chi nhánh làm việc; `closingBalance` bằng sổ công nợ cùng kỳ. `?format=xlsx` tải Excel. `from` / `to` dạng YYYY-MM-DD (giờ Việt Nam, gồm cả ngày).',
+  })
+  @ApiOkResponse({ type: CustomerStatementDto })
+  @ApiNotFoundResponse({ description: 'Không tìm thấy khách hàng' })
+  @ApiForbiddenResponse({ description: 'Không được xem công nợ của khách này' })
+  async statement(
+    @CurrentUser() user: AuthUser,
+    @WorkingBranchId() branchId: string,
+    @Param('id', ParseIdPipe) id: string,
+    @Query() query: CustomerStatementQueryDto,
+  ) {
+    const statement = await this.customers.statement(user, branchId, id, query);
+    if (query.format === 'xlsx') {
+      return xlsxFile(await statementXlsx(statement), 'doi-chieu-cong-no');
+    }
+    return statement;
   }
 
   @Post()

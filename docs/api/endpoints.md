@@ -692,7 +692,67 @@ Server từ chối trường lạ (`400`), ví dụ gửi công nợ hay tổng 
 // GET /customers/:id/visits → [{ "id": "…", "visitedOn": "2026-11-03", "note": "…", "createdByName": "…", "createdAt": "…" }]
 ```
 
-**Còn lại trong bản nháp (chưa triển khai):** `GET /customers/:id/orders|invoices|sales-returns|aging|statement` làm cùng Đơn hàng. **Thu nợ nhanh `POST /customers/:id/receipts` đã có** (mục 6).
+**Tuổi nợ** — `GET /customers/:id/aging` (cần `customer.view` + `debt.view`; "chỉ của mình" thì chỉ khách mình phụ trách, khách khác `403`; theo chi nhánh làm việc):
+
+```json
+{
+  "branchId": "…",
+  "asOf": "2026-11-07", // hôm nay theo giờ Việt Nam
+  "invoices": [ // hóa đơn hoàn tất còn nợ, cũ nhất trước
+    {
+      "invoiceId": "…", "code": "HD016890", "invoicedAt": "…",
+      "total": "20000", "paid": "5000", "returned": "0", "outstanding": "15000",
+      "ageDays": 10, // số ngày lịch từ NGÀY HÓA ĐƠN đến hôm nay
+      "dueDate": "2026-11-12", // ngày hóa đơn + kỳ hạn công nợ của khách tại chi nhánh; null nếu không có kỳ hạn
+      "overdue": false // đã qua dueDate; không có kỳ hạn thì luôn false
+    }
+  ],
+  "buckets": { "d0_30": "15000", "d31_60": "20000", "d61_90": "40000", "over90": "25000" }, // tổng còn nợ theo ageDays
+  "invoiceTotal": "100000", // Σ còn nợ của các hóa đơn
+  "balance": "142000", // nợ theo sổ công nợ (= closingBalance của /ledger)
+  "notAllocated": "42000" // = balance − invoiceTotal: nợ KHÔNG gắn hóa đơn (nợ đầu kỳ chuyển từ KiotViet, điều chỉnh, tiền khách trả trước chưa cấn — số âm)
+}
+```
+
+**Sao kê / biên bản đối chiếu công nợ** — `GET /customers/:id/statement?from&to` (quyền như tuổi nợ; `from`/`to` dạng `YYYY-MM-DD`, giờ Việt Nam, gồm cả ngày; ngày sai hoặc `to` < `from` → `400`; `?format=xlsx` tải Excel với cột `Ngày`, `Chứng từ`, `Diễn giải`, `Phát sinh tăng`, `Phát sinh giảm`, `Còn nợ`, có dòng "Nợ đầu kỳ", "Cộng phát sinh", "Nợ cuối kỳ"):
+
+```json
+{
+  "customer": { "id": "…", "code": "KH000010", "name": "…", "phone": "…", "address": "…" },
+  "branch": { "id": "…", "name": "Chi nhánh Sài Gòn" },
+  "from": "2026-11-01", "to": "2026-11-30",
+  "openingBalance": "100000", // tổng bút toán trước `from`
+  "lines": [
+    {
+      "occurredAt": "…",
+      "kind": "invoice", // opening | invoice | invoice_cancel | sales_return | sales_return_cancel | receipt | refund | cash_cancel | adjustment
+      "refType": "invoice", "refId": "…", "refCode": "HD016890",
+      "description": "Hóa đơn HD016890",
+      "increase": "20000", // phát sinh tăng nợ (≥ 0); hóa đơn: tổng khách cần trả
+      "decrease": "5000", // phát sinh giảm nợ (≥ 0); hóa đơn: phần THU NGAY lúc xuất
+      "balance": "115000", // còn nợ sau dòng này
+      "note": null
+    }
+  ],
+  "totals": { "increase": "…", "decrease": "…" },
+  "closingBalance": "…" // = openingBalance + tăng − giảm = closingBalance của /ledger cùng kỳ
+}
+```
+
+Sao kê dựng từ sổ công nợ (nguồn duy nhất của nợ): bút toán xuất hóa đơn và thu ngay của cùng một hóa đơn gộp thành **một dòng**; mỗi chứng từ khác một dòng (hủy hóa đơn / hủy phiếu trả hàng / hủy phiếu quỹ có dòng riêng, `decrease` hoặc `increase` là phần đảo).
+
+**Lịch sử trong trang chi tiết khách** — không có endpoint riêng, dùng các danh sách có sẵn lọc theo khách (mỗi danh sách đã tự áp quyền và phạm vi "chỉ của mình"):
+
+| Tab | Gọi | Quyền |
+| --- | --- | --- |
+| Đặt hàng | `GET /orders?customerId=` | `order.view` |
+| Hóa đơn (kèm còn nợ) | `GET /invoices?customerId=` (`hasDebt=true` cho hóa đơn còn nợ) | `invoice.view` |
+| Trả hàng | `GET /sales-returns?customerId=` | `invoice.view` |
+| Thu nợ / hoàn tiền | `GET /cash-transactions?partyType=customer&partyId=` | `cash.view` |
+| Sổ công nợ | `GET /customers/:id/ledger` | `customer.view` + `debt.view` |
+| Tuổi nợ, đối chiếu | `GET /customers/:id/aging`, `/statement` | `customer.view` + `debt.view` |
+
+Sale có `invoice.view` "chỉ của mình" chỉ thấy đơn / hóa đơn / phiếu trả do mình bán của khách đó; frontend ẩn tab theo `can(me, '<mã quyền>')`.
 
 ---
 

@@ -1162,6 +1162,124 @@
         ]
       }
     },
+    "/api/v1/customers/{id}/aging": {
+      "get": {
+        "description": "Các hóa đơn còn nợ (cũ nhất trước) tính tuổi theo ngày hóa đơn kèm ngày đến hạn / quá hạn nếu khách có kỳ hạn công nợ; tổng theo nhóm 0–30, 31–60, 61–90, trên 90 ngày. `invoiceTotal + notAllocated = balance` (công nợ theo sổ): `notAllocated` là nợ không gắn hóa đơn (nợ đầu kỳ chuyển từ KiotViet, điều chỉnh, tiền khách trả trước chưa cấn). Cần customer.view và debt.view (chỉ \"của mình\" thì chỉ khách mình phụ trách).",
+        "operationId": "CustomersController_aging",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerAgingDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Không được xem công nợ của khách này"
+          },
+          "404": {
+            "description": "Không tìm thấy khách hàng"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tuổi nợ của khách tại chi nhánh làm việc",
+        "tags": [
+          "Khách hàng"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}/statement": {
+      "get": {
+        "description": "Nợ đầu kỳ, các chứng từ phát sinh trong kỳ (hóa đơn gộp tổng và phần thu ngay lúc xuất thành một dòng, trả hàng, thu nợ, hoàn tiền, hủy chứng từ), cộng phát sinh và nợ cuối kỳ của chi nhánh làm việc; `closingBalance` bằng sổ công nợ cùng kỳ. `?format=xlsx` tải Excel. `from` / `to` dạng YYYY-MM-DD (giờ Việt Nam, gồm cả ngày).",
+        "operationId": "CustomersController_statement",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Từ ngày (giờ Việt Nam, tính cả ngày này); bỏ trống = từ đầu. Dạng YYYY-MM-DD",
+            "schema": {
+              "example": "2026-11-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Đến ngày (giờ Việt Nam, tính cả ngày này); bỏ trống = đến hiện tại",
+            "schema": {
+              "example": "2026-11-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "description": "xlsx = tải Excel biên bản đối chiếu theo đúng kỳ",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "xlsx"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerStatementDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Không được xem công nợ của khách này"
+          },
+          "404": {
+            "description": "Không tìm thấy khách hàng"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Biên bản đối chiếu công nợ theo kỳ",
+        "tags": [
+          "Khách hàng"
+        ]
+      }
+    },
     "/api/v1/customers/{id}/branches/{branchId}/terms": {
       "put": {
         "description": "Riêng từng chi nhánh. Cả hai null = không giới hạn (xóa thiết lập). Cần customer.edit và debt.view; chi nhánh phải nằm trong chi nhánh người dùng được phép.",
@@ -6499,6 +6617,322 @@
           "address",
           "priceLevel",
           "salesOwner"
+        ]
+      },
+      "CustomerAgingInvoiceDto": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "HD016890"
+          },
+          "invoicedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "total": {
+            "type": "string",
+            "description": "Khách cần trả"
+          },
+          "paid": {
+            "type": "string",
+            "description": "Đã trả = thu lúc xuất + cấn trừ thu nợ về sau"
+          },
+          "returned": {
+            "type": "string",
+            "description": "Tổng phiếu trả hàng hoàn tất gắn hóa đơn"
+          },
+          "outstanding": {
+            "type": "string",
+            "description": "Còn nợ (> 0)"
+          },
+          "ageDays": {
+            "type": "number",
+            "description": "Số ngày lịch (giờ Việt Nam) từ ngày hóa đơn đến hôm nay"
+          },
+          "dueDate": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-11-18",
+            "description": "Ngày đến hạn = ngày hóa đơn + kỳ hạn công nợ của khách tại chi nhánh; null nếu khách không có kỳ hạn"
+          },
+          "overdue": {
+            "type": "boolean",
+            "description": "true khi đã qua ngày đến hạn (không có kỳ hạn thì luôn false)"
+          }
+        },
+        "required": [
+          "invoiceId",
+          "code",
+          "invoicedAt",
+          "total",
+          "paid",
+          "returned",
+          "outstanding",
+          "ageDays",
+          "dueDate",
+          "overdue"
+        ]
+      },
+      "CustomerAgingBucketsDto": {
+        "type": "object",
+        "properties": {
+          "d0_30": {
+            "type": "string",
+            "description": "0–30 ngày"
+          },
+          "d31_60": {
+            "type": "string",
+            "description": "31–60 ngày"
+          },
+          "d61_90": {
+            "type": "string",
+            "description": "61–90 ngày"
+          },
+          "over90": {
+            "type": "string",
+            "description": "Trên 90 ngày"
+          }
+        },
+        "required": [
+          "d0_30",
+          "d31_60",
+          "d61_90",
+          "over90"
+        ]
+      },
+      "CustomerAgingDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "description": "Chi nhánh làm việc; mỗi chi nhánh một bộ số riêng"
+          },
+          "asOf": {
+            "type": "string",
+            "example": "2026-11-07",
+            "description": "Ngày tính (giờ Việt Nam)"
+          },
+          "invoices": {
+            "description": "Hóa đơn còn nợ, cũ nhất trước",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerAgingInvoiceDto"
+            }
+          },
+          "buckets": {
+            "description": "Tổng còn nợ của hóa đơn theo nhóm tuổi (tính theo ngày hóa đơn)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerAgingBucketsDto"
+              }
+            ]
+          },
+          "invoiceTotal": {
+            "type": "string",
+            "description": "Σ còn nợ của các hóa đơn"
+          },
+          "balance": {
+            "type": "string",
+            "description": "Nợ của khách tại chi nhánh theo sổ công nợ (bằng `closingBalance` của sổ)"
+          },
+          "notAllocated": {
+            "type": "string",
+            "description": "balance − invoiceTotal: phần nợ không gắn hóa đơn nào, gồm nợ đầu kỳ chuyển từ KiotViet, điều chỉnh và tiền khách trả trước chưa cấn (số âm)"
+          }
+        },
+        "required": [
+          "branchId",
+          "asOf",
+          "invoices",
+          "buckets",
+          "invoiceTotal",
+          "balance",
+          "notAllocated"
+        ]
+      },
+      "CustomerStatementPartyDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "phone",
+          "address"
+        ]
+      },
+      "CustomerStatementBranchDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "CustomerStatementLineDto": {
+        "type": "object",
+        "properties": {
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "opening",
+              "invoice",
+              "invoice_cancel",
+              "sales_return",
+              "sales_return_cancel",
+              "receipt",
+              "refund",
+              "cash_cancel",
+              "adjustment"
+            ]
+          },
+          "refType": {
+            "type": "string",
+            "nullable": true,
+            "description": "Loại chứng từ gốc: invoice, sales_return, cash_transaction…"
+          },
+          "refId": {
+            "type": "string",
+            "nullable": true
+          },
+          "refCode": {
+            "type": "string",
+            "nullable": true,
+            "example": "HD016890"
+          },
+          "description": {
+            "type": "string",
+            "example": "Hóa đơn HD016890"
+          },
+          "increase": {
+            "type": "string",
+            "description": "Phát sinh tăng nợ (số dương hoặc 0). Hóa đơn: tổng tiền khách cần trả"
+          },
+          "decrease": {
+            "type": "string",
+            "description": "Phát sinh giảm nợ (số dương hoặc 0). Hóa đơn: phần thu ngay lúc xuất"
+          },
+          "balance": {
+            "type": "string",
+            "description": "Còn nợ sau dòng này (cộng dồn từ nợ đầu kỳ)"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "occurredAt",
+          "kind",
+          "refType",
+          "refId",
+          "refCode",
+          "description",
+          "increase",
+          "decrease",
+          "balance",
+          "note"
+        ]
+      },
+      "CustomerStatementTotalsDto": {
+        "type": "object",
+        "properties": {
+          "increase": {
+            "type": "string"
+          },
+          "decrease": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "increase",
+          "decrease"
+        ]
+      },
+      "CustomerStatementDto": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "$ref": "#/components/schemas/CustomerStatementPartyDto"
+          },
+          "branch": {
+            "$ref": "#/components/schemas/CustomerStatementBranchDto"
+          },
+          "from": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-11-01"
+          },
+          "to": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-11-30"
+          },
+          "openingBalance": {
+            "type": "string",
+            "description": "Nợ trước ngày `from` (0 nếu không có `from`)"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerStatementLineDto"
+            }
+          },
+          "totals": {
+            "description": "Cộng phát sinh trong kỳ",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerStatementTotalsDto"
+              }
+            ]
+          },
+          "closingBalance": {
+            "type": "string",
+            "description": "Nợ cuối kỳ = nợ đầu kỳ + tăng − giảm; bằng `closingBalance` của sổ công nợ cùng kỳ"
+          }
+        },
+        "required": [
+          "customer",
+          "branch",
+          "from",
+          "to",
+          "openingBalance",
+          "lines",
+          "totals",
+          "closingBalance"
         ]
       },
       "CustomerProfileInputDto": {

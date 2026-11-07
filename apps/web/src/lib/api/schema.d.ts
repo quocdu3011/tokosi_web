@@ -377,6 +377,46 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/customers/{id}/aging': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Tuổi nợ của khách tại chi nhánh làm việc
+     * @description Các hóa đơn còn nợ (cũ nhất trước) tính tuổi theo ngày hóa đơn kèm ngày đến hạn / quá hạn nếu khách có kỳ hạn công nợ; tổng theo nhóm 0–30, 31–60, 61–90, trên 90 ngày. `invoiceTotal + notAllocated = balance` (công nợ theo sổ): `notAllocated` là nợ không gắn hóa đơn (nợ đầu kỳ chuyển từ KiotViet, điều chỉnh, tiền khách trả trước chưa cấn). Cần customer.view và debt.view (chỉ "của mình" thì chỉ khách mình phụ trách).
+     */
+    get: operations['CustomersController_aging'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/customers/{id}/statement': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Biên bản đối chiếu công nợ theo kỳ
+     * @description Nợ đầu kỳ, các chứng từ phát sinh trong kỳ (hóa đơn gộp tổng và phần thu ngay lúc xuất thành một dòng, trả hàng, thu nợ, hoàn tiền, hủy chứng từ), cộng phát sinh và nợ cuối kỳ của chi nhánh làm việc; `closingBalance` bằng sổ công nợ cùng kỳ. `?format=xlsx` tải Excel. `from` / `to` dạng YYYY-MM-DD (giờ Việt Nam, gồm cả ngày).
+     */
+    get: operations['CustomersController_statement'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/customers/{id}/branches/{branchId}/terms': {
     parameters: {
       query?: never;
@@ -1829,6 +1869,118 @@ export interface components {
       creditLimit?: string | null;
       /** @description Hạn mức còn lại = hạn mức − công nợ (có thể âm = đã vượt); null nếu không giới hạn */
       creditAvailable?: string | null;
+    };
+    CustomerAgingInvoiceDto: {
+      invoiceId: string;
+      /** @example HD016890 */
+      code: string;
+      /** Format: date-time */
+      invoicedAt: string;
+      /** @description Khách cần trả */
+      total: string;
+      /** @description Đã trả = thu lúc xuất + cấn trừ thu nợ về sau */
+      paid: string;
+      /** @description Tổng phiếu trả hàng hoàn tất gắn hóa đơn */
+      returned: string;
+      /** @description Còn nợ (> 0) */
+      outstanding: string;
+      /** @description Số ngày lịch (giờ Việt Nam) từ ngày hóa đơn đến hôm nay */
+      ageDays: number;
+      /**
+       * @description Ngày đến hạn = ngày hóa đơn + kỳ hạn công nợ của khách tại chi nhánh; null nếu khách không có kỳ hạn
+       * @example 2026-11-18
+       */
+      dueDate: string | null;
+      /** @description true khi đã qua ngày đến hạn (không có kỳ hạn thì luôn false) */
+      overdue: boolean;
+    };
+    CustomerAgingBucketsDto: {
+      /** @description 0–30 ngày */
+      d0_30: string;
+      /** @description 31–60 ngày */
+      d31_60: string;
+      /** @description 61–90 ngày */
+      d61_90: string;
+      /** @description Trên 90 ngày */
+      over90: string;
+    };
+    CustomerAgingDto: {
+      /** @description Chi nhánh làm việc; mỗi chi nhánh một bộ số riêng */
+      branchId: string;
+      /**
+       * @description Ngày tính (giờ Việt Nam)
+       * @example 2026-11-07
+       */
+      asOf: string;
+      /** @description Hóa đơn còn nợ, cũ nhất trước */
+      invoices: components['schemas']['CustomerAgingInvoiceDto'][];
+      /** @description Tổng còn nợ của hóa đơn theo nhóm tuổi (tính theo ngày hóa đơn) */
+      buckets: components['schemas']['CustomerAgingBucketsDto'];
+      /** @description Σ còn nợ của các hóa đơn */
+      invoiceTotal: string;
+      /** @description Nợ của khách tại chi nhánh theo sổ công nợ (bằng `closingBalance` của sổ) */
+      balance: string;
+      /** @description balance − invoiceTotal: phần nợ không gắn hóa đơn nào, gồm nợ đầu kỳ chuyển từ KiotViet, điều chỉnh và tiền khách trả trước chưa cấn (số âm) */
+      notAllocated: string;
+    };
+    CustomerStatementPartyDto: {
+      id: string;
+      code: string;
+      name: string;
+      phone: string | null;
+      address: string | null;
+    };
+    CustomerStatementBranchDto: {
+      id: string;
+      name: string;
+    };
+    CustomerStatementLineDto: {
+      /** Format: date-time */
+      occurredAt: string;
+      /** @enum {string} */
+      kind:
+        | 'opening'
+        | 'invoice'
+        | 'invoice_cancel'
+        | 'sales_return'
+        | 'sales_return_cancel'
+        | 'receipt'
+        | 'refund'
+        | 'cash_cancel'
+        | 'adjustment';
+      /** @description Loại chứng từ gốc: invoice, sales_return, cash_transaction… */
+      refType: string | null;
+      refId: string | null;
+      /** @example HD016890 */
+      refCode: string | null;
+      /** @example Hóa đơn HD016890 */
+      description: string;
+      /** @description Phát sinh tăng nợ (số dương hoặc 0). Hóa đơn: tổng tiền khách cần trả */
+      increase: string;
+      /** @description Phát sinh giảm nợ (số dương hoặc 0). Hóa đơn: phần thu ngay lúc xuất */
+      decrease: string;
+      /** @description Còn nợ sau dòng này (cộng dồn từ nợ đầu kỳ) */
+      balance: string;
+      note: string | null;
+    };
+    CustomerStatementTotalsDto: {
+      increase: string;
+      decrease: string;
+    };
+    CustomerStatementDto: {
+      customer: components['schemas']['CustomerStatementPartyDto'];
+      branch: components['schemas']['CustomerStatementBranchDto'];
+      /** @example 2026-11-01 */
+      from: string | null;
+      /** @example 2026-11-30 */
+      to: string | null;
+      /** @description Nợ trước ngày `from` (0 nếu không có `from`) */
+      openingBalance: string;
+      lines: components['schemas']['CustomerStatementLineDto'][];
+      /** @description Cộng phát sinh trong kỳ */
+      totals: components['schemas']['CustomerStatementTotalsDto'];
+      /** @description Nợ cuối kỳ = nợ đầu kỳ + tăng − giảm; bằng `closingBalance` của sổ công nợ cùng kỳ */
+      closingBalance: string;
     };
     CustomerProfileInputDto: {
       warehouseLocation?: string | null;
@@ -3912,6 +4064,83 @@ export interface operations {
         content: {
           'application/json': components['schemas']['LedgerDto'];
         };
+      };
+      /** @description Không tìm thấy khách hàng */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  CustomersController_aging: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CustomerAgingDto'];
+        };
+      };
+      /** @description Không được xem công nợ của khách này */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Không tìm thấy khách hàng */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  CustomersController_statement: {
+    parameters: {
+      query?: {
+        /** @description Từ ngày (giờ Việt Nam, tính cả ngày này); bỏ trống = từ đầu. Dạng YYYY-MM-DD */
+        from?: string;
+        /** @description Đến ngày (giờ Việt Nam, tính cả ngày này); bỏ trống = đến hiện tại */
+        to?: string;
+        /** @description xlsx = tải Excel biên bản đối chiếu theo đúng kỳ */
+        format?: 'xlsx';
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CustomerStatementDto'];
+        };
+      };
+      /** @description Không được xem công nợ của khách này */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Không tìm thấy khách hàng */
       404: {
